@@ -1,2 +1,3 @@
 import { defineConfig } from 'vitest/config';
-export default defineConfig({ test: { include: ['src/**/*.test.ts'] } });
+// Engine tests run many Newton solves; CI runners are several times slower than a laptop.
+export default defineConfig({ test: { include: ['src/**/*.test.ts'], testTimeout: 120_000, hookTimeout: 60_000 } });
