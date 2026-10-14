@@ -1,6 +1,6 @@
 # Fly.io configuration: a single tiny nginx machine serving the static PWA.
 app = "gas-turbine-lab"
-primary_region = "yul"
+primary_region = "yyz"
 
 [build]
   dockerfile = "Dockerfile"
