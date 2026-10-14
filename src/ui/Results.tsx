@@ -7,6 +7,9 @@ import { Diagrams } from '../viz/Diagrams';
 import { MapCharts } from '../viz/MapChart';
 import { exportStationsCsv } from './csv';
 import { estimateWeight } from '../engine/weight';
+import { estimateNoise, LtoResult } from '../engine/certification';
+import { request } from '../engine/client';
+import { useState } from 'react';
 
 export function Results({ store, result }: { store: Store; result: EngineResult }) {
   const p = result.perf;
@@ -74,6 +77,8 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
           </div>
         </div>
       ); } catch { return null; } })()}
+
+      <Certification store={store} result={result} />
 
       <div className="section">
         <h3>Emissions & noise <span className="hint">P3–T3 correlations, Lighthill jet noise · estimates</span></h3>
@@ -157,4 +162,44 @@ function ValueRow({ k, v, units = 'SI' }: { k: string; v: number; units?: 'SI' |
   else if (k === 'W') text = j(u.massflow(v, 1));
   label = label.replace(/_/g, ' ');
   return <><span className="k">{label}</span><span className="v">{text}</span></>;
+}
+
+function Certification({ store, result }: { store: Store; result: EngineResult }) {
+  const [lto, setLto] = useState<LtoResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const noise = (() => { try { return estimateNoise(result); } catch { return null; } })();
+  const run = () => { setBusy(true); setErr(null); request<LtoResult>({ type: 'lto', inputs: { ...store.state.inputs, chemistry: 'frozen' } }).then((r) => { setLto(r); setBusy(false); }).catch((e) => { setErr(e.message); setBusy(false); }); };
+  if (result.inputs.arch === 'turboprop') return null;
+  return (
+    <div className="section">
+      <h3>Certification <span className="hint">ICAO LTO cycle · CAEP/8 NOx · Heidmann fan noise · estimates</span></h3>
+      {noise && (
+        <div className="kv" style={{ marginBottom: 8 }}>
+          <span className="k">Fan inlet broadband · tone</span><span className="v">{fmt(noise.fanInlet_dB, 0)} · {fmt(noise.fanTone_dB, 0)} dB at 1 m (tip Mach {fmt(noise.tipMach, 2)})</span>
+          <span className="k">Jet mixing</span><span className="v">{fmt(noise.jet_dB, 0)} dB</span>
+          <span className="k">Total OASPL at 1 m · 100 m</span><span className="v">{fmt(noise.total_dB, 0)} · {fmt(noise.total_dB - 40, 0)} dB</span>
+          {noise.notes.map((n, k) => <span key={k} style={{ gridColumn: '1 / -1', color: 'var(--text-muted)', fontSize: 12 }}>{n}</span>)}
+        </div>
+      )}
+      <div className="row"><button className="btn" onClick={run} disabled={busy}>{busy ? 'Running LTO cycle…' : 'Run ICAO LTO emissions cycle'}</button>{err && <span style={{ color: 'var(--bad)' }}>{err}</span>}</div>
+      {lto && (
+        <>
+          {!lto.applicable && <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Rated thrust below 26.7 kN: the Annex 16 limits do not apply, shown for reference.</div>}
+          {lto.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
+          <div className="kv" style={{ marginTop: 8 }}>
+            <span className="k">Rated thrust Foo · OPR</span><span className="v">{fmt(lto.Foo_kN, 1)} kN · {fmt(lto.OPR, 1)}</span>
+            <span className="k">NOx Dp/Foo</span><span className="v" style={{ color: lto.margins.NOx < 0 ? 'var(--bad)' : undefined }}>{fmt(lto.DpFoo.NOx, 1)} g/kN · limit {fmt(lto.limits.NOx, 1)} · margin {fmt(lto.margins.NOx, 0)} %</span>
+            <span className="k">CO Dp/Foo</span><span className="v" style={{ color: lto.margins.CO < 0 ? 'var(--bad)' : undefined }}>{fmt(lto.DpFoo.CO, 1)} g/kN · limit 118 · margin {fmt(lto.margins.CO, 0)} %</span>
+            <span className="k">HC Dp/Foo</span><span className="v" style={{ color: lto.margins.HC < 0 ? 'var(--bad)' : undefined }}>{fmt(lto.DpFoo.HC, 2)} g/kN · limit 19.6 · margin {fmt(lto.margins.HC, 0)} %</span>
+            <span className="k">LTO fuel</span><span className="v">{fmt(lto.fuel_kg, 0)} kg</span>
+          </div>
+          <table className="stations" style={{ marginTop: 8 }}>
+            <thead><tr><th>Mode</th><th>Thrust</th><th>Time</th><th>Fn kN</th><th>Wf kg/s</th><th>EI NOx</th><th>EI CO</th><th>EI HC</th><th>T3 K</th></tr></thead>
+            <tbody>{lto.modes.map((m) => <tr key={m.name} style={{ color: m.converged ? undefined : 'var(--bad)' }}><td>{m.name}</td><td className="num">{fmt(m.thrustFrac * 100, 0)} %</td><td className="num">{fmt(m.time_s / 60, 1)} min</td><td className="num">{fmt(m.Fn / 1000, 1)}</td><td className="num">{fmt(m.Wf, 3)}</td><td className="num">{fmt(m.EI_NOx, 1)}</td><td className="num">{fmt(m.EI_CO, 1)}</td><td className="num">{fmt(m.EI_HC, 2)}</td><td className="num">{fmt(m.T3, 0)}</td></tr>)}</tbody>
+          </table>
+        </>
+      )}
+    </div>
+  );
 }

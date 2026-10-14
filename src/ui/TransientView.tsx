@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Store } from '../state/store';
 import { request } from '../engine/client';
-import { TransientResult, TransientSample, FuelSchedule, StartInputs, Controller, DEFAULT_CONTROLLER } from '../engine/transient';
+import { TransientResult, TransientSample, FuelSchedule, StartInputs, Controller, DEFAULT_CONTROLLER, ThermalInputs, DEFAULT_THERMAL } from '../engine/transient';
 import { LineChart, Series } from '../viz/charts';
 import { fmt } from './format';
 import { MapTrajectory } from '../viz/MapChart';
@@ -12,6 +12,7 @@ export function TransientView({ store }: { store: Store }) {
   const inputs = store.state.inputs;
   const [sch, setSch] = useState<FuelSchedule>({ ...DEFAULT, T4start: Math.round(inputs.burner.T4_K * 0.75) });
   const [duration, setDuration] = useState(8);
+  const [th, setTh] = useState<ThermalInputs>({ ...DEFAULT_THERMAL });
   const [ctl, setCtl] = useState<Controller>({ ...DEFAULT_CONTROLLER, target: inputs.arch === 'turbofan' ? 0.95 : 0.98 });
   const [start, setStart] = useState<StartInputs>({ enabled: false, starterTorque_Nm: Math.round(inputs.inertia.HP * 60), starterCutout: 0.45, lightOffSpeed: 0.18, lightOffT3min_K: 290, lightOffFuelFrac: 0.06, frictionPower_W: Math.round(inputs.flight.W_kgs * 150) });
   const [samples, setSamples] = useState<TransientSample[]>([]);
@@ -20,7 +21,7 @@ export function TransientView({ store }: { store: Store }) {
   const [error, setError] = useState<string | null>(null);
   const run = () => {
     setBusy(true); setError(null); setResult(null); setSamples([]);
-    request<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start, controller: ctl } }, (p: TransientSample[]) => setSamples(p))
+    request<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start, controller: ctl, thermal: th } }, (p: TransientSample[]) => setSamples(p))
       .then((r) => { setResult(r); setSamples(r.samples); setBusy(false); })
       .catch((e) => { setError(e.message); setBusy(false); });
   };
@@ -72,6 +73,20 @@ export function TransientView({ store }: { store: Store }) {
         <label>bleed valve open below N2 <input className="num" type="number" aria-label="Bleed valve threshold" style={{ width: 55 }} value={ctl.bleedValve.openBelowN2} step={0.01} onChange={(e) => setCtl({ ...ctl, bleedValve: { ...ctl.bleedValve, openBelowN2: +e.target.value } })} /> × design, {' '}<input className="num" type="number" aria-label="Bleed valve fraction" style={{ width: 55 }} value={ctl.bleedValve.frac} step={0.01} onChange={(e) => setCtl({ ...ctl, bleedValve: { ...ctl.bleedValve, frac: +e.target.value } })} /> of core flow</label>
         <label>VSV gain <input className="num" type="number" aria-label="VSV gain" style={{ width: 55 }} value={ctl.vsvGain} step={0.05} onChange={(e) => setCtl({ ...ctl, vsvGain: +e.target.value })} /></label>
       </div>
+      <div className="explore-controls" style={{ borderTop: 0 }}>
+        <label className="toggle"><input type="checkbox" checked={th.enabled} onChange={(e) => setTh({ ...th, enabled: e.target.checked })} /> heat soak &amp; tip clearance</label>
+        {th.enabled && (
+          <>
+            <label>τ casing <input className="num" type="number" aria-label="Casing time constant" style={{ width: 55 }} value={th.tauCasing_s} step={1} onChange={(e) => setTh({ ...th, tauCasing_s: +e.target.value })} /> s</label>
+            <label>τ disc <input className="num" type="number" aria-label="Disc time constant" style={{ width: 55 }} value={th.tauDisc_s} step={5} onChange={(e) => setTh({ ...th, tauDisc_s: +e.target.value })} /> s</label>
+            <label>cold clearance <input className="num" type="number" aria-label="Cold clearance" style={{ width: 55 }} value={th.coldClearance_mm} step={0.1} onChange={(e) => setTh({ ...th, coldClearance_mm: +e.target.value })} /> mm</label>
+            <label>blade height <input className="num" type="number" aria-label="Blade height" style={{ width: 55 }} value={th.bladeHeight_mm} step={1} onChange={(e) => setTh({ ...th, bladeHeight_mm: +e.target.value })} /> mm</label>
+            <label>casing radius <input className="num" type="number" aria-label="Casing radius" style={{ width: 60 }} value={th.rCasing_mm} step={10} onChange={(e) => setTh({ ...th, rCasing_mm: +e.target.value })} /> mm</label>
+            <label>centrifugal growth <input className="num" type="number" aria-label="Centrifugal growth" style={{ width: 55 }} value={th.centrifugalGrowth_mm} step={0.1} onChange={(e) => setTh({ ...th, centrifugalGrowth_mm: +e.target.value })} /> mm</label>
+            <label>Δη per δ/h <input className="num" type="number" aria-label="Efficiency per clearance" style={{ width: 55 }} value={th.effPerClearance} step={0.1} onChange={(e) => setTh({ ...th, effPerClearance: +e.target.value })} /></label>
+          </>
+        )}
+      </div>
       {result?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {samples.length > 1 && (
         <>
@@ -90,6 +105,12 @@ export function TransientView({ store }: { store: Store }) {
             <LineChart title="Net thrust" series={[s((x) => x.Fn / 1000, 'thrust')]} xLabel="time (s)" yLabel="kN" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
             <LineChart title="Surge margins" series={comps.map((c, i) => s((x) => x.SM[c], c.toUpperCase(), i))} xLabel="time (s)" yLabel="%" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
             <LineChart title="Turbine inlet and exit temperature" series={[s((x) => x.T4, 'T4', 1), s((x) => x.T5, 'T5', 0)]} xLabel="time (s)" yLabel="K" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
+            {th.enabled && samples[0]?.clearance_mm !== undefined && (
+              <>
+                <LineChart title="Metal temperatures" series={[s((x) => x.Tcasing ?? NaN, 'casing', 1), s((x) => x.Tdisc ?? NaN, 'disc', 0)]} xLabel="time (s)" yLabel="K" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
+                <LineChart title="Tip clearance and efficiency penalty" sub="HP compressor; efficiency delta relative to the design clearance" series={[s((x) => x.clearance_mm ?? NaN, 'clearance (mm)', 0), s((x) => 100 * (x.effDeltaHPC ?? 0), 'Δη (%)', 1)]} xLabel="time (s)" yLabel="" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
+              </>
+            )}
             <MapTrajectory design={inputs} samples={samples} />
           </div>
         </>
