@@ -1,5 +1,5 @@
 import { Gas } from './gas';
-import { Flow, staticFromMN, staticFromPs, StaticState } from './flow';
+import { Flow, staticFromMN, staticFromPs, staticFromArea, totalFromStatic, StaticState } from './flow';
 
 export interface CompressorOut {
   out: Flow;
@@ -131,4 +131,78 @@ export function nozzle(inp: Flow, Pamb: number, type: 'CV' | 'CD', Cv: number): 
   const throat = choked ? sonic : exit;
   const Fg = inp.W * exit.V * Cv + (exit.Ps - Pamb) * exit.A;
   return { exit, throat, choked, Fg, Videal: exit.V, PR };
+}
+
+export interface MixerOut {
+  out: Flow; // mixed total state (after mixer pressure loss)
+  Acore: number; Abyp: number; A: number;
+  MNcore: number; MNbyp: number; MNout: number;
+  PsCore: number; PsByp: number;
+  PtLoss: number; // (Pt_mixed ideal - Pt_out)/Pt_in core
+}
+
+/**
+ * Constant-area mixer.  Design: core Mach given, bypass static pressure matched;
+ * off-design: both areas fixed and the static-pressure mismatch is a residual.
+ * Mixed state from conservation of mass, momentum (impulse) and energy in A = Acore + Abyp.
+ */
+export function mixer(core: Flow, byp: Flow, opts: { MNcore?: number; Acore?: number; Abyp?: number }, dPqP: number): MixerOut {
+  const stC = opts.Acore !== undefined ? staticFromArea(core, opts.Acore) : staticFromMN(core, opts.MNcore ?? 0.4);
+  let stB: StaticState;
+  if (opts.Abyp !== undefined) stB = staticFromArea(byp, opts.Abyp);
+  else {
+    // bypass Mach such that Ps_byp = Ps_core
+    let lo = 0.02, hi = 1.0;
+    for (let i = 0; i < 60; i++) {
+      const mid = 0.5 * (lo + hi);
+      const st = staticFromMN(byp, mid);
+      if (st.Ps > stC.Ps) lo = mid; else hi = mid;
+    }
+    stB = staticFromMN(byp, 0.5 * (lo + hi));
+  }
+  const Acore = stC.A, Abyp = stB.A, A = Acore + Abyp;
+  const W = core.W + byp.W;
+  const gas = core.gas.mixWith(byp.gas, core.W, byp.W);
+  const ht = (core.W * core.ht + byp.W * byp.ht) / W;
+  const I = stC.Ps * Acore + core.W * stC.V + stB.Ps * Abyp + byp.W * stB.V; // impulse
+  // solve mixed static pressure on the subsonic branch: impulse(Ps) = I
+  const impulse = (Ps: number) => {
+    // energy: h(Ts) + V^2/2 = ht with V = W/(rho A) = W R Ts /(Ps A)
+    let Ts = ht > gas.h(1000, Ps) ? 1200 : 600;
+    for (let k = 0; k < 40; k++) {
+      const R = gas.Rlocal(Ts, Ps);
+      const V = (W * R * Ts) / (Ps * A);
+      const F = gas.h(Ts, Ps) + 0.5 * V * V - ht;
+      const dF = gas.cpEq(Ts, Ps) + V * (W * R) / (Ps * A);
+      const dT = -F / dF; Ts += Math.max(-150, Math.min(150, dT));
+      if (Math.abs(dT) < 1e-7 * Ts) break;
+    }
+    const R = gas.Rlocal(Ts, Ps);
+    const V = (W * R * Ts) / (Ps * A);
+    return { I: Ps * A + W * V, Ts, V };
+  };
+  // impulse is minimal at M=1; subsonic branch has dI/dPs > 0 -> bisection between a low Ps (near sonic) and a high Ps
+  let lo = Math.min(stC.Ps, stB.Ps) * 0.6, hi = Math.max(core.Pt, byp.Pt) * 1.2;
+  for (let i = 0; i < 70; i++) {
+    const mid = 0.5 * (lo + hi);
+    if (impulse(mid).I < I) lo = mid; else hi = mid;
+    if (hi / lo - 1 < 1e-11) break;
+  }
+  const Ps = 0.5 * (lo + hi);
+  const { Ts, V } = impulse(Ps);
+  const total = totalFromStatic(gas, Ts, Ps, V, W);
+  const MNout = V / gas.a(Ts, Ps);
+  const out: Flow = { ...total, Pt: total.Pt * (1 - dPqP) };
+  return { out, Acore, Abyp, A, MNcore: stC.MN, MNbyp: stB.MN, MNout, PsCore: stC.Ps, PsByp: stB.Ps, PtLoss: 1 - out.Pt / core.Pt };
+}
+
+/** Burn a given fuel/air ratio (off-design throttle). */
+export function burnerAtFAR(inp: Flow, far: number, dPqP: number, eff: number, hFuel: number, LHV: number): BurnerOut {
+  const Pt = inp.Pt * (1 - dPqP);
+  const Wf = far * (inp.W / (1 + inp.gas.far));
+  const gas = inp.gas.withFuel(far);
+  const Wout = inp.W + Wf;
+  const ht = (inp.W * inp.ht + Wf * hFuel - (1 - eff) * Wf * LHV) / Wout;
+  const Tt = gas.TfromH(ht, Pt, inp.Tt + 700);
+  return { out: { gas, Pt, Tt, ht, W: Wout }, FAR: far, Wfuel: Wf };
 }

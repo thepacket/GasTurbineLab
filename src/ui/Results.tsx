@@ -2,6 +2,8 @@ import { EngineResult } from '../engine/types';
 import { Store } from '../state/store';
 import { fmt, kN, kW, pct, kPa } from './format';
 import { Diagrams } from '../viz/Diagrams';
+import { MapCharts } from '../viz/MapChart';
+import { exportStationsCsv } from './csv';
 
 export function Results({ store, result }: { store: Store; result: EngineResult }) {
   const p = result.perf;
@@ -9,6 +11,16 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
   const sel = store.state.selected;
   return (
     <div>
+      {result.offDesign && (
+        <div className="section" style={{ paddingBottom: 8 }}>
+          <h3>Off-design operating point</h3>
+          <div className="kv">
+            <span className="k">Throttle</span><span className="v">{result.offDesign.throttle}</span>
+            <span className="k">Solver</span><span className="v">{result.offDesign.converged ? 'converged' : 'not converged'} · {result.offDesign.iterations} iterations · residual {result.offDesign.residualNorm.toExponential(1)}</span>
+            {Object.entries(result.offDesign.x).map(([k, v]) => <ValueRow key={k} k={k} v={v} />)}
+          </div>
+        </div>
+      )}
       {result.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       <div className="cards">
         {arch === 'turboprop' ? (
@@ -29,7 +41,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
             <div className="card"><div className="k">Specific thrust</div><div className="v">{fmt(p.specificThrust, 1)}<small>N·s/kg</small></div></div>
             <div className="card"><div className="k">Gross thrust</div><div className="v">{kN(p.Fg)}<small>kN</small></div></div>
             <div className="card"><div className="k">Ram drag</div><div className="v">{kN(p.ramDrag)}<small>kN</small></div></div>
-            {arch === 'turbofan' && <div className="card"><div className="k">Bypass share of gross thrust</div><div className="v">{pct(p.Fg_byp / p.Fg, 0)}</div></div>}
+            {arch === 'turbofan' && !result.inputs.mixed && <div className="card"><div className="k">Bypass share of gross thrust</div><div className="v">{pct(p.Fg_byp / p.Fg, 0)}</div></div>}
             <div className="card"><div className="k">Fuel flow</div><div className="v">{fmt(p.Wfuel, 3)}<small>kg/s</small></div></div>
           </>
         )}
@@ -46,7 +58,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
           const max = Math.max(s.powerIn_W, s.powerOut_W, 1);
           return (
             <div className="shaft" key={s.name}>
-              <div className="kv"><span className="k">{s.name}</span><span className="v">turbine PR {fmt(s.turbinePR, 3)}</span></div>
+              <div className="kv"><span className="k">{s.name}</span><span className="v">turbine PR {fmt(s.turbinePR, 3)} · {fmt(s.rpm, 0)} rpm{s.outputRpm ? ` → ${fmt(s.outputRpm, 0)} rpm` : ''}</span></div>
               <div className="kv"><span className="k">Turbine supplies</span><span className="v">{kW(s.powerIn_W)}</span></div>
               <div className="bar"><i style={{ width: `${(100 * s.powerIn_W) / max}%` }} /></div>
               <div className="kv"><span className="k">Compressors + extraction absorb</span><span className="v">{kW(s.powerOut_W)}</span></div>
@@ -57,9 +69,10 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
       </div>
 
       <Diagrams result={result} />
+      <MapCharts design={store.state.inputs} result={result} />
 
       <div className="section" style={{ padding: 0 }}>
-        <h3 style={{ padding: '12px 14px 0' }}>Stations</h3>
+        <h3 style={{ padding: '12px 14px 0' }}>Stations<span className="hint"><button className="btn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => exportStationsCsv(result)}>Export CSV</button></span></h3>
         <div style={{ overflowX: 'auto' }}>
           <table className="stations">
             <thead><tr><th>St.</th><th>Pt kPa</th><th>Tt K</th><th>W kg/s</th><th>Ps kPa</th><th>M</th><th>V m/s</th><th>A m²</th></tr></thead>
@@ -101,6 +114,9 @@ function ValueRow({ k, v }: { k: string; v: number }) {
   else if (k.endsWith('_m')) { label = k.slice(0, -2); text = fmt(v, 2) + ' m'; }
   else if (k.endsWith('_W_m2')) { label = k.slice(0, -5); text = fmt(v / 1000, 1) + ' kW/m²'; }
   else if (k === 'choked') text = v ? 'yes' : 'no';
+  else if (k.endsWith('_pct')) { label = k.slice(0, -4); text = fmt(v, 1) + ' %'; }
+  else if (k === 'rpm' || k.endsWith('_rpm') || k.startsWith('N_')) text = fmt(v, 0) + ' rpm';
+  else if (k.endsWith('_Pa')) { label = k.slice(0, -3); text = kPa(v) + ' kPa'; }
   else if (k.startsWith('Tt') || k.startsWith('T4') || k.startsWith('T7')) text = fmt(v, 1) + ' K';
   else if (k.startsWith('V')) text = fmt(v, 1) + ' m/s';
   label = label.replace(/_/g, ' ');

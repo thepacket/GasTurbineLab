@@ -67,3 +67,17 @@ export function staticFromPs(f: Flow, Ps: number): StaticState {
   const rho = Ps / (g.Rlocal(Ts, Ps) * Ts);
   return { Ts, Ps, V, MN: V / g.a(Ts, Ps), A: V > 0 ? f.W / (rho * V) : Infinity, rho };
 }
+
+/** Subsonic static state for a given flow area (solve MN such that A(MN) = A). */
+export function staticFromArea(f: Flow, A: number): StaticState {
+  let lo = 0.02, hi = 1.0;
+  const sonic = staticFromMN(f, 1);
+  if (A <= sonic.A) return sonic; // choked (or over-constrained): return the sonic state
+  for (let i = 0; i < 60; i++) {
+    const mid = 0.5 * (lo + hi);
+    const st = staticFromMN(f, mid);
+    if (st.A > A) lo = mid; else hi = mid; // area decreases with MN on the subsonic branch
+    if (hi - lo < 1e-9) break;
+  }
+  return staticFromMN(f, 0.5 * (lo + hi));
+}

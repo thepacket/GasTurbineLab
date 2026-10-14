@@ -161,7 +161,7 @@ export function calibrateEngine(spec: EngineSpec): CalibratedEngine {
     inp.hpt = { eff: e.turb - 0.01, MN: 0.35 }; inp.lpt = { eff: e.turb, MN: 0.35 };
     inp.coreNozzle = { type: 'CV', Cv: 0.98 };
     inp.burner.MN = 0.15;
-    inp.prop = { shaftPower_W: spec.power_kW! * 1000, gearboxEff: 0.985, propEff: 0.9, diameter_m: spec.propDiameter_m ?? 3.0 };
+    inp.prop = { shaftPower_W: spec.power_kW! * 1000, gearboxEff: 0.985, gearRatio: inp.prop.gearRatio, propEff: 0.9, diameter_m: spec.propDiameter_m ?? 3.0 };
     if (!W) { W = (spec.power_kW! / (90 + 8 * spec.OPR)); estimated.push(`airflow ${W.toFixed(1)} kg/s`); }
   }
   if (!spec.airflow_kgs && spec.arch !== 'turboprop') estimated.push(`airflow ${W.toFixed(0)} kg/s from fan diameter`);

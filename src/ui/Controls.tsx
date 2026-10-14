@@ -30,8 +30,24 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   );
 }
 
+function OdSlider(p: Omit<SliderProps, 'store'> & { store: Store }) {
+  const { store, ...rest } = p;
+  const shown = rest.value * (rest.scale ?? 1);
+  const d = rest.digits ?? (rest.step * (rest.scale ?? 1) < 0.01 ? 3 : rest.step * (rest.scale ?? 1) < 0.1 ? 2 : rest.step * (rest.scale ?? 1) < 1 ? 1 : 0);
+  const commit = (v: number) => { if (Number.isFinite(v)) store.setOd(rest.path, v / (rest.scale ?? 1)); };
+  return (
+    <div className="control">
+      <label>{rest.label}</label>
+      <div className="val"><input className="num" type="number" value={Number(shown.toFixed(d))} step={rest.step * (rest.scale ?? 1)} onChange={(e) => commit(parseFloat(e.target.value))} /><span className="unit">{rest.unit ?? ''}</span></div>
+      <input type="range" min={rest.min * (rest.scale ?? 1)} max={rest.max * (rest.scale ?? 1)} step={rest.step * (rest.scale ?? 1)} value={shown} onChange={(e) => commit(parseFloat(e.target.value))} aria-label={rest.label} />
+    </div>
+  );
+}
+
 export function Controls({ store }: { store: Store }) {
   const i = store.state.inputs;
+  const od = store.state.od;
+  const designWf = 'error' in store.design ? 1 : store.design.perf.Wfuel;
   const S = (p: Omit<SliderProps, 'store'>) => <Slider {...p} store={store} />;
   const arch = i.arch;
   const presets = [...PRESETS, ...REFERENCE_PRESETS];
@@ -70,6 +86,36 @@ export function Controls({ store }: { store: Store }) {
         )}
       </Section>
 
+      <Section title="Operating point" hint={store.odBusy ? 'solving…' : undefined}>
+        <div className="segmented" style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+          <button className={store.state.mode === 'design' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'design' })}>Design point</button>
+          <button className={store.state.mode === 'offdesign' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'offdesign' })}>Off-design</button>
+        </div>
+        {store.state.mode === 'offdesign' ? (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4 }}>Geometry, maps and areas are frozen at the design point below; speeds, flows and bypass ratio float.</div>
+            <OdSlider label="Altitude" path="altitude_m" value={od.altitude_m} min={0} max={20000} step={100} unit="m" store={store} />
+            <OdSlider label="Mach number" path="mach" value={od.mach} min={0} max={2.5} step={0.01} unit="M" store={store} />
+            <OdSlider label="ΔT from ISA" path="dT_isa" value={od.dT_isa} min={-40} max={40} step={1} unit="K" store={store} />
+            <div className="control">
+              <label>Throttle by</label>
+              <div className="segmented">
+                <button className={od.throttle.mode === 'T4' ? 'on' : ''} onClick={() => store.setOd('throttle', { mode: 'T4', value: i.burner.T4_K })}>T4</button>
+                <button className={od.throttle.mode === 'Wf' ? 'on' : ''} onClick={() => store.setOd('throttle', { mode: 'Wf', value: designWf })}>Fuel flow</button>
+                <button className={od.throttle.mode === 'NHP' ? 'on' : ''} onClick={() => store.setOd('throttle', { mode: 'NHP', value: 1 })}>N HP</button>
+              </div>
+            </div>
+            {od.throttle.mode === 'T4' && <OdSlider label="Turbine inlet temperature T4" path="throttle.value" value={od.throttle.value} min={900} max={2100} step={5} unit="K" store={store} />}
+            {od.throttle.mode === 'Wf' && <OdSlider label="Fuel flow" path="throttle.value" value={od.throttle.value} min={designWf * 0.2} max={designWf * 1.3} step={designWf / 200} unit="kg/s" store={store} digits={4} />}
+            {od.throttle.mode === 'NHP' && <OdSlider label="HP spool speed" path="throttle.value" value={od.throttle.value} min={0.6} max={1.1} step={0.001} unit="% design" scale={100} digits={1} store={store} />}
+            {arch === 'turboprop' && <OdSlider label="Propeller load (shaft power)" path="propPower_W" value={od.propPower_W ?? i.prop.shaftPower_W} min={50e3} max={i.prop.shaftPower_W * 1.2} step={5e3} unit="kW" scale={1e-3} digits={0} store={store} />}
+            <OdSlider label="Power extraction" path="HPX_W" value={od.HPX_W ?? 0} min={0} max={1000e3} step={5e3} unit="kW" scale={1e-3} digits={0} store={store} />
+          </div>
+        ) : (
+          <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>All sliders below define the design point: component pressure ratios and efficiencies are specified, turbine pressure ratios are solved for the shaft balance, and nozzle and mixer areas follow.</div>
+        )}
+      </Section>
+
       <Section title="Flight condition" hint="ISA 1976">
         {S({ label: 'Altitude', path: 'flight.altitude_m', value: i.flight.altitude_m, min: 0, max: 20000, step: 100, unit: 'm' })}
         {S({ label: 'Mach number', path: 'flight.mach', value: i.flight.mach, min: 0, max: 2.5, step: 0.01, unit: 'M' })}
@@ -84,6 +130,26 @@ export function Controls({ store }: { store: Store }) {
 
       {arch === 'turbofan' && (
         <>
+          <Section title="Layout">
+            <div className="control">
+              <label>Spools</label>
+              <div className="segmented">
+                <button className={i.spools === 2 ? 'on' : ''} onClick={() => { if (i.spools === 3) { const core = i.ipc.PR * i.hpc.PR; const inp = { ...i, spools: 2 as const, lpc: { ...i.lpc, PR: Math.min(3, Math.sqrt(core) * 0.45 + 1) }, hpc: { ...i.hpc, PR: core / Math.min(3, Math.sqrt(core) * 0.45 + 1) } }; store.dispatch({ type: 'inputs', inputs: inp, note: store.state.note ?? undefined }); } }}>Two (fan + booster)</button>
+                <button className={i.spools === 3 ? 'on' : ''} onClick={() => { if (i.spools === 2) { const core = i.lpc.PR * i.hpc.PR; const ipc = Math.sqrt(core) * 0.9, hpc = core / ipc; store.dispatch({ type: 'inputs', inputs: { ...i, spools: 3 as const, ipc: { ...i.ipc, PR: ipc }, hpc: { ...i.hpc, PR: hpc } }, note: store.state.note ?? undefined }); } }}>Three (IP spool)</button>
+              </div>
+            </div>
+            <div className="control">
+              <label>Exhaust</label>
+              <div className="segmented">
+                <button className={!i.mixed ? 'on' : ''} onClick={() => store.set('mixed', false)}>Separate flow</button>
+                <button className={i.mixed ? 'on' : ''} onClick={() => store.set('mixed', true)}>Mixed flow</button>
+              </div>
+            </div>
+            {S({ label: 'Fan gear ratio (1 = direct drive)', path: 'fanGear.ratio', value: i.fanGear.ratio, min: 1, max: 4, step: 0.01 })}
+            {i.fanGear.ratio !== 1 && S({ label: 'Fan gearbox efficiency', path: 'fanGear.eff', value: i.fanGear.eff, min: 0.97, max: 1, step: 0.001 })}
+            {i.mixed && S({ label: 'Mixer core Mach (sizing)', path: 'mixer.MNcore', value: i.mixer.MNcore, min: 0.2, max: 0.7, step: 0.01 })}
+            {i.mixed && S({ label: 'Mixer pressure loss ΔP/P', path: 'mixer.dPqP', value: i.mixer.dPqP, min: 0, max: 0.05, step: 0.001 })}
+          </Section>
           <Section title="Fan & bypass">
             {S({ label: 'Fan pressure ratio', path: 'fan.PR', value: i.fan.PR, min: 1.1, max: 4, step: 0.01 })}
             {S({ label: 'Fan isentropic efficiency', path: 'fan.eff', value: i.fan.eff, min: 0.75, max: 0.95, step: 0.001 })}
@@ -91,8 +157,10 @@ export function Controls({ store }: { store: Store }) {
             {S({ label: 'Bypass duct loss ΔP/P', path: 'bypDuct_dPqP', value: i.bypDuct_dPqP, min: 0, max: 0.05, step: 0.001 })}
           </Section>
           <Section title="Core compressors">
-            {S({ label: 'Booster (LPC) pressure ratio', path: 'lpc.PR', value: i.lpc.PR, min: 1, max: 5, step: 0.01 })}
-            {S({ label: 'Booster efficiency', path: 'lpc.eff', value: i.lpc.eff, min: 0.75, max: 0.95, step: 0.001 })}
+            {i.spools === 2 && S({ label: 'Booster (LPC) pressure ratio', path: 'lpc.PR', value: i.lpc.PR, min: 1, max: 5, step: 0.01 })}
+            {i.spools === 2 && S({ label: 'Booster efficiency', path: 'lpc.eff', value: i.lpc.eff, min: 0.75, max: 0.95, step: 0.001 })}
+            {i.spools === 3 && S({ label: 'IP compressor pressure ratio', path: 'ipc.PR', value: i.ipc.PR, min: 1.5, max: 10, step: 0.01 })}
+            {i.spools === 3 && S({ label: 'IP compressor efficiency', path: 'ipc.eff', value: i.ipc.eff, min: 0.75, max: 0.95, step: 0.001 })}
             {S({ label: 'HPC pressure ratio', path: 'hpc.PR', value: i.hpc.PR, min: 2, max: 30, step: 0.1 })}
             {S({ label: 'HPC efficiency', path: 'hpc.eff', value: i.hpc.eff, min: 0.75, max: 0.95, step: 0.001 })}
             {S({ label: 'Turbine cooling bleed (does work)', path: 'coolInletFrac', value: i.coolInletFrac, min: 0, max: 0.15, step: 0.005, unit: '% W25', scale: 100, digits: 1 })}
@@ -115,12 +183,13 @@ export function Controls({ store }: { store: Store }) {
 
       <Section title={arch === 'turbofan' ? 'Turbines' : arch === 'turboprop' ? 'Turbines' : 'Turbine'}>
         {S({ label: arch === 'turbofan' ? 'HP turbine efficiency' : arch === 'turboprop' ? 'Gas-generator turbine efficiency' : 'Turbine efficiency', path: 'hpt.eff', value: i.hpt.eff, min: 0.8, max: 0.95, step: 0.001 })}
+        {arch === 'turbofan' && i.spools === 3 && S({ label: 'IP turbine efficiency', path: 'ipt.eff', value: i.ipt.eff, min: 0.8, max: 0.95, step: 0.001 })}
         {arch !== 'turbojet' && S({ label: arch === 'turbofan' ? 'LP turbine efficiency' : 'Power turbine efficiency', path: 'lpt.eff', value: i.lpt.eff, min: 0.8, max: 0.95, step: 0.001 })}
         {S({ label: 'Shaft mechanical efficiency', path: 'mechEff', value: i.mechEff, min: 0.95, max: 1, step: 0.001 })}
         {S({ label: 'Power extraction (HP shaft)', path: 'HPX_W', value: i.HPX_W, min: 0, max: 1000e3, step: 5e3, unit: 'kW', scale: 1e-3, digits: 0 })}
       </Section>
 
-      {arch === 'turbojet' && (
+      {(arch === 'turbojet' || (arch === 'turbofan' && i.mixed)) && (
         <Section title="Afterburner">
           <label className="toggle"><input type="checkbox" checked={i.afterburner.enabled} onChange={(e) => store.set('afterburner.enabled', e.target.checked)} /> Afterburner lit</label>
           {i.afterburner.enabled && (
@@ -139,13 +208,14 @@ export function Controls({ store }: { store: Store }) {
           {S({ label: 'Propeller diameter', path: 'prop.diameter_m', value: i.prop.diameter_m, min: 1.5, max: 6, step: 0.05, unit: 'm' })}
           {S({ label: 'Propeller profile efficiency', path: 'prop.propEff', value: i.prop.propEff, min: 0.7, max: 1, step: 0.005 })}
           {S({ label: 'Gearbox efficiency', path: 'prop.gearboxEff', value: i.prop.gearboxEff, min: 0.95, max: 1, step: 0.001 })}
+          {S({ label: 'Gear ratio (turbine rpm / propeller rpm)', path: 'prop.gearRatio', value: i.prop.gearRatio, min: 5, max: 30, step: 0.1 })}
         </Section>
       )}
 
       <Section title={arch === 'turbofan' ? 'Nozzles' : 'Nozzle'}>
         {arch !== 'turboprop' && (
           <div className="control">
-            <label>{arch === 'turbofan' ? 'Core nozzle type' : 'Nozzle type'}</label>
+            <label>{arch === 'turbofan' ? (i.mixed ? 'Mixed nozzle type' : 'Core nozzle type') : 'Nozzle type'}</label>
             <div className="segmented">
               <button className={i.coreNozzle.type === 'CV' ? 'on' : ''} onClick={() => store.set('coreNozzle.type', 'CV')}>Convergent</button>
               <button className={i.coreNozzle.type === 'CD' ? 'on' : ''} onClick={() => store.set('coreNozzle.type', 'CD')}>Con-di</button>
@@ -153,7 +223,7 @@ export function Controls({ store }: { store: Store }) {
           </div>
         )}
         {S({ label: arch === 'turbofan' ? 'Core velocity coefficient Cv' : 'Velocity coefficient Cv', path: 'coreNozzle.Cv', value: i.coreNozzle.Cv, min: 0.9, max: 1, step: 0.001 })}
-        {arch === 'turbofan' && (
+        {arch === 'turbofan' && !i.mixed && (
           <>
             <div className="control">
               <label>Bypass nozzle type</label>
@@ -165,6 +235,13 @@ export function Controls({ store }: { store: Store }) {
             {S({ label: 'Bypass velocity coefficient Cv', path: 'bypNozzle.Cv', value: i.bypNozzle.Cv, min: 0.9, max: 1, step: 0.001 })}
           </>
         )}
+      </Section>
+
+      <Section title="Design shaft speeds" hint="for corrected-speed maps">
+        {arch === 'turbofan' && S({ label: 'LP spool', path: 'speeds.LP', value: i.speeds.LP, min: 1000, max: 20000, step: 10, unit: 'rpm' })}
+        {arch === 'turbofan' && i.spools === 3 && S({ label: 'IP spool', path: 'speeds.IP', value: i.speeds.IP, min: 2000, max: 20000, step: 10, unit: 'rpm' })}
+        {S({ label: arch === 'turbofan' ? 'HP spool' : arch === 'turboprop' ? 'Gas-generator spool' : 'Spool', path: 'speeds.HP', value: i.speeds.HP, min: 3000, max: 60000, step: 10, unit: 'rpm' })}
+        {arch === 'turboprop' && S({ label: 'Power turbine', path: 'speeds.PT', value: i.speeds.PT, min: 3000, max: 45000, step: 10, unit: 'rpm' })}
       </Section>
 
       <Section title="Fuel & gas model" hint="Jet-A, CEA polynomials">

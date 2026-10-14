@@ -25,7 +25,7 @@ export const PRESETS: Preset[] = [
   tf('Low-bypass military turbofan, M0.9 at 9 km', (i) => { i.flight = { altitude_m: 9000, mach: 0.9, dT_isa: 0, W_kgs: 80 }; i.inlet.ramRecovery = 0.98; i.fan = { PR: 3.0, eff: 0.87, MN: 0.45 }; i.BPR = 0.8; i.lpc = { PR: 1.5, eff: 0.87, MN: 0.35 }; i.hpc = { PR: 6, eff: 0.86, MN: 0.3 }; i.burner.T4_K = 1700; i.coolInletFrac = 0.04; i.coreNozzle = { type: 'CD', Cv: 0.99 }; i.bypNozzle = { type: 'CD', Cv: 0.99 }; }),
   tp('Regional turboprop, take-off', () => {}),
   tp('Regional turboprop, cruise M0.45 at 7.6 km', (i) => { i.flight = { altitude_m: 7600, mach: 0.45, dT_isa: 0, W_kgs: 4.5 }; i.comp.PR = 11; i.burner.T4_K = 1300; i.prop.shaftPower_W = 0.9e6; }),
-  tp('Small turboprop (PT6-class), take-off', (i) => { i.flight = { altitude_m: 0, mach: 0, dT_isa: 0, W_kgs: 3.3 }; i.comp = { PR: 8, eff: 0.80, MN: 0.25 }; i.burner.T4_K = 1250; i.hpt.eff = 0.87; i.lpt.eff = 0.88; i.prop = { shaftPower_W: 0.5e6, gearboxEff: 0.98, propEff: 0.88, diameter_m: 2.4 }; }),
+  tp('Small turboprop (PT6-class), take-off', (i) => { i.flight = { altitude_m: 0, mach: 0, dT_isa: 0, W_kgs: 3.3 }; i.comp = { PR: 8, eff: 0.80, MN: 0.25 }; i.burner.T4_K = 1250; i.hpt.eff = 0.87; i.lpt.eff = 0.88; i.prop = { ...i.prop, shaftPower_W: 0.5e6, gearboxEff: 0.98, propEff: 0.88, diameter_m: 2.4 }; }),
 ];
 
 export const REFERENCE_PRESETS: Preset[] = (ref as any).cases.filter((c: any) => !c.error).map((c: any) => ({
