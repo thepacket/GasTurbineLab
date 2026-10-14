@@ -47,7 +47,7 @@ export interface EngineInputs {
   bypDuct_dPqP: number;
   /** mixed-flow turbofan: bypass and core streams join in a constant-area mixer ahead of one nozzle */
   mixed: boolean;
-  mixer: { MNcore: number; dPqP: number };
+  mixer: { MNcore: number; dPqP: number; designedStream?: 'core' | 'bypass'; MNbyp?: number }; // designedStream: which stream's Mach is specified; the other matches its static pressure
   /** fan drive gearbox (ratio 1 = direct drive) */
   fanGear: { ratio: number; eff: number };
   /** design shaft speeds, rpm (for corrected-speed bookkeeping and off-design maps) */

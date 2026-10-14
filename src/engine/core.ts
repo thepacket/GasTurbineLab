@@ -293,7 +293,7 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     if (inp.mixed) {
       stations.push(station('17', 'Bypass duct exit', f17, staticFromMN(f17, 0.45), 0.72, 'bypass'));
       const areas = prov.mixerAreas();
-      const m = mixer(lpt.out, f17, areas ? { Acore: areas.Acore, Abyp: areas.Abyp } : { MNcore: inp.mixer.MNcore }, inp.mixer.dPqP);
+      const m = mixer(lpt.out, f17, areas ? { Acore: areas.Acore, Abyp: areas.Abyp } : inp.mixer.designedStream === 'core' ? { MNbyp: inp.mixer.MNbyp ?? 0.45 } : { MNcore: inp.mixer.MNcore }, inp.mixer.dPqP);
       if (areas) R.mixer_ps = m.PsCore / m.PsByp - 1;
       components.push({ id: 'mixer', kind: 'mixer', name: 'Mixer', values: { MNcore: m.MNcore, MNbyp: m.MNbyp, MNmixed: m.MNout, Acore_m2: m.Acore, Abyp_m2: m.Abyp, Ps_core_Pa: m.PsCore, Ps_byp_Pa: m.PsByp, Pt_loss: m.PtLoss, Tt_out: m.out.Tt } });
       stations.push(station('6', 'Mixer exit', m.out, staticFromMN(m.out, m.MNout), 0.84));

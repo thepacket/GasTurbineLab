@@ -148,7 +148,17 @@ export function Controls({ store }: { store: Store }) {
             </div>
             {S({ label: 'Fan gear ratio (1 = direct drive)', path: 'fanGear.ratio', value: i.fanGear.ratio, min: 1, max: 4, step: 0.01 })}
             {i.fanGear.ratio !== 1 && S({ label: 'Fan gearbox efficiency', path: 'fanGear.eff', value: i.fanGear.eff, min: 0.97, max: 1, step: 0.001 })}
-            {i.mixed && S({ label: 'Mixer core Mach (sizing)', path: 'mixer.MNcore', value: i.mixer.MNcore, min: 0.2, max: 0.7, step: 0.01 })}
+            {i.mixed && (
+              <div className="control">
+                <label>Mixer sizing</label>
+                <div className="segmented">
+                  <button className={(i.mixer.designedStream ?? 'bypass') === 'bypass' ? 'on' : ''} onClick={() => store.set('mixer.designedStream', 'bypass')}>Core Mach given</button>
+                  <button className={i.mixer.designedStream === 'core' ? 'on' : ''} onClick={() => store.set('mixer.designedStream', 'core')}>Bypass Mach given</button>
+                </div>
+              </div>
+            )}
+            {i.mixed && i.mixer.designedStream !== 'core' && S({ label: 'Mixer core Mach (sizing)', path: 'mixer.MNcore', value: i.mixer.MNcore, min: 0.2, max: 0.7, step: 0.01 })}
+            {i.mixed && i.mixer.designedStream === 'core' && S({ label: 'Mixer bypass Mach (sizing)', path: 'mixer.MNbyp', value: i.mixer.MNbyp ?? 0.45, min: 0.2, max: 0.7, step: 0.01 })}
             {i.mixed && S({ label: 'Mixer pressure loss ΔP/P', path: 'mixer.dPqP', value: i.mixer.dPqP, min: 0, max: 0.05, step: 0.001 })}
           </Section>
           <Section title="Fan & bypass">

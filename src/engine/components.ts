@@ -148,20 +148,13 @@ export interface MixerOut {
  * off-design: both areas fixed and the static-pressure mismatch is a residual.
  * Mixed state from conservation of mass, momentum (impulse) and energy in A = Acore + Abyp.
  */
-export function mixer(core: Flow, byp: Flow, opts: { MNcore?: number; Acore?: number; Abyp?: number }, dPqP: number): MixerOut {
-  const stC = opts.Acore !== undefined ? staticFromArea(core, opts.Acore) : staticFromMN(core, opts.MNcore ?? 0.4);
-  let stB: StaticState;
-  if (opts.Abyp !== undefined) stB = staticFromArea(byp, opts.Abyp);
-  else {
-    // bypass Mach such that Ps_byp = Ps_core
-    let lo = 0.02, hi = 1.0;
-    for (let i = 0; i < 60; i++) {
-      const mid = 0.5 * (lo + hi);
-      const st = staticFromMN(byp, mid);
-      if (st.Ps > stC.Ps) lo = mid; else hi = mid;
-    }
-    stB = staticFromMN(byp, 0.5 * (lo + hi));
-  }
+export function mixer(core: Flow, byp: Flow, opts: { MNcore?: number; MNbyp?: number; Acore?: number; Abyp?: number }, dPqP: number): MixerOut {
+  // Design: one stream's Mach is specified and the other's static state is found at the same static pressure
+  // (pyCycle: designed_stream). Off-design: both areas are fixed.
+  let stC: StaticState, stB: StaticState;
+  if (opts.Acore !== undefined && opts.Abyp !== undefined) { stC = staticFromArea(core, opts.Acore); stB = staticFromArea(byp, opts.Abyp); }
+  else if (opts.MNbyp !== undefined) { stB = staticFromMN(byp, opts.MNbyp); stC = staticFromPs(core, Math.min(stB.Ps, core.Pt * 0.995)); }
+  else { stC = staticFromMN(core, opts.MNcore ?? 0.4); stB = staticFromPs(byp, Math.min(stC.Ps, byp.Pt * 0.995)); }
   const Acore = stC.A, Abyp = stB.A, A = Acore + Abyp;
   const W = core.W + byp.W;
   const gas = core.gas.mixWith(byp.gas, core.W, byp.W);

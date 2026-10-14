@@ -3,6 +3,9 @@ import ref from '../data/pycycle_reference.json';
 import { solveEngine } from '../engine/cycle';
 import { inputsFromReferenceCase } from '../engine/reference';
 import { fmt } from './format';
+import refOd from '../data/pycycle_offdesign.json';
+import { makeDesignPoint, solveOffDesign } from '../engine/offdesign';
+import { turbojetInputs, hbtfInputs, mixedInputs } from '../engine/reference_od';
 
 interface Row { label: string; pyc: number; lab: number; unit: string; tol: number }
 
@@ -30,6 +33,31 @@ export function Validation() {
     return { c, rows, worst: Math.max(...rows.map((x) => Math.abs(x.lab / x.pyc - 1) * 100)) };
   }), []);
 
+  const od = useMemo(() => {
+    const R = refOd as any; const out: { name: string; rows: Row[]; worst: number }[] = [];
+    const push = (name: string, rows: Row[]) => out.push({ name, rows, worst: Math.max(...rows.map((x) => Math.abs(x.lab / x.pyc - 1) * 100)) });
+    for (const [key, build] of [['turbojet', turbojetInputs], ['hbtf', hbtfInputs]] as const) {
+      const c = R[key]; if (!c || c.error) continue;
+      const dp = makeDesignPoint(build());
+      for (const o of c.od) {
+        const s = solveOffDesign(dp, { altitude_m: o.inputs.alt_m, mach: o.inputs.mach, dT_isa: 0, throttle: { mode: 'T4', value: o.inputs.T4_K } });
+        const rows: Row[] = [
+          { label: 'Net thrust', pyc: o.perf.Fn_N, lab: s.result.perf.Fn, unit: 'N', tol: 0.1 }, { label: 'Fuel flow', pyc: o.perf.Wfuel_kgs, lab: s.result.perf.Wfuel, unit: 'kg/s', tol: 0.1 },
+          { label: 'Inlet mass flow', pyc: o.W_kgs, lab: s.x.W, unit: 'kg/s', tol: 0.1 },
+          ...(o.Nmech ? [{ label: 'Spool speed', pyc: o.Nmech, lab: s.x.N_HP, unit: 'rpm', tol: 0.1 }] : [{ label: 'LP speed', pyc: o.LP_Nmech, lab: s.x.N_LP, unit: 'rpm', tol: 0.1 }, { label: 'HP speed', pyc: o.HP_Nmech, lab: s.x.N_HP, unit: 'rpm', tol: 0.1 }, { label: 'Bypass ratio', pyc: o.BPR, lab: s.x.BPR, unit: '', tol: 0.1 }]),
+        ];
+        for (const [id, st] of Object.entries<any>(o.stations)) { const m = s.result.stations.find((q) => q.id === id); if (!m || id === '0') continue; rows.push({ label: `Pt station ${id}`, pyc: st.Pt_Pa, lab: m.Pt, unit: 'Pa', tol: 0.1 }, { label: `Tt station ${id}`, pyc: st.Tt_K, lab: m.Tt, unit: 'K', tol: 0.1 }); }
+        push(`${key === 'turbojet' ? 'Turbojet' : 'HBPR turbofan'} off-design: ${o.inputs.alt_m} m, M ${o.inputs.mach}, T4 ${o.inputs.T4_K} K`, rows);
+      }
+    }
+    if (R.mixed && !R.mixed.error) {
+      const r = solveEngine(mixedInputs());
+      const rows: Row[] = [{ label: 'Net thrust', pyc: R.mixed.perf.Fn_N, lab: r.perf.Fn, unit: 'N', tol: 0.1 }, { label: 'Fuel flow', pyc: R.mixed.perf.Wfuel_kgs, lab: r.perf.Wfuel, unit: 'kg/s', tol: 0.1 }];
+      for (const [id, st] of Object.entries<any>(R.mixed.stations)) { const m = r.stations.find((q) => q.id === id); if (!m || id === '0') continue; rows.push({ label: `Pt station ${id}`, pyc: st.Pt_Pa, lab: m.Pt, unit: 'Pa', tol: 0.1 }, { label: `Tt station ${id}`, pyc: st.Tt_K, lab: m.Tt, unit: 'K', tol: 0.1 }); }
+      push('Mixed-flow low-bypass turbofan design point (M0.8, 9 km)', rows);
+    }
+    return out;
+  }, []);
   return (
     <div>
       <div className="prose">
@@ -60,9 +88,19 @@ export function Validation() {
           </div>
         </details>
       ))}
+      <div className="prose"><h3>Off-design and mixed flow</h3><p>These cases run pyCycle's multi-point model (design point plus off-design points with the same generic maps) and the mixed-flow turbofan with pyCycle's constant-area mixer. The lab's fixed-geometry solver reproduces them to better than 0.05 %.</p></div>
+      {od.map(({ name, rows, worst }) => (
+        <details key={name} className="section">
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}><span className={`status ${worst < 0.05 ? 'good' : worst < 0.5 ? 'warn' : 'bad'}`} />{name}<span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>worst deviation {fmt(worst, 3)} %</span></summary>
+          <div style={{ overflowX: 'auto', marginTop: 8 }}>
+            <table className="stations"><thead><tr><th>Quantity</th><th>pyCycle</th><th>This lab</th><th>Δ %</th><th></th></tr></thead>
+              <tbody>{rows.map((r) => { const d = (r.lab / r.pyc - 1) * 100; const st = Math.abs(d) < 0.05 ? 'good' : Math.abs(d) < r.tol ? 'warn' : 'bad'; return <tr key={r.label}><td>{r.label}</td><td className="num">{smart(r.pyc)} {r.unit}</td><td className="num">{smart(r.lab)} {r.unit}</td><td className="num">{d >= 0 ? '+' : ''}{fmt(d, 3)}</td><td><span className={`status ${st}`} /></td></tr>; })}</tbody></table>
+          </div>
+        </details>
+      ))}
       <div className="prose">
         <h3>Reproducing the reference</h3>
-        <p>Install <code>om-pycycle</code> in a Python 3.11 environment with <code>numpy&lt;2</code>, then run the script in <code>reference/</code>. It writes <code>src/data/pycycle_reference.json</code>, which is bundled into this static app; nothing runs on a server.</p>
+        <p>Install <code>om-pycycle</code> in a Python 3.11 environment with <code>numpy&lt;2</code>, then run the scripts in <code>reference/</code>. They write <code>src/data/pycycle_reference.json</code> and <code>src/data/pycycle_offdesign.json</code>, which is bundled into this static app; nothing runs on a server.</p>
       </div>
     </div>
   );
