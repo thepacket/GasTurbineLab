@@ -2,11 +2,17 @@
 import { EngineInputs } from './types';
 import { makeDesignPoint, solveOffDesign, OffDesignInputs, DesignPoint } from './offdesign';
 import { solveEngine } from './cycle';
+import { runTransient, TransientInputs, TransientSample } from './transient';
+import { runMission, MissionInputs, MissionPoint } from './mission';
+import { registerCustomMap } from './maps';
 
 export type WorkerRequest =
   | { id: number; type: 'offdesign'; inputs: EngineInputs; od: OffDesignInputs }
+  | { id: number; type: 'transient'; inputs: EngineInputs; ti: TransientInputs }
+  | { id: number; type: 'mission'; inputs: EngineInputs; mi: MissionInputs }
+  | { id: number; type: 'maps'; maps: { id: string; kind: 'compressor' | 'turbine'; data: any }[] }
   | { id: number; type: 'sweep'; inputs: EngineInputs; mode: 'design' | 'offdesign'; od?: OffDesignInputs; param: string; values: number[]; families?: { param: string; values: number[] } };
-export type WorkerResponse = { id: number; ok: true; payload: unknown } | { id: number; ok: false; error: string };
+export type WorkerResponse = { id: number; ok: true; payload: unknown } | { id: number; ok: false; error: string } | { id: number; progress: unknown };
 
 let cache: { key: string; dp: DesignPoint } | null = null;
 function designPoint(inputs: EngineInputs): DesignPoint {
@@ -24,7 +30,19 @@ function setPath(obj: any, path: string, value: unknown): any {
 self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   const msg = e.data;
   try {
-    if (msg.type === 'offdesign') {
+    if (msg.type === 'maps') {
+      for (const m of msg.maps) registerCustomMap(m.id, m.kind, m.data);
+      cache = null;
+      post({ id: msg.id, ok: true, payload: msg.maps.length });
+    } else if (msg.type === 'transient') {
+      const dp = designPoint(msg.inputs);
+      const r = runTransient(dp, msg.ti, (samples: TransientSample[]) => post({ id: msg.id, progress: samples.slice() }));
+      post({ id: msg.id, ok: true, payload: r });
+    } else if (msg.type === 'mission') {
+      const dp = designPoint(msg.inputs);
+      const r = runMission(dp, msg.mi, (pts: MissionPoint[]) => post({ id: msg.id, progress: pts.slice() }));
+      post({ id: msg.id, ok: true, payload: r });
+    } else if (msg.type === 'offdesign') {
       const dp = designPoint(msg.inputs);
       const s = solveOffDesign(dp, msg.od);
       post({ id: msg.id, ok: true, payload: { result: s.result, converged: s.converged, iterations: s.iterations, x: s.x } });

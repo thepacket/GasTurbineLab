@@ -66,6 +66,19 @@ export interface EngineInputs {
   LHV_Jkg: number;
   /** gas chemistry: CEA-style equilibrium (default) or frozen complete combustion */
   chemistry?: 'equilibrium' | 'frozen';
+  /** variable geometry and bleeds (design values; off-design overrides in OffDesignInputs) */
+  geometry: {
+    customerBleed_kgs: number; // extracted at HPC exit, not returned
+    handlingBleedFrac: number; // fraction of booster/LPC exit flow dumped (to bypass duct, or overboard on a turbojet/turboprop)
+    A8scale: number; // exhaust-nozzle throat area multiplier relative to the design throat (variable-area nozzle)
+    vsvFlowGain: number; // variable stator effect: map corrected-flow multiplier = 1 + gain*(Nc/NcDes - 1)
+  };
+  /** installation (nacelle/inlet/afterbody drag) */
+  installation: { enabled: boolean; captureRatioDesign: number; nacelleCf: number; afterbodyCd: number };
+  /** polar moments of inertia, kg m^2, for transients */
+  inertia: { LP: number; IP: number; HP: number; PT: number };
+  /** component map choices (built-in names or custom map ids) */
+  mapIds?: Record<string, string>;
 }
 
 export interface Station {
@@ -101,6 +114,12 @@ export interface Performance {
   // turboprop
   shaftPower_W: number; propThrust: number; jetThrust: number; ESHP_W: number; PSFC_kg_kWh: number;
   heatRate_W: number;
+  /** installed performance */
+  installedFn: number; inletDrag: number; nacelleDrag: number; afterbodyDrag: number; installedTSFC_mg_Ns: number;
+  /** emissions */
+  EI_NOx_g_kg: number; EI_CO_g_kg: number; NOx_g_s: number; CO_g_s: number; CO2_g_s: number;
+  /** jet mixing noise, overall sound pressure level at 1 m sideline (Lighthill scaling), dB */
+  jetNoise_dB: number;
 }
 
 export interface ShaftResult { name: string; powerIn_W: number; powerOut_W: number; turbinePR: number; rpm: number; outputRpm?: number }
@@ -113,5 +132,5 @@ export interface EngineResult {
   warnings: string[];
   shafts: ShaftResult[];
   /** off-design bookkeeping (undefined for a design-point result) */
-  offDesign?: { converged: boolean; iterations: number; residualNorm: number; throttle: string; x: Record<string, number> };
+  offDesign?: { converged: boolean; iterations: number; residualNorm: number; throttle: string; x: Record<string, number>; shaftImbalance_W?: Record<string, number> };
 }

@@ -10,12 +10,18 @@ import { CompressorMap, TurbineMap, CompScalars, TurbScalars, correctedFlow, cor
 import { burnerAtFAR, TurbineStream } from './components';
 import { Flow } from './flow';
 
-export type ThrottleMode = 'T4' | 'Wf' | 'NHP';
+export type ThrottleMode = 'T4' | 'Wf' | 'NHP' | 'NLP' | 'Fn';
 export interface OffDesignInputs {
   altitude_m: number; mach: number; dT_isa: number;
   throttle: { mode: ThrottleMode; value: number }; // T4 in K, Wf in kg/s, NHP as fraction of design
   HPX_W?: number;
   propPower_W?: number; // turboprop: power absorbed by the propeller (constant-speed governor)
+  geometry?: Partial<EngineInputs['geometry']>; // variable geometry / bleed overrides
+  installation?: boolean; // installed thrust in the Fn throttle target
+}
+export interface SolveOptions {
+  /** transient mode: spool speeds are states, not unknowns; shaft power imbalance is reported instead */
+  fixedSpeeds?: { LP: number; IP: number; HP: number };
 }
 
 interface CompDes { map: CompressorMap; sc: CompScalars; NcDes: number; Ndes: number }
@@ -30,7 +36,8 @@ export interface DesignPoint {
   mapNames: Record<string, string>;
 }
 
-const MAP_FOR: Record<string, string> = { fan: 'Fan', lpc: 'LPC', ipc: 'LPC', hpc: 'HPC', comp: 'HPC', hpt: 'HPT', ipt: 'LPT', lpt: 'LPT', turb: 'HPT', pt: 'LPT' };
+export const MAP_FOR: Record<string, string> = { fan: 'Fan', lpc: 'LPC', ipc: 'LPC', hpc: 'HPC', comp: 'HPC', hpt: 'HPT', ipt: 'LPT', lpt: 'LPT', turb: 'HPT', pt: 'LPT' };
+const mapFor = (inp: EngineInputs, id: string) => inp.mapIds?.[id] ?? MAP_FOR[id];
 /** station id feeding each component (main flow) */
 const INLET_STATION = (inp: EngineInputs): Record<string, string> => ({
   fan: '2', lpc: '22', ipc: '22', hpc: '25', comp: '2', hpt: '4', ipt: '45', lpt: inp.spools === 3 ? '47' : '45', turb: '4', pt: '45',
@@ -45,13 +52,13 @@ export function makeDesignPoint(inp: EngineInputs): DesignPoint {
   for (const c of result.components) {
     if (c.kind === 'compressor') {
       const s = st(inletOf[c.id]); const N = speedOf(c.id);
-      const map = new CompressorMap(MAP_FOR[c.id]);
+      const map = new CompressorMap(mapFor(inp, c.id));
       const Nc = correctedSpeed(N, s.Tt), Wc = correctedFlow(s.W, s.Tt, s.Pt);
       comps[c.id] = { map, sc: map.scalars(Nc, c.values.PR, c.values.eff, Wc), NcDes: Nc, Ndes: N };
       mapNames[c.id] = map.name;
     } else if (c.kind === 'turbine') {
       const s = st(inletOf[c.id]); const N = speedOf(c.id);
-      const map = new TurbineMap(MAP_FOR[c.id]);
+      const map = new TurbineMap(mapFor(inp, c.id));
       turbs[c.id] = { map, sc: map.scalars(paramSpeed(N, s.Tt), c.values.PR, c.values.eff, paramFlow(s.W, s.Tt, s.Pt)), PRdes: c.values.PR };
       mapNames[c.id] = map.name;
     } else if (c.kind === 'nozzle') nozzleAreas[c.id] = c.values.Ath_m2;
@@ -69,21 +76,26 @@ export function unknownNames(inp: EngineInputs): string[] {
   return u;
 }
 
-function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>): Provider {
+function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>, opt: SolveOptions = {}): Provider {
   const inp = dp.inputs;
   const residuals: Record<string, number> = {};
-  const speeds = { LP: x.N_LP ?? inp.speeds.LP, IP: x.N_IP ?? inp.speeds.IP, HP: x.N_HP, PT: inp.speeds.PT };
+  const fs = opt.fixedSpeeds;
+  const speeds = fs ? { ...fs, PT: inp.speeds.PT } : { LP: x.N_LP ?? inp.speeds.LP, IP: x.N_IP ?? inp.speeds.IP, HP: x.N_HP, PT: inp.speeds.PT };
+  const geometry = { ...inp.geometry, ...(od.geometry ?? {}) };
   return {
-    W: x.W, BPR: x.BPR ?? inp.BPR, speeds, residuals,
+    W: x.W, BPR: x.BPR ?? inp.BPR, speeds, residuals, geometry,
     compressor: (id, inlet, N, _d) => {
       const c = dp.comps[id];
       const Nc = correctedSpeed(N, inlet.Tt);
+      // maps extrapolate linearly beyond their tabulated R-line range (a soft bound keeps the solver sane);
+      // operation beyond the stall line shows up as a negative surge margin.
       const [rlo, rhi] = c.map.RlineRange;
-      const Rl = Math.min(rhi, Math.max(rlo, x['Rl_' + id]));
+      const Rl = Math.min(rhi, Math.max(rlo, x['Rl_' + id])); // clamped to the tabulated R-lines; the penalty term below keeps the solver consistent
       const m = c.map.read(c.sc, Nc, Rl);
+      const vsv = (id === 'fan' || id === 'hpc' || id === 'comp') ? 1 + geometry.vsvFlowGain * (Nc / c.NcDes - 1) : 1;
       const Wc = correctedFlow(inlet.W, inlet.Tt, inlet.Pt);
-      const pen = (x['Rl_' + id] - Rl); // keep the solver inside the map
-      return { PR: m.PR, eff: m.eff, residual: m.Wc / Wc - 1 + pen, extra: { Nc_pct: 100 * (Nc / c.NcDes), Rline: Rl, surgeMargin_pct: c.map.surgeMargin(c.sc, Nc, Rl), rpm: N } };
+      const pen = (x['Rl_' + id] - Rl);
+      return { PR: m.PR, eff: m.eff, residual: (m.Wc * vsv) / Wc - 1 + pen, extra: { Nc_pct: 100 * (Nc / c.NcDes), Rline: Rl, surgeMargin_pct: c.map.surgeMargin(c.sc, Nc, Rl), rpm: N, Wc } };
     },
     turbine: (id, inlet, N, _cooling: TurbineStream[], _d, _powerReq, _PRmax) => {
       const t = dp.turbs[id];
@@ -97,10 +109,12 @@ function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<strin
       let residual = 0;
       if (od.throttle.mode === 'T4') residual = b.out.Tt / od.throttle.value - 1;
       else if (od.throttle.mode === 'Wf') residual = b.Wfuel / od.throttle.value - 1;
-      else residual = x.N_HP / (od.throttle.value * inp.speeds.HP) - 1;
+      else if (od.throttle.mode === 'NHP') residual = (fs ? fs.HP : x.N_HP) / (od.throttle.value * inp.speeds.HP) - 1;
+      else if (od.throttle.mode === 'NLP') residual = (fs ? fs.LP : (x.N_LP ?? inp.speeds.LP)) / (od.throttle.value * inp.speeds.LP) - 1;
+      else residual = 0; // 'Fn': closed after evaluation (needs the thrust)
       return { ...b, residual };
     },
-    nozzleArea: (id) => dp.nozzleAreas[id],
+    nozzleArea: (id) => { const a = dp.nozzleAreas[id]; return a === undefined ? undefined : a * (id === 'nozz' || id === 'core_nozz' ? geometry.A8scale : 1); },
     mixerAreas: () => dp.mixerAreas,
   };
 }
@@ -110,7 +124,13 @@ function withFlight(inp: EngineInputs, od: OffDesignInputs): EngineInputs {
   i.flight = { ...i.flight, altitude_m: od.altitude_m, mach: od.mach, dT_isa: od.dT_isa };
   if (od.HPX_W !== undefined) i.HPX_W = od.HPX_W;
   if (od.propPower_W !== undefined) i.prop.shaftPower_W = od.propPower_W;
+  if (od.installation !== undefined) i.installation = { ...i.installation, enabled: od.installation };
   return i;
+}
+/** Unknowns and residual names actually used, given the solve options. */
+function activeNames(inp: EngineInputs, opt: SolveOptions): string[] {
+  const names = unknownNames(inp);
+  return opt.fixedSpeeds ? names.filter((n) => !n.startsWith('N_')) : names;
 }
 
 export function designUnknowns(dp: DesignPoint): Record<string, number> {
@@ -126,25 +146,40 @@ export function designUnknowns(dp: DesignPoint): Record<string, number> {
   return x;
 }
 
+export function debugResiduals(dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>) { const inp = withFlight(dp.inputs, od); const prov = offDesignProvider(dp, od, x, {}); const result = evaluate(inp, prov); return { residuals: prov.residuals, stations: result.stations.map((s) => ({ id: s.id, Pt: s.Pt, Tt: s.Tt, W: s.W, MN: s.MN })), comps: result.components.map((c) => ({ id: c.id, ...c.values })) }; }
+
 export interface OffDesignSolution { result: EngineResult; converged: boolean; iterations: number; norm: number; x: Record<string, number> }
 
-function residualVector(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>): { r: number[]; names: string[]; result: EngineResult } {
-  const prov = offDesignProvider(dp, od, x);
+function residualVector(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>, opt: SolveOptions): { r: number[]; names: string[]; result: EngineResult } {
+  const prov = offDesignProvider(dp, od, x, opt);
   const result = evaluate(inp, prov);
+  if (od.throttle.mode === 'Fn') prov.residuals.burner = (od.installation ? result.perf.installedFn : result.perf.Fn) / od.throttle.value - 1;
+  if (opt.fixedSpeeds) {
+    // speeds are states: the power residuals become the reported imbalance
+    const imb: Record<string, number> = {};
+    for (const sh of result.shafts) imb[sh.name] = sh.powerIn_W - sh.powerOut_W;
+    for (const k of Object.keys(prov.residuals)) if (k.endsWith('_power')) delete prov.residuals[k];
+    result.offDesign = { converged: false, iterations: 0, residualNorm: 0, throttle: '', x, shaftImbalance_W: imb };
+  }
   const names = Object.keys(prov.residuals).sort();
   return { r: names.map((n) => prov.residuals[n]), names, result };
 }
 
 /** Solve the off-design point. Uses Newton with backtracking and, if needed, continuation in the throttle from the design value. */
-export function solveOffDesign(dp: DesignPoint, od: OffDesignInputs, x0?: Record<string, number>): OffDesignSolution {
+export function solveOffDesign(dp: DesignPoint, od: OffDesignInputs, x0?: Record<string, number>, opt: SolveOptions = {}): OffDesignSolution {
   const inp = withFlight(dp.inputs, od);
-  const names = unknownNames(inp);
+  const names = activeNames(inp, opt);
   let x = { ...(x0 ?? designUnknowns(dp)) };
   const scale: Record<string, number> = {}; for (const n of names) scale[n] = Math.abs(x[n]) || 1;
 
-  const run = (target: OffDesignInputs, xs: Record<string, number>) => newton(inp, dp, target, xs, names, scale);
+  const run = (target: OffDesignInputs, xs: Record<string, number>) => newton(inp, dp, target, xs, names, scale, opt);
   let sol = run(od, x);
-  if (!sol.converged) {
+  if (!sol.converged && x0 && !opt.fixedSpeeds) {
+    // a warm start can sit on a map edge; retry from the design point before continuation
+    const s2 = run(od, designUnknowns(dp));
+    if (s2.converged || s2.norm < sol.norm) sol = s2;
+  }
+  if (!sol.converged && !opt.fixedSpeeds) {
     // continuation from the design throttle setting
     const des = designThrottle(dp, od.throttle.mode);
     const steps = 6;
@@ -153,7 +188,7 @@ export function solveOffDesign(dp: DesignPoint, od: OffDesignInputs, x0?: Record
       const f = k / steps;
       const t = { ...od, throttle: { mode: od.throttle.mode, value: des + (od.throttle.value - des) * f }, altitude_m: dp.inputs.flight.altitude_m + (od.altitude_m - dp.inputs.flight.altitude_m) * f, mach: dp.inputs.flight.mach + (od.mach - dp.inputs.flight.mach) * f };
       const inpK = withFlight(dp.inputs, t);
-      const s = newton(inpK, dp, t, xs, names, scale);
+      const s = newton(inpK, dp, t, xs, names, scale, opt);
       if (!s.converged) break;
       xs = s.x;
       if (k === steps) sol = s;
@@ -165,15 +200,16 @@ export function solveOffDesign(dp: DesignPoint, od: OffDesignInputs, x0?: Record
 export function designThrottle(dp: DesignPoint, mode: ThrottleMode): number {
   if (mode === 'T4') return dp.inputs.burner.T4_K;
   if (mode === 'Wf') return dp.result.components.find((c) => c.id === 'burner')!.values.Wfuel_kgs;
+  if (mode === 'Fn') return dp.result.perf.Fn;
   return 1;
 }
 
-function newton(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x0: Record<string, number>, names: string[], scale: Record<string, number>): OffDesignSolution {
+function newton(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x0: Record<string, number>, names: string[], scale: Record<string, number>, opt: SolveOptions = {}): OffDesignSolution {
   let x = { ...x0 };
   const n = names.length;
-  const evalR = (xx: Record<string, number>) => { try { return residualVector(inp, dp, od, xx); } catch { return null; } };
+  const evalR = (xx: Record<string, number>) => { try { return residualVector(inp, dp, od, xx, opt); } catch { return null; } };
   let cur = evalR(x);
-  if (!cur) return { result: dp.result, converged: false, iterations: 0, norm: Infinity, x };
+  if (!cur || !cur.r.every(Number.isFinite)) return { result: dp.result, converged: false, iterations: 0, norm: Infinity, x };
   let norm = Math.hypot(...cur.r);
   let it = 0;
   for (; it < 40 && norm > 1e-9; it++) {
@@ -198,19 +234,20 @@ function newton(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x0: Rec
     for (let k = 0; k < 10; k++) {
       const xn: Record<string, number> = { ...x };
       for (let j = 0; j < n; j++) xn[names[j]] = x[names[j]] + lam * dx[j];
-      if (xn.W <= 0 || xn.FAR <= 0 || xn.N_HP <= 0 || (xn.BPR !== undefined && xn.BPR <= 0)) { lam *= 0.5; continue; }
+      if (xn.W <= 0 || xn.FAR <= 0 || (xn.N_HP !== undefined && xn.N_HP <= 0) || (xn.BPR !== undefined && xn.BPR <= 0)) { lam *= 0.5; continue; }
       const rn = evalR(xn);
-      if (rn) {
+      if (rn && rn.r.every(Number.isFinite)) {
         const nn = Math.hypot(...rn.r);
         if (nn < norm || k === 9) { x = xn; cur = rn; norm = nn; accepted = true; break; }
       }
       lam *= 0.5;
     }
     if (!accepted) break;
+    if ((globalThis as any).__OD_TRACE) console.log('  it', it, 'norm', norm.toExponential(2), 'lam', lam.toFixed(3), JSON.stringify(Object.fromEntries(Object.entries(x).map(([k, v]) => [k, +v.toPrecision(5)]))));
   }
   const converged = norm < 1e-6;
   const result = cur.result;
-  result.offDesign = { converged, iterations: it, residualNorm: norm, throttle: `${od.throttle.mode} ${od.throttle.value}`, x };
+  result.offDesign = { ...(result.offDesign ?? {}), converged, iterations: it, residualNorm: norm, throttle: `${od.throttle.mode} ${od.throttle.value}`, x };
   return { result, converged, iterations: it, norm, x };
 }
 

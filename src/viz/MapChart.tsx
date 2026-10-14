@@ -3,6 +3,7 @@ import { EngineInputs, EngineResult } from '../engine/types';
 import { makeDesignPoint } from '../engine/offdesign';
 import { correctedFlow } from '../engine/maps';
 import { fmt } from '../ui/format';
+import type { TransientSample } from '../engine/transient';
 
 /** Scaled compressor maps with the design point and the current operating point. */
 export function MapCharts({ design, result }: { design: EngineInputs; result: EngineResult }) {
@@ -58,6 +59,42 @@ function OneMap({ name, map, sc, NcDes, op, des }: { name: string; map: any; sc:
         <span><i style={{ background: 'transparent', border: '1.5px solid var(--text-primary)', borderRadius: '50%' }} />design point</span><span><i style={{ background: 'var(--series-2)', borderRadius: '50%' }} />operating point{op.Nc !== undefined ? ` · Nc ${fmt(op.Nc, 1)} % · surge margin ${fmt(op.SM ?? NaN, 1)} %` : ''}</span>
       </div>
       <div style={{ display: 'none' }}>{NcDes}</div>
+    </div>
+  );
+}
+
+/** Transient trajectory drawn on the first compressor map (HPC or the single compressor). */
+export function MapTrajectory({ design, samples }: { design: EngineInputs; samples: TransientSample[] }) {
+  const dp = useMemo(() => { try { return makeDesignPoint(design); } catch { return null; } }, [design]);
+  if (!dp || samples.length < 2) return null;
+  const id = dp.comps.hpc ? 'hpc' : dp.comps.comp ? 'comp' : Object.keys(dp.comps)[0];
+  const cd = dp.comps[id]; if (!cd) return null;
+  const W = 420, H = 260, m = { l: 48, r: 12, t: 10, b: 34 };
+  const d = cd.map.d;
+  const speeds: number[] = d.NcMap.filter((n: number) => n >= 0.5);
+  const lines = speeds.map((nc: number) => d.RlineMap.map((rl: number) => { const r = cd.map.read(cd.sc, nc * cd.sc.sNc, rl); return { Wc: r.Wc, PR: r.PR }; }));
+  const stall = speeds.map((nc: number) => { const r = cd.map.read(cd.sc, nc * cd.sc.sNc, d.RlineStall); return { Wc: r.Wc, PR: r.PR }; });
+  const traj = samples.filter((s) => Number.isFinite(s.Wc[id]) && Number.isFinite(s.PR[id])).map((s) => ({ Wc: s.Wc[id], PR: s.PR[id] }));
+  const allW = [...lines.flat().map((p: any) => p.Wc), ...traj.map((p) => p.Wc)], allP = [...lines.flat().map((p: any) => p.PR), ...traj.map((p) => p.PR)];
+  const xmin = 0, xmax = Math.max(...allW) * 1.05, ymin = 1, ymax = Math.max(...allP) * 1.05;
+  const sx = (v: number) => m.l + ((v - xmin) / (xmax - xmin)) * (W - m.l - m.r);
+  const sy = (v: number) => H - m.b - ((v - ymin) / (ymax - ymin)) * (H - m.t - m.b);
+  const path = (pts: { Wc: number; PR: number }[]) => pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.Wc).toFixed(1)},${sy(p.PR).toFixed(1)}`).join('');
+  return (
+    <div className="chart">
+      <h4>{id.toUpperCase()} running line during the transient</h4>
+      <div className="sub">operating point trajectory on the scaled map · start ○ end ●</div>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="transient trajectory on compressor map">
+        <g className="axis"><line x1={m.l} x2={W - m.r} y1={H - m.b} y2={H - m.b} /><line x1={m.l} x2={m.l} y1={m.t} y2={H - m.b} /></g>
+        <text x={(m.l + W - m.r) / 2} y={H - 3} textAnchor="middle">corrected flow (kg/s)</text>
+        <text transform={`translate(11,${(m.t + H - m.b) / 2}) rotate(-90)`} textAnchor="middle">pressure ratio</text>
+        {lines.map((pts: any, k: number) => <path key={k} d={path(pts)} fill="none" stroke="var(--series-1)" strokeOpacity={0.3 + (0.5 * k) / lines.length} strokeWidth={1.2} />)}
+        <path d={path(stall)} fill="none" stroke="var(--bad)" strokeWidth={1.5} strokeDasharray="5 3" />
+        <path d={path(traj)} fill="none" stroke="var(--series-2)" strokeWidth={2.5} strokeLinejoin="round" />
+        <circle cx={sx(traj[0].Wc)} cy={sy(traj[0].PR)} r={5} fill="var(--surface-2)" stroke="var(--series-2)" strokeWidth={2} />
+        <circle cx={sx(traj[traj.length - 1].Wc)} cy={sy(traj[traj.length - 1].PR)} r={5} fill="var(--series-2)" stroke="var(--surface-2)" strokeWidth={2} />
+      </svg>
+      <div className="legendrow"><span><i style={{ background: 'var(--series-1)' }} />speed lines</span><span><i style={{ background: 'var(--bad)' }} />stall line</span><span><i style={{ background: 'var(--series-2)' }} />trajectory</span></div>
     </div>
   );
 }

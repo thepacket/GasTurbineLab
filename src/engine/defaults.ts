@@ -31,9 +31,13 @@ export function defaultInputs(arch: Architecture): EngineInputs {
     prop: { shaftPower_W: 1.4e6, gearboxEff: 0.985, gearRatio: 16, propEff: 0.9, diameter_m: 3.9 },
     LHV_Jkg: 43.0e6,
     chemistry: 'equilibrium',
+    geometry: { customerBleed_kgs: 0, handlingBleedFrac: 0, A8scale: 1, vsvFlowGain: 0 },
+    installation: { enabled: false, captureRatioDesign: 0.95, nacelleCf: 0.0025, afterbodyCd: 0.02 },
+    inertia: { LP: 40, IP: 10, HP: 6, PT: 2 },
   };
   if (arch === 'turbojet') {
     base.speeds = { LP: 8070, IP: 8070, HP: 8070, PT: 8070 };
+    base.inertia = { LP: 0, IP: 0, HP: 12, PT: 0 };
   }
   if (arch === 'turbofan') {
     base.speeds = { LP: 4666, IP: 8000, HP: 14706, PT: 0 };
@@ -56,6 +60,7 @@ export function defaultInputs(arch: Architecture): EngineInputs {
     base.lpt = { eff: 0.9, MN: 0.35 };
     base.coreNozzle = { type: 'CV', Cv: 0.98 };
     base.speeds = { LP: 0, IP: 0, HP: 30000, PT: 20000 };
+    base.inertia = { LP: 0, IP: 0, HP: 0.25, PT: 0.6 };
     base.prop.gearRatio = 16.7; // 20000 -> ~1200 rpm
   }
   return base;

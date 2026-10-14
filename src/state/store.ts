@@ -5,8 +5,10 @@ import { solveEngine } from '../engine/cycle';
 import { OffDesignInputs } from '../engine/offdesign';
 import { request } from '../engine/client';
 import { decodeShare } from '../ui/share';
+import { loadCustomMaps } from '../engine/custommaps';
+loadCustomMaps();
 
-export type View = 'build' | 'section' | 'model' | 'results' | 'explore' | 'compare' | 'validate';
+export type View = 'build' | 'section' | 'model' | 'results' | 'explore' | 'compare' | 'transient' | 'mission' | 'maps' | 'learn' | 'validate';
 
 export interface AppState {
   inputs: EngineInputs;
@@ -18,6 +20,7 @@ export interface AppState {
   compare: EngineInputs | null;
   compareLabel: string | null;
   units: 'SI' | 'imperial';
+  scenario: string | null;
 }
 
 type Action =
@@ -31,6 +34,7 @@ type Action =
   | { type: 'compare'; inputs: EngineInputs | null; label: string | null }
   | { type: 'load'; state: Partial<AppState> }
   | { type: 'units'; units: 'SI' | 'imperial' }
+  | { type: 'scenario'; id: string | null }
   | { type: 'reset' };
 
 const KEY = 'gtl.state.v1';
@@ -54,6 +58,7 @@ function reducer(s: AppState, a: Action): AppState {
     case 'compare': return { ...s, compare: a.inputs, compareLabel: a.label };
     case 'load': return { ...s, ...a.state };
     case 'units': return { ...s, units: a.units };
+    case 'scenario': return { ...s, scenario: a.id };
     case 'reset': return { ...s, inputs: defaultInputs(s.inputs.arch), selected: null, note: null };
   }
 }
@@ -63,7 +68,7 @@ export function odFromDesign(i: EngineInputs): OffDesignInputs {
 }
 
 function load(): AppState {
-  const fallback: AppState = { inputs: defaultInputs('turbofan'), selected: null, view: 'build', note: null, mode: 'design', od: odFromDesign(defaultInputs('turbofan')), compare: null, compareLabel: null, units: 'SI' };
+  const fallback: AppState = { inputs: defaultInputs('turbofan'), selected: null, view: 'build', note: null, mode: 'design', od: odFromDesign(defaultInputs('turbofan')), compare: null, compareLabel: null, units: 'SI', scenario: null };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
@@ -71,7 +76,7 @@ function load(): AppState {
     // merge with defaults so new fields get sane values
     const d = defaultInputs(parsed.inputs?.arch ?? 'turbofan');
     const inputs = { ...d, ...parsed.inputs };
-    for (const k of ['ipc', 'ipt', 'mixer', 'fanGear', 'speeds', 'prop', 'afterburner'] as const) (inputs as any)[k] = { ...(d as any)[k], ...(parsed.inputs?.[k] ?? {}) };
+    for (const k of ['ipc', 'ipt', 'mixer', 'fanGear', 'speeds', 'prop', 'afterburner', 'geometry', 'installation', 'inertia'] as const) (inputs as any)[k] = { ...(d as any)[k], ...(parsed.inputs?.[k] ?? {}) };
     const od = { ...fallback.od, ...(parsed.od ?? {}) };
     return { ...fallback, ...parsed, inputs, od };
   } catch {

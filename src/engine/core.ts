@@ -28,6 +28,8 @@ export interface Provider {
   /** fixed mixer areas in off-design */
   mixerAreas(): { Acore: number; Abyp: number } | undefined;
   residuals: Record<string, number>;
+  /** effective variable geometry / bleed settings for this evaluation */
+  geometry: EngineInputs['geometry'];
 }
 
 function station(id: string, name: string, f: Flow, st: StaticState, x: number, stream: Station['stream'] = 'core'): Station {
@@ -51,7 +53,7 @@ export function propellerThrust(Pavail: number, V0: number, rho: number, diamete
 /** Design-point provider: fixed compressor PR/eff; turbine PR solved for the required power. */
 export function designProvider(inp: EngineInputs): Provider {
   return {
-    W: inp.flight.W_kgs, BPR: inp.BPR, speeds: inp.speeds, residuals: {},
+    W: inp.flight.W_kgs, BPR: inp.BPR, speeds: inp.speeds, residuals: {}, geometry: inp.geometry,
     compressor: (_id, _inlet, _N, d) => ({ PR: d.PR, eff: d.eff }),
     turbine: (_id, inlet, _N, cooling, d, powerReq, PRmax) => {
       const t = turbineForPower(inlet, powerReq, d.eff, cooling, PRmax);
@@ -88,7 +90,12 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   const perf: Performance = {
     Fn: 0, Fg: 0, ramDrag, Fg_core: 0, Fg_byp: 0, TSFC_kg_Nh: 0, TSFC_mg_Ns: 0, Wfuel: 0, specificThrust: 0, OPR: 1, FAR: 0,
     thermalEff: 0, propulsiveEff: 0, overallEff: 0, V0, shaftPower_W: 0, propThrust: 0, jetThrust: 0, ESHP_W: 0, PSFC_kg_kWh: 0, heatRate_W: 0,
+    installedFn: 0, inletDrag: 0, nacelleDrag: 0, afterbodyDrag: 0, installedTSFC_mg_Ns: 0,
+    EI_NOx_g_kg: 0, EI_CO_g_kg: 0, NOx_g_s: 0, CO_g_s: 0, CO2_g_s: 0, jetNoise_dB: 0,
   };
+  const geom = prov.geometry;
+  const jets: { W: number; V: number; rho: number; A: number }[] = [];
+  let T3 = 0, P3 = 0;
   let kineticPowerOut = 0;
   let Wfuel = 0;
   const PRavail = (Pt: number) => Pt / (amb.P * 1.02);
@@ -109,19 +116,25 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     const Ades = prov.nozzleArea(id);
     if (Ades !== undefined) R[id + '_area'] = n.throat.A / Ades - 1;
     kineticPowerOut += 0.5 * f.W * (n.Fg / f.W) ** 2;
+    jets.push({ W: f.W, V: n.Fg / f.W, rho: n.exit.rho, A: n.exit.A });
     return n;
   };
+  /** overboard handling bleed at a compressor exit (turbojet / turboprop): flow removed, work already spent */
+  const dumpOverboard = (f: Flow, frac: number): Flow => (frac > 0 ? { ...f, W: f.W * (1 - frac) } : f);
   const hpx = inp.HPX_W;
 
   if (inp.arch === 'turbojet') {
     const N = prov.speeds.HP;
     stations.push(station('2', 'Compressor inlet', f2, st2, 0.17));
     const op = prov.compressor('comp', f2, N, inp.comp);
-    const c = compressor(f2, op.PR, op.eff);
+    const c = compressor(f2, op.PR, op.eff, [Math.min(0.5, geom.customerBleed_kgs / f2.W)]);
     if (op.residual !== undefined) R.comp_flow = op.residual;
-    stations.push(station('3', 'Compressor exit', c.out, staticFromMN(c.out, inp.comp.MN), 0.42));
+    const f3 = dumpOverboard(c.out, geom.handlingBleedFrac);
+    stations.push(station('3', 'Compressor exit', f3, staticFromMN(f3, inp.comp.MN), 0.42));
     compValues('comp', 'Compressor', op, c);
-    const b = prov.burner('burner', c.out, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
+    if (geom.customerBleed_kgs > 0 || geom.handlingBleedFrac > 0) components[components.length - 1].values.bleed_kgs = c.bleeds[0].W + c.out.W * geom.handlingBleedFrac;
+    T3 = f3.Tt; P3 = f3.Pt;
+    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'Turbine inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.56));
@@ -179,12 +192,18 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
       compValues('lpc', 'LP compressor (booster)', lop, lpc);
       f25 = lpc.out; lpPower = lpc.power;
     }
-    const hop = prov.compressor('hpc', f25, Nhp, inp.hpc);
-    const hpc = compressor(f25, hop.PR, hop.eff, [inp.coolInletFrac, inp.coolExitFrac]);
+    // handling bleed: part of the booster/IPC exit flow is dumped into the bypass duct
+    const Whb = f25.W * geom.handlingBleedFrac;
+    const f25c: Flow = Whb > 0 ? { ...f25, W: f25.W - Whb } : f25;
+    const hop = prov.compressor('hpc', f25c, Nhp, inp.hpc);
+    const hpc = compressor(f25c, hop.PR, hop.eff, [inp.coolInletFrac, inp.coolExitFrac, Math.min(0.3, geom.customerBleed_kgs / f25c.W)]);
     if (hop.residual !== undefined) R.hpc_flow = hop.residual;
     stations.push(station('3', 'HPC exit', hpc.out, staticFromMN(hpc.out, inp.hpc.MN), 0.50));
     compValues('hpc', 'HP compressor', hop, hpc);
     components[components.length - 1].values.Wbleed_kgs = hpc.bleeds[0].W + hpc.bleeds[1].W;
+    if (hpc.bleeds[2].W > 0) components[components.length - 1].values.customerBleed_kgs = hpc.bleeds[2].W;
+    if (Whb > 0) components[components.length - 1].values.handlingBleed_kgs = Whb;
+    T3 = hpc.out.Tt; P3 = hpc.out.Pt;
     if (hpc.out.Tt > 950) warnings.push(`HPC exit temperature ${hpc.out.Tt.toFixed(0)} K exceeds typical material limits (~950 K).`);
     const b = prov.burner('burner', hpc.out, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
     if (b.residual !== undefined) R.burner = b.residual;
@@ -221,7 +240,12 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     stations.push(station('5', 'LPT exit', lpt.out, staticFromMN(lpt.out, inp.lpt.MN), 0.76));
     turbValues('lpt', 'LP turbine', lop2, lpt.power, lpt.out.Tt);
     shafts.push({ name: 'LP shaft', powerIn_W: lpt.power * inp.mechEff, powerOut_W: fanShaftPower + lpPower, turbinePR: lop2.PR, rpm: Nlp, outputRpm: inp.fanGear.ratio !== 1 ? Nfan : undefined });
-    const f17: Flow = { ...f13, Pt: f13.Pt * (1 - inp.bypDuct_dPqP) };
+    let f17: Flow = { ...f13, Pt: f13.Pt * (1 - inp.bypDuct_dPqP) };
+    if (Whb > 0) { // bleed air mixes into the bypass duct at bypass pressure
+      const ht = (f17.W * f17.ht + Whb * f25.ht) / (f17.W + Whb);
+      const Tt = f17.gas.TfromH(ht, f17.Pt, f17.Tt + 20);
+      f17 = { gas: f17.gas, Pt: f17.Pt, Tt, ht, W: f17.W + Whb };
+    }
     if (inp.mixed) {
       stations.push(station('17', 'Bypass duct exit', f17, staticFromMN(f17, 0.45), 0.72, 'bypass'));
       const areas = prov.mixerAreas();
@@ -253,11 +277,13 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     const Nhp = prov.speeds.HP, Npt = prov.speeds.PT;
     stations.push(station('2', 'Compressor inlet', f2, st2, 0.30));
     const op = prov.compressor('comp', f2, Nhp, inp.comp);
-    const c = compressor(f2, op.PR, op.eff);
+    const c = compressor(f2, op.PR, op.eff, [Math.min(0.5, geom.customerBleed_kgs / f2.W)]);
     if (op.residual !== undefined) R.comp_flow = op.residual;
-    stations.push(station('3', 'Compressor exit', c.out, staticFromMN(c.out, inp.comp.MN), 0.50));
+    const f3 = dumpOverboard(c.out, geom.handlingBleedFrac);
+    stations.push(station('3', 'Compressor exit', f3, staticFromMN(f3, inp.comp.MN), 0.50));
     compValues('comp', 'Compressor', op, c);
-    const b = prov.burner('burner', c.out, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
+    T3 = f3.Tt; P3 = f3.Pt;
+    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'Turbine inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.62));
@@ -309,5 +335,32 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   perf.propulsiveEff = V0 > 0 ? (perf.Fn * V0) / Math.max(kineticPowerOut - kineticPowerIn, 1e-9) : 0;
   perf.overallEff = V0 > 0 ? (perf.Fn * V0) / perf.heatRate_W : 0;
   if (perf.FAR > 0.9 * 0.0678) warnings.push('Fuel/air ratio is close to stoichiometric.');
+
+  // ---- installed performance (optional): additive inlet drag, nacelle friction, afterbody drag
+  const q0 = 0.5 * amb.rho * V0 * V0;
+  if (inp.installation.enabled) {
+    const A2 = st2.A;
+    const rTip = Math.sqrt(A2 / (Math.PI * (1 - 0.3 * 0.3)));
+    const Ahl = A2 / inp.installation.captureRatioDesign; // highlight area sized at the design capture ratio
+    const A0 = V0 > 0 ? W0 / (amb.rho * V0) : Ahl;
+    const Dmax = 2.3 * rTip, L = (inp.arch === 'turbofan' ? 3.6 : 5.6) * rTip;
+    perf.inletDrag = 0.4 * q0 * Math.max(Ahl - A0, 0); // ~60 % of additive drag recovered by lip suction
+    perf.nacelleDrag = inp.installation.nacelleCf * 1.25 * q0 * Math.PI * Dmax * L;
+    const A9 = jets.reduce((a, j) => a + j.A, 0);
+    perf.afterbodyDrag = inp.installation.afterbodyCd * q0 * Math.max((Math.PI * Dmax * Dmax) / 4 - A9, 0);
+  }
+  perf.installedFn = perf.Fn - perf.inletDrag - perf.nacelleDrag - perf.afterbodyDrag;
+  perf.installedTSFC_mg_Ns = perf.installedFn > 0 ? (Wfuel * 1e6) / perf.installedFn : NaN;
+
+  // ---- emissions: P3–T3 correlations (approximate, conventional RQL-type combustor)
+  const Wf = Wfuel;
+  perf.EI_NOx_g_kg = 32 * Math.pow(P3 / 2965e3, 0.4) * Math.exp((T3 - 826) / 194);
+  perf.EI_CO_g_kg = 0.4 + 40 * Math.exp(-(T3 - 450) / 110);
+  perf.NOx_g_s = perf.EI_NOx_g_kg * Wf; perf.CO_g_s = perf.EI_CO_g_kg * Wf; perf.CO2_g_s = 3160 * Wf;
+
+  // ---- jet mixing noise (Lighthill V^8 scaling, SAE ARP 876 style constant), OASPL at 1 m
+  let pw = 0;
+  for (const j of jets) { if (j.V > V0 + 1) pw += Math.pow(j.rho / amb.rho, 2) * Math.pow((j.V - V0) / a0, 8) * j.A; }
+  perf.jetNoise_dB = pw > 0 ? 141 + 10 * Math.log10(pw) : 0;
   return { inputs: inp, stations, components, perf, warnings, shafts };
 }

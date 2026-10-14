@@ -14,6 +14,16 @@ A gas-turbine cycle laboratory that runs entirely in the browser (installable PW
 
 The design point fixes nozzle throat and mixer areas and scales the NPSS-style component maps distributed with pyCycle (fan, LPC, HPC, HPT, LPT) so that each passes through its design flow, pressure ratio, efficiency and corrected speed. Off-design, the unknowns are inlet mass flow, bypass ratio, spool speeds, fuel/air ratio, compressor R-lines and turbine pressure ratios; the residuals are map-flow continuity at every compressor and turbine, shaft power balances, nozzle throat and mixer static-pressure matching, and the throttle target (T4, fuel flow or HP spool speed). A Newton solver with finite-difference Jacobian, backtracking and continuation from the design throttle solves 5 (turbojet) to 12 (three-spool turbofan) unknowns in a web worker. Results include corrected speeds, surge margins and the operating point drawn on each compressor map. Turboprops run with a constant-speed power turbine and a propeller load setting.
 
+## Transients, missions, installation, emissions
+
+* **Transient** (Transient tab): spool dynamics `I ω dω/dt = P_turbine − P_load` integrated with a Heun scheme while the gas path is solved quasi-steadily at each step with speeds held as states. A fuel ramp is applied, optionally limited by a ratio-unit (Wf/P3) acceleration schedule and deceleration floor. Outputs: spool speeds, fuel command vs delivered, thrust, surge margins, T4/T5 and the running-line trajectory on the compressor map. Inertias are inputs (Build → Spool inertia).
+* **Mission** (Mission tab): a segment profile (take-off, climb, cruise, descent, hold) flown with the fixed engine against a simple aircraft (mass, wing area, parabolic polar, engine count). Thrust required sets the throttle through a thrust-matching solve; N1, N2 and T4 ratings cap it and shortfalls are flagged. Fuel burn and mass are integrated; block fuel, time and distance are reported per segment.
+* **Variable geometry and bleeds**: customer bleed at HPC exit, handling bleed from the booster/compressor exit (to the bypass duct, or overboard), variable-area exhaust nozzle (A8 multiplier off-design) and a variable-stator flow gain on the fan and HPC maps.
+* **Installed performance**: additive inlet drag from the capture ratio, nacelle skin friction from the computed geometry, and afterbody drag; installed thrust and TSFC are reported and can drive the mission.
+* **Emissions and noise**: NOx and CO emission indices from P3–T3 correlations, CO₂ from fuel flow, and jet mixing noise from Lighthill V⁸ scaling (overall sound pressure level at 1 m). All are estimates and labelled as such.
+* **Custom maps** (Maps tab): assign any built-in or uploaded map to each compressor and turbine. Upload JSON (same structure as `src/data/maps.json`) or a CSV grid, or generate a parametric elliptical compressor map. Maps are kept in the browser's local storage.
+* **Learn** (Learn tab): seven guided scenarios (bypass ratio, T4, OPR, altitude, part power, acceleration and surge margin, block fuel) that load a design, open the right view and explain what to look for.
+
 ## Views
 
 * **Build**: architecture, layout, presets, catalogue, operating point (design / off-design) and every component parameter; SI inputs with a SI / US display-unit toggle in the header.
@@ -21,6 +31,7 @@ The design point fixes nozzle throat and mixer areas and scales the NPSS-style c
 * **Results**: performance cards, shaft balances with speeds, T–s and station profiles, compressor maps, station table (CSV export), component details.
 * **Explore**: design-point sweeps (new design per point) or off-design sweeps (fixed engine) with optional parameter families, computed in a worker; CSV export.
 * **Compare**: the live design against a pinned snapshot or any catalogue engine, with overlaid diagrams.
+* **Transient**, **Mission**, **Maps**, **Learn**: see above.
 * **Validate**: every station and performance figure against pyCycle.
 * **Share**: the link button encodes the complete design, operating point and comparison in the URL (`#d=`).
 
@@ -45,7 +56,7 @@ reference/venv/bin/python reference/pycycle_reference.py > src/data/pycycle_refe
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # vitest: pyCycle comparison, engine catalogue, off-design solver
+npm test           # vitest: pyCycle comparison, engine catalogue, off-design, transient, mission, catalogue envelope fuzz
 npm run test:e2e   # Playwright: desktop, tablet and phone layouts, off-design worker, PWA, share links
 npm run build      # static bundle + service worker in dist/
 node scripts/icons.mjs   # regenerate PWA icons from public/icons/icon.svg
@@ -66,7 +77,7 @@ fly deploy
 ```
 src/engine/      gas model (gas.ts, equilibrium.ts), components, generic core (core.ts),
                  design wrapper (cycle.ts), maps and off-design solver (maps.ts, offdesign.ts),
-                 engine catalogue (engines.ts), worker (worker.ts)
+                 transient.ts, mission.ts, custommaps.ts, engine catalogue (engines.ts), worker (worker.ts)
 src/data/        janaf polynomial coefficients, component maps, pyCycle reference results
 e2e/             Playwright layout and PWA tests
 src/viz/         SVG cross-section, shared parametric geometry, charts, explorer

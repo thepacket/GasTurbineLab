@@ -18,7 +18,7 @@ test('layout matches the viewport', async ({ page }, info) => {
     await expect(page.locator('.main.tablet')).toBeVisible();
     await expect(page.locator('aside.controls')).toBeVisible();
     await expect(page.locator('nav.tabbar')).toHaveCount(0);
-    await page.getByRole('button', { name: '3D', exact: true }).click();
+    await page.getByLabel('View').selectOption({ label: '3D' });
     await expect(page.locator('canvas.canvas3d')).toBeVisible();
   } else {
     await expect(page.locator('.main.phone')).toBeVisible();
@@ -40,7 +40,7 @@ test('no horizontal overflow', async ({ page }) => {
 async function showResults(page: import('@playwright/test').Page) {
   const w = page.viewportSize()!.width;
   if (w < 760) await page.locator('nav.tabbar').getByRole('button', { name: 'Results' }).click();
-  else if (w < 1180) await page.locator('header').getByRole('button', { name: 'Results' }).click();
+  else if (w < 1180) await page.getByLabel('View').selectOption({ label: 'Results' });
 }
 async function showBuild(page: import('@playwright/test').Page) {
   const w = page.viewportSize()!.width;

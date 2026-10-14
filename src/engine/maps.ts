@@ -11,6 +11,12 @@ export interface TurbineMapData { defaults: Record<string, number>; alphaMap: nu
 const DATA = mapsJson as unknown as { compressors: Record<string, CompressorMapData>; turbines: Record<string, TurbineMapData> };
 export const COMPRESSOR_MAPS = Object.keys(DATA.compressors);
 export const TURBINE_MAPS = Object.keys(DATA.turbines);
+const CUSTOM: { compressors: Record<string, CompressorMapData>; turbines: Record<string, TurbineMapData> } = { compressors: {}, turbines: {} };
+export function registerCustomMap(id: string, kind: 'compressor' | 'turbine', data: CompressorMapData | TurbineMapData) {
+  if (kind === 'compressor') CUSTOM.compressors[id] = data as CompressorMapData; else CUSTOM.turbines[id] = data as TurbineMapData;
+}
+export function listCustomMaps(): string[] { return [...Object.keys(CUSTOM.compressors), ...Object.keys(CUSTOM.turbines)]; }
+export function customMapKind(id: string): 'compressor' | 'turbine' | null { return CUSTOM.compressors[id] ? 'compressor' : CUSTOM.turbines[id] ? 'turbine' : null; }
 
 /** Bilinear interpolation on a 2-D table (first alpha slice), with linear extrapolation outside. */
 function interp2(xs: number[], ys: number[], table: number[][], x: number, y: number): number {
@@ -34,7 +40,7 @@ export interface TurbScalars { sNp: number; sPR: number; sEff: number; sWp: numb
 export class CompressorMap {
   readonly d: CompressorMapData;
   readonly name: string;
-  constructor(name: string) { this.name = name; this.d = DATA.compressors[name]; if (!this.d) throw new Error('unknown compressor map ' + name); }
+  constructor(name: string) { this.name = name; this.d = CUSTOM.compressors[name] ?? DATA.compressors[name]; if (!this.d) throw new Error('unknown compressor map ' + name); }
   raw(Nc: number, Rline: number) {
     return { Wc: interp2(this.d.NcMap, this.d.RlineMap, this.d.WcMap[0], Nc, Rline), PR: interp2(this.d.NcMap, this.d.RlineMap, this.d.PRmap[0], Nc, Rline), eff: interp2(this.d.NcMap, this.d.RlineMap, this.d.effMap[0], Nc, Rline) };
   }
@@ -62,7 +68,7 @@ export class CompressorMap {
 export class TurbineMap {
   readonly d: TurbineMapData;
   readonly name: string;
-  constructor(name: string) { this.name = name; this.d = DATA.turbines[name]; if (!this.d) throw new Error('unknown turbine map ' + name); }
+  constructor(name: string) { this.name = name; this.d = CUSTOM.turbines[name] ?? DATA.turbines[name]; if (!this.d) throw new Error('unknown turbine map ' + name); }
   raw(Np: number, PR: number) {
     return { Wp: interp2(this.d.NpMap, this.d.PRmap, this.d.WpMap[0], Np, PR), eff: interp2(this.d.NpMap, this.d.PRmap, this.d.effMap[0], Np, PR) };
   }

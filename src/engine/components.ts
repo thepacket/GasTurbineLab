@@ -117,9 +117,11 @@ export interface NozzleOut {
 }
 
 /** Convergent (CV) or convergent-divergent (CD) nozzle. Cv applied to exit velocity for gross thrust (pyCycle convention). */
-export function nozzle(inp: Flow, Pamb: number, type: 'CV' | 'CD', Cv: number): NozzleOut {
+export function nozzle(inp: Flow, PambIn: number, type: 'CV' | 'CD', Cv: number): NozzleOut {
   const sonic = staticFromMN(inp, 1);
-  const PR = inp.Pt / Pamb;
+  // a nozzle cannot expand to a back pressure above its total pressure: keep a tiny expansion so areas stay finite
+  const Pamb = Math.min(PambIn, inp.Pt * 0.995);
+  const PR = inp.Pt / PambIn;
   let exit: StaticState;
   let choked = Pamb < sonic.Ps;
   if (type === 'CV') {

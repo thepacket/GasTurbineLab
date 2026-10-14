@@ -48,11 +48,27 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
             <div className="card"><div className="k">Fuel flow</div><div className="v">{C(u.fuelflow(p.Wfuel))}</div></div>
           </>
         )}
+        {result.inputs.installation.enabled && arch !== 'turboprop' && (
+          <>
+            <div className="card"><div className="k">Installed net thrust</div><div className="v">{C(u.thrust(p.installedFn))}</div></div>
+            <div className="card"><div className="k">Installation drag</div><div className="v">{C(u.thrust(p.inletDrag + p.nacelleDrag + p.afterbodyDrag))}<small style={{ display: 'block', marginLeft: 0 }}>inlet {u.thrust(p.inletDrag).v} · nacelle {u.thrust(p.nacelleDrag).v} · afterbody {u.thrust(p.afterbodyDrag).v}</small></div></div>
+          </>
+        )}
         <div className="card"><div className="k">Overall pressure ratio</div><div className="v">{fmt(p.OPR, 1)}</div></div>
         <div className="card"><div className="k">Fuel/air ratio</div><div className="v">{fmt(p.FAR, 4)}</div></div>
         <div className="card"><div className="k">Thermal efficiency</div><div className="v">{pct(p.thermalEff)}</div></div>
         <div className="card"><div className="k">Propulsive efficiency</div><div className="v">{p.V0 > 0 ? pct(p.propulsiveEff) : '–'}</div></div>
         <div className="card"><div className="k">Overall efficiency</div><div className="v">{p.V0 > 0 ? pct(p.overallEff) : '–'}</div></div>
+      </div>
+
+      <div className="section">
+        <h3>Emissions & noise <span className="hint">P3–T3 correlations, Lighthill jet noise · estimates</span></h3>
+        <div className="kv">
+          <span className="k">NOx emission index</span><span className="v">{fmt(p.EI_NOx_g_kg, 1)} g/kg fuel · {fmt(p.NOx_g_s, 2)} g/s</span>
+          <span className="k">CO emission index</span><span className="v">{fmt(p.EI_CO_g_kg, 1)} g/kg fuel · {fmt(p.CO_g_s, 2)} g/s</span>
+          <span className="k">CO₂</span><span className="v">{fmt(p.CO2_g_s / 1000, 2)} kg/s · {fmt((p.CO2_g_s * 3.6) / 1000, 0)} kg/h</span>
+          <span className="k">Jet mixing noise, OASPL at 1 m</span><span className="v">{fmt(p.jetNoise_dB, 0)} dB · at 100 m {fmt(p.jetNoise_dB - 40, 0)} dB</span>
+        </div>
       </div>
 
       <div className="section">

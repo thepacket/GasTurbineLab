@@ -237,6 +237,37 @@ export function Controls({ store }: { store: Store }) {
         )}
       </Section>
 
+      <Section title="Variable geometry & bleeds" hint="design values">
+        {S({ label: 'Customer bleed (HPC exit)', path: 'geometry.customerBleed_kgs', value: i.geometry.customerBleed_kgs, min: 0, max: arch === 'turboprop' ? 1 : 5, step: 0.01, unit: 'kg/s' })}
+        {S({ label: 'Handling bleed (booster / compressor exit)', path: 'geometry.handlingBleedFrac', value: i.geometry.handlingBleedFrac, min: 0, max: 0.2, step: 0.005, unit: '%', scale: 100, digits: 1 })}
+        {S({ label: 'Variable stator flow gain', path: 'geometry.vsvFlowGain', value: i.geometry.vsvFlowGain, min: -1, max: 1, step: 0.01 })}
+        {store.state.mode === 'offdesign' && (
+          <>
+            <OdSlider label="Off-design: nozzle throat area A8" path="geometry.A8scale" value={od.geometry?.A8scale ?? i.geometry.A8scale} min={0.7} max={1.4} step={0.01} unit="× design" store={store} />
+            <OdSlider label="Off-design: customer bleed" path="geometry.customerBleed_kgs" value={od.geometry?.customerBleed_kgs ?? i.geometry.customerBleed_kgs} min={0} max={5} step={0.01} unit="kg/s" store={store} />
+            <OdSlider label="Off-design: handling bleed" path="geometry.handlingBleedFrac" value={od.geometry?.handlingBleedFrac ?? i.geometry.handlingBleedFrac} min={0} max={0.2} step={0.005} unit="%" scale={100} digits={1} store={store} />
+          </>
+        )}
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Variable stator gain: map corrected flow × (1 + gain·(Nc/Nc,des − 1)) on the fan and HPC. Negative gain closes stators at low speed.</div>
+      </Section>
+
+      <Section title="Installation" hint="nacelle, inlet, afterbody">
+        <label className="toggle"><input type="checkbox" checked={i.installation.enabled} onChange={(e) => store.set('installation.enabled', e.target.checked)} /> Report installed thrust</label>
+        {i.installation.enabled && (
+          <>
+            {S({ label: 'Design inlet capture ratio A0/A_highlight', path: 'installation.captureRatioDesign', value: i.installation.captureRatioDesign, min: 0.6, max: 1, step: 0.01 })}
+            {S({ label: 'Nacelle skin-friction coefficient', path: 'installation.nacelleCf', value: i.installation.nacelleCf, min: 0.001, max: 0.006, step: 0.0001, digits: 4 })}
+            {S({ label: 'Afterbody drag coefficient', path: 'installation.afterbodyCd', value: i.installation.afterbodyCd, min: 0, max: 0.1, step: 0.001 })}
+          </>
+        )}
+      </Section>
+
+      <Section title="Spool inertia" hint="for transients">
+        {arch === 'turbofan' && S({ label: 'LP spool', path: 'inertia.LP', value: i.inertia.LP, min: 0.5, max: 400, step: 0.5, unit: 'kg·m²' })}
+        {arch === 'turbofan' && i.spools === 3 && S({ label: 'IP spool', path: 'inertia.IP', value: i.inertia.IP, min: 0.5, max: 100, step: 0.5, unit: 'kg·m²' })}
+        {S({ label: arch === 'turbofan' ? 'HP spool' : arch === 'turboprop' ? 'Gas-generator spool' : 'Spool', path: 'inertia.HP', value: i.inertia.HP, min: 0.05, max: 60, step: 0.05, unit: 'kg·m²' })}
+      </Section>
+
       <Section title="Design shaft speeds" hint="for corrected-speed maps">
         {arch === 'turbofan' && S({ label: 'LP spool', path: 'speeds.LP', value: i.speeds.LP, min: 1000, max: 20000, step: 10, unit: 'rpm' })}
         {arch === 'turbofan' && i.spools === 3 && S({ label: 'IP spool', path: 'speeds.IP', value: i.speeds.IP, min: 2000, max: 20000, step: 10, unit: 'rpm' })}
