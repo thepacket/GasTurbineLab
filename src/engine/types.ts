@@ -79,6 +79,11 @@ export interface EngineInputs {
   inertia: { LP: number; IP: number; HP: number; PT: number };
   /** component map choices (built-in names or custom map ids) */
   mapIds?: Record<string, string>;
+  /** fuel type and ambient humidity */
+  fuel: 'jetA' | 'saf' | 'hydrogen' | 'methane';
+  humidity: { relative: number }; // 0..1 relative humidity at the ambient condition
+  /** turbine cooling model: fixed fractions, or computed from a target blade metal temperature */
+  cooling: { mode: 'fixed' | 'computed'; targetMetal_K: number; effectivenessMax: number; coolantTempRise_K: number };
 }
 
 export interface Station {

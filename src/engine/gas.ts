@@ -33,6 +33,36 @@ const JETA_MW = 12 * ELEMENT_WT.C + 23 * ELEMENT_WT.H;
 export const JETA: Composition = { N: 0, O: 0, Ar: 0, C: 12 / JETA_MW, H: 23 / JETA_MW };
 export const FAR_STOICH = (AIR.O - 2 * AIR.C) / (2 * JETA.C + 0.5 * JETA.H);
 
+/** Fuels: elemental composition per kg, lower heating value and absolute enthalpy of the liquid/gas as supplied. */
+export type FuelId = 'jetA' | 'saf' | 'hydrogen' | 'methane';
+export interface Fuel { id: FuelId; name: string; comp: Composition; LHV_Jkg: number; h_Jkg: number; stoichFAR: number; density_kgm3: number; note: string }
+const fuelOf = (id: FuelId, name: string, C: number, H: number, LHV: number, hForm_Jmol: number, density: number, note: string): Fuel => {
+  const MW = C * ELEMENT_WT.C + H * ELEMENT_WT.H;
+  const comp: Composition = { N: 0, O: 0, Ar: 0, C: C / MW, H: H / MW };
+  const stoich = (AIR.O - 2 * AIR.C) / (2 * comp.C + 0.5 * comp.H);
+  return { id, name, comp, LHV_Jkg: LHV, h_Jkg: (hForm_Jmol * 1000) / MW, stoichFAR: stoich, density_kgm3: density, note };
+};
+export const FUELS: Record<FuelId, Fuel> = {
+  jetA: fuelOf('jetA', 'Jet-A (kerosene)', 12, 23, 43.0e6, 0, 800, 'C12H23 surrogate; fuel enthalpy 0 reproduces pyCycle.'),
+  saf: fuelOf('saf', 'Synthetic paraffinic kerosene (SAF)', 12, 26, 44.1e6, 0, 760, 'C12H26 paraffin: higher H/C, ~2.5 % higher LHV, lower CO2 per MJ.'),
+  hydrogen: fuelOf('hydrogen', 'Hydrogen', 0, 2, 120.0e6, 0, 71, 'Gaseous H2 at combustor inlet; LHV per kg 2.8× kerosene.'),
+  methane: fuelOf('methane', 'Methane (LNG)', 1, 4, 50.0e6, -74870, 423, 'CH4; formation enthalpy -74.87 kJ/mol.'),
+};
+/** Humid air: adds water vapour at a water/air mass ratio (kg water per kg dry air). */
+export function humidAir(war: number): Composition {
+  if (war <= 0) return AIR;
+  const MW_H2O = 2 * ELEMENT_WT.H + ELEMENT_WT.O;
+  const water: Composition = { N: 0, O: 1 / MW_H2O, Ar: 0, C: 0, H: 2 / MW_H2O };
+  return mixComposition(AIR, 1, water, war);
+}
+/** Water/air ratio from relative humidity at ambient T (K) and P (Pa) (Magnus saturation pressure). */
+export function warFromRH(rh: number, T: number, P: number): number {
+  const Tc = T - 273.15;
+  const ps = 610.94 * Math.exp((17.625 * Tc) / (Tc + 243.04));
+  const pw = Math.min(rh, 1) * ps;
+  return (0.622 * pw) / Math.max(P - pw, 1);
+}
+
 export function mixComposition(a: Composition, wa: number, b: Composition, wb: number): Composition {
   const t = wa + wb;
   return { N: (a.N * wa + b.N * wb) / t, O: (a.O * wa + b.O * wb) / t, Ar: (a.Ar * wa + b.Ar * wb) / t, C: (a.C * wa + b.C * wb) / t, H: (a.H * wa + b.H * wb) / t };
@@ -64,20 +94,26 @@ export class Gas {
 
   constructor(comp: Composition, far = 0, chemistry: Chemistry = 'equilibrium') {
     this.comp = comp; this.far = far; this.chemistry = chemistry;
+    this.fuel = FUELS.jetA;
     this.n = speciesMoles(comp);
     this.nTotal = Object.values(this.n).reduce((s, v) => s + v, 0);
     this.R = R_UNIVERSAL * this.nTotal;
     this.MW = 1 / this.nTotal;
   }
-  static air(chemistry: Chemistry = 'equilibrium'): Gas { return new Gas(AIR, 0, chemistry); }
+  readonly fuel: Fuel;
+  static air(chemistry: Chemistry = 'equilibrium', war = 0, fuel: FuelId = 'jetA'): Gas { const g = new Gas(humidAir(war), 0, chemistry); (g as any).fuel = FUELS[fuel]; return g; }
   withFuel(farAdd: number): Gas {
     const airMass = 1 / (1 + this.far);
-    return new Gas(mixComposition(this.comp, 1, JETA, farAdd * airMass), this.far + farAdd, this.chemistry);
+    const g = new Gas(mixComposition(this.comp, 1, this.fuel.comp, farAdd * airMass), this.far + farAdd, this.chemistry);
+    (g as any).fuel = this.fuel;
+    return g;
   }
   mixWith(other: Gas, wThis: number, wOther: number): Gas {
     const comp = mixComposition(this.comp, wThis, other.comp, wOther);
     const fuelThis = (wThis * this.far) / (1 + this.far), fuelOther = (wOther * other.far) / (1 + other.far);
-    return new Gas(comp, (fuelThis + fuelOther) / (wThis + wOther - fuelThis - fuelOther), this.chemistry);
+    const g = new Gas(comp, (fuelThis + fuelOther) / (wThis + wOther - fuelThis - fuelOther), this.chemistry);
+    (g as any).fuel = this.fuel;
+    return g;
   }
 
   private useEq(T: number) { return this.chemistry === 'equilibrium' && T >= EQ_T_MIN; }

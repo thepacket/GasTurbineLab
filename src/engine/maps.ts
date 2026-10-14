@@ -41,7 +41,14 @@ export class CompressorMap {
   readonly d: CompressorMapData;
   readonly name: string;
   constructor(name: string) { this.name = name; this.d = CUSTOM.compressors[name] ?? DATA.compressors[name]; if (!this.d) throw new Error('unknown compressor map ' + name); }
-  raw(Nc: number, Rline: number) {
+  raw(Nc: number, Rline: number): { Wc: number; PR: number; eff: number } {
+    const NcMin = this.d.NcMap[0];
+    if (Nc < NcMin) {
+      // sub-idle extension: flow ~ speed, pressure rise ~ speed², efficiency falls toward zero speed (windmilling branch is PR < 1 at zero speed)
+      const f = Math.max(Nc, 0) / NcMin;
+      const b = this.raw(NcMin, Rline);
+      return { Wc: b.Wc * f, PR: 1 + (b.PR - 1) * f * f - 0.02 * (1 - f), eff: b.eff * (0.35 + 0.65 * f) };
+    }
     return { Wc: interp2(this.d.NcMap, this.d.RlineMap, this.d.WcMap[0], Nc, Rline), PR: interp2(this.d.NcMap, this.d.RlineMap, this.d.PRmap[0], Nc, Rline), eff: interp2(this.d.NcMap, this.d.RlineMap, this.d.effMap[0], Nc, Rline) };
   }
   /** Scalars so that the map's design point reproduces (Nc, PR, eff, Wc). */
@@ -69,8 +76,14 @@ export class TurbineMap {
   readonly d: TurbineMapData;
   readonly name: string;
   constructor(name: string) { this.name = name; this.d = CUSTOM.turbines[name] ?? DATA.turbines[name]; if (!this.d) throw new Error('unknown turbine map ' + name); }
-  raw(Np: number, PR: number) {
-    return { Wp: interp2(this.d.NpMap, this.d.PRmap, this.d.WpMap[0], Np, PR), eff: interp2(this.d.NpMap, this.d.PRmap, this.d.effMap[0], Np, PR) };
+  raw(Np: number, PR: number): { Wp: number; eff: number } {
+    const NpMin = this.d.NpMap[0], PRmin = this.d.PRmap[0];
+    const n = Math.max(Np, 0.25 * NpMin), p = Math.max(PR, 1.02);
+    const base = { Wp: interp2(this.d.NpMap, this.d.PRmap, this.d.WpMap[0], Math.max(n, NpMin), Math.max(p, PRmin)), eff: interp2(this.d.NpMap, this.d.PRmap, this.d.effMap[0], Math.max(n, NpMin), Math.max(p, PRmin)) };
+    // below the tabulated PR range the turbine unchokes: flow ~ sqrt(1 - 1/PR^2) relative to the lowest tabulated PR
+    const flowScale = p < PRmin ? Math.sqrt(Math.max(1 - 1 / (p * p), 0.01) / (1 - 1 / (PRmin * PRmin))) : 1;
+    const effScale = n < NpMin ? 0.4 + 0.6 * (n / NpMin) : 1;
+    return { Wp: base.Wp * flowScale, eff: base.eff * effScale };
   }
   scalars(NpDes: number, PRDes: number, effDes: number, WpDes: number): TurbScalars {
     const m = this.raw(this.d.defaults.NpMap, this.d.defaults.PRmap);

@@ -5,12 +5,16 @@ import { solveEngine } from './cycle';
 import { runTransient, TransientInputs, TransientSample } from './transient';
 import { runMission, MissionInputs, MissionPoint } from './mission';
 import { registerCustomMap } from './maps';
+import { runOptimization, OptimizeInputs, OptimizeTrace } from './optimize';
+import { runMonteCarlo, MonteCarloInputs } from './montecarlo';
 
 export type WorkerRequest =
   | { id: number; type: 'offdesign'; inputs: EngineInputs; od: OffDesignInputs }
   | { id: number; type: 'transient'; inputs: EngineInputs; ti: TransientInputs }
   | { id: number; type: 'mission'; inputs: EngineInputs; mi: MissionInputs }
   | { id: number; type: 'maps'; maps: { id: string; kind: 'compressor' | 'turbine'; data: any }[] }
+  | { id: number; type: 'optimize'; inputs: EngineInputs; oi: OptimizeInputs }
+  | { id: number; type: 'montecarlo'; inputs: EngineInputs; mc: MonteCarloInputs }
   | { id: number; type: 'sweep'; inputs: EngineInputs; mode: 'design' | 'offdesign'; od?: OffDesignInputs; param: string; values: number[]; families?: { param: string; values: number[] } };
 export type WorkerResponse = { id: number; ok: true; payload: unknown } | { id: number; ok: false; error: string } | { id: number; progress: unknown };
 
@@ -34,6 +38,12 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       for (const m of msg.maps) registerCustomMap(m.id, m.kind, m.data);
       cache = null;
       post({ id: msg.id, ok: true, payload: msg.maps.length });
+    } else if (msg.type === 'optimize') {
+      const r = runOptimization(msg.inputs, msg.oi, (t: OptimizeTrace[]) => post({ id: msg.id, progress: t.slice() }));
+      post({ id: msg.id, ok: true, payload: r });
+    } else if (msg.type === 'montecarlo') {
+      const r = runMonteCarlo(msg.inputs, msg.mc, (k: number) => post({ id: msg.id, progress: k }));
+      post({ id: msg.id, ok: true, payload: r });
     } else if (msg.type === 'transient') {
       const dp = designPoint(msg.inputs);
       const r = runTransient(dp, msg.ti, (samples: TransientSample[]) => post({ id: msg.id, progress: samples.slice() }));

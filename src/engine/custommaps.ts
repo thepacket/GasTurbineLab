@@ -95,3 +95,67 @@ export function generateCompressorMap(opts: { PRdes: number; WcDes: number; spee
   }
   return { defaults: { alphaMap: 0, NcMap: 1, RlineMap: 2.0, PR: opts.PRdes }, RlineStall: 1.0, alphaMap: [0, 90], NcMap: Nc, RlineMap: Rl, WcMap: [Wc], PRmap: [PR], effMap: [eff] };
 }
+
+/**
+ * Stage-stacking compressor map generator.  Each stage has a linear work
+ * characteristic ψ = ψ* (1 + a (1 − φ/φ*)) and a parabolic loss bucket around
+ * its design incidence; stages are stacked on a mean line with blade speed
+ * proportional to corrected speed.  Variable stators rotate the design flow
+ * coefficient of the front stages with speed, which is how a real VSV schedule
+ * keeps the front stages off stall at low speed.  The resulting map is laid out
+ * on R-lines between the stall (first stage with ψ beyond its peak) and choke.
+ */
+export function generateStageStackedMap(opts: { stages: number; PRdes: number; WcDes: number; vsvStages?: number; vsvGain?: number; stageLoading?: number; speedLines?: number[] }): CompressorMapData {
+  const nSt = Math.max(1, Math.round(opts.stages));
+  const Nc = opts.speedLines ?? [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0, 1.05, 1.1];
+  const Rl = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0];
+  const gamma = 1.4, cp = 1004.5;
+  const T1 = 288.15;
+  // design: equal stage temperature ratios → stage work from the overall PR at polytropic efficiency 0.9
+  const effP = 0.9;
+  const Tr = Math.pow(opts.PRdes, (gamma - 1) / (gamma * effP));
+  const dTstage = (T1 * (Tr - 1)) / nSt;
+  const psiStar = opts.stageLoading ?? 0.4; // ψ = cp ΔT / U²
+  const U = Math.sqrt((cp * dTstage) / psiStar);
+  const phiStar = 0.55;
+  const a = 0.8; // slope of ψ(φ): rising work as flow falls, until stall at φ/φ* ≈ 0.72
+  const vsvN = Math.min(nSt, Math.round(opts.vsvStages ?? Math.ceil(nSt / 2)));
+  const vsvGain = opts.vsvGain ?? 0.35;
+  const phiGrid = (nc: number) => {
+    // candidate inlet flow coefficients for this speed from stall to choke
+    const out: number[] = [];
+    for (let k = 0; k < Rl.length; k++) out.push(phiStar * (0.70 + (0.42 * k) / (Rl.length - 1)) * (1 - 0.1 * (1 - nc))); // R-line 1 = stall (low flow), 3 = choke
+    return out;
+  };
+  const Wc: number[][] = [], PR: number[][] = [], eff: number[][] = [];
+  for (const nc of Nc) {
+    const wc: number[] = [], pr: number[] = [], ef: number[] = [];
+    for (const phi1 of phiGrid(nc)) {
+      let T = T1, P = 1, phi = phi1, stalled = false, dTsum = 0, dTisSum = 0;
+      for (let st = 0; st < nSt; st++) {
+        // VSV: front stages see a flow coefficient shifted toward design at low speed
+        const shift = st < vsvN ? 1 - vsvGain * (1 - nc) : 1;
+        const phiRel = phi / (phiStar * shift);
+        if (phiRel < 0.72) stalled = true;
+        const psi = psiStar * (1 + a * (1 - phiRel));
+        const Ust = U * nc;
+        const dT = Math.max(psi * Ust * Ust / cp, 1);
+        const loss = 0.12 * Math.pow(phiRel - 1, 2) + 0.03 * Math.pow(1 - nc, 2);
+        const effSt = Math.max(0.5, 0.91 - loss);
+        const dTis = dT * effSt;
+        dTsum += dT; dTisSum += dTis;
+        P *= Math.pow(1 + dTis / T, gamma / (gamma - 1));
+        T += dT;
+        // continuity through the stage: density rises, axial velocity (and φ) falls
+        phi *= Math.pow(1 + dT / (T - dT), -1) * (1 + 0.5 * dT / (T - dT));
+      }
+      const prTot = Math.max(P, 1.02);
+      const flow = phi1 / phiStar * nc; // corrected flow ∝ φ·N on the mean line
+      wc.push(opts.WcDes * flow * (1 - (stalled ? 0 : 0)));
+      pr.push(stalled ? prTot * 0.98 : prTot);
+      ef.push(Math.min(0.93, Math.max(0.5, dTisSum / dTsum)));
+    }
+    Wc.push(wc); PR.push(pr); eff.push(ef);
+  }
+  return { defaults: { alphaMap: 0, NcMap: 1, RlineMap: 2.0, PR: opts.PRdes }, RlineStall: 1.0, alphaMap: [0, 90], NcMap: Nc, RlineMap: Rl, WcMap: [Wc], PRmap: [PR], effMap: [eff] };
+}

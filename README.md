@@ -24,6 +24,19 @@ The design point fixes nozzle throat and mixer areas and scales the NPSS-style c
 * **Custom maps** (Maps tab): assign any built-in or uploaded map to each compressor and turbine. Upload JSON (same structure as `src/data/maps.json`) or a CSV grid, or generate a parametric elliptical compressor map. Maps are kept in the browser's local storage.
 * **Learn** (Learn tab): seven guided scenarios (bypass ratio, T4, OPR, altitude, part power, acceleration and surge margin, block fuel) that load a design, open the right view and explain what to look for.
 
+## Fidelity and design tools (third round)
+
+* **Start-up and sub-idle**: maps extend below their lowest speed line (flow ∝ speed, pressure rise ∝ speed², turbines unchoke below the tabulated pressure ratio). Transients can start from shutdown with a starter torque, friction, a light-off speed and T3 condition and a light-off fuel flow; hung starts are reported. Windmilling speed at forward speed is an empirical fraction.
+* **Stage stacking**: a mean-line stage-stacking generator (linear work characteristic, parabolic loss bucket per stage, front-stage variable stators rotating with speed) produces compressor maps that can be assigned to any compressor.
+* **Turbine cooling physics**: cooling effectiveness ε(m) = ε_max·m/(m + 3 %) relates flow fraction, gas, coolant and metal temperatures. Choose fixed fractions or let the model compute the flow for a target blade metal temperature; metal temperature and a creep-life estimate are reported.
+* **Fuels and humidity**: Jet-A, synthetic paraffinic kerosene, hydrogen and methane with their own composition, heating value and formation enthalpy through the equilibrium chemistry; ambient relative humidity adds water vapour to the air.
+* **Optimise** (Optimise tab): Nelder–Mead over chosen design variables with bounds, T3/T4/thrust/metal-temperature constraints, an optional off-design surge-margin check, and objectives of TSFC, specific thrust, thrust, thermal efficiency or mission block fuel.
+* **Uncertainty** (Uncertainty tab): Monte Carlo over component efficiencies, losses and coefficients with histograms, percentiles and one-at-a-time sensitivities.
+* **Weight and size**: WATE-style component weight correlations from the solved annulus areas, pressure ratios and temperatures, calibrated to published dry weights (within ±30 %), plus thrust/weight.
+* **Gallery** (Gallery tab): named saved designs with JSON export/import, share links and direct comparison.
+* **Report**: a self-contained HTML engineering report (inputs, performance, shafts, cross-section, stations, components, weight) opened for printing or saving as PDF; PNG export of the cross-section, charts and the 3D view.
+* **Mobile and language**: touch rotate/tilt/zoom buttons and auto-orbit in the 3D view; English/French interface toggle.
+
 ## Views
 
 * **Build**: architecture, layout, presets, catalogue, operating point (design / off-design) and every component parameter; SI inputs with a SI / US display-unit toggle in the header.
@@ -31,7 +44,7 @@ The design point fixes nozzle throat and mixer areas and scales the NPSS-style c
 * **Results**: performance cards, shaft balances with speeds, T–s and station profiles, compressor maps, station table (CSV export), component details.
 * **Explore**: design-point sweeps (new design per point) or off-design sweeps (fixed engine) with optional parameter families, computed in a worker; CSV export.
 * **Compare**: the live design against a pinned snapshot or any catalogue engine, with overlaid diagrams.
-* **Transient**, **Mission**, **Maps**, **Learn**: see above.
+* **Transient**, **Mission**, **Optimise**, **Uncertainty**, **Maps**, **Gallery**, **Learn**: see above.
 * **Validate**: every station and performance figure against pyCycle.
 * **Share**: the link button encodes the complete design, operating point and comparison in the URL (`#d=`).
 
@@ -77,7 +90,8 @@ fly deploy
 ```
 src/engine/      gas model (gas.ts, equilibrium.ts), components, generic core (core.ts),
                  design wrapper (cycle.ts), maps and off-design solver (maps.ts, offdesign.ts),
-                 transient.ts, mission.ts, custommaps.ts, engine catalogue (engines.ts), worker (worker.ts)
+                 transient.ts, mission.ts, optimize.ts, montecarlo.ts, weight.ts, custommaps.ts,
+                 engine catalogue (engines.ts), worker (worker.ts)
 src/data/        janaf polynomial coefficients, component maps, pyCycle reference results
 e2e/             Playwright layout and PWA tests
 src/viz/         SVG cross-section, shared parametric geometry, charts, explorer

@@ -4,7 +4,7 @@
  * balance) and off-design operation (PR/eff read from scaled maps, with
  * continuity / power / area residuals returned for an outer Newton solver).
  */
-import { Gas } from './gas';
+import { Gas, FUELS, warFromRH } from './gas';
 import { isa } from './atmosphere';
 import { Flow, staticFromMN, totalFromStatic, StaticState } from './flow';
 import { compressor, turbineAtPR, turbineForPower, burnerToT, nozzle, mixer, TurbineStream, BurnerOut } from './components';
@@ -65,6 +65,27 @@ export function designProvider(inp: EngineInputs): Provider {
   };
 }
 
+/**
+ * Turbine cooling: effectiveness ε = (T_gas − T_metal)/(T_gas − T_coolant) with ε(m) = ε_max · m/(m + m½),
+ * m½ = 3 % of core flow per cooled row.  Returns the per-row flow fraction needed for a target metal temperature,
+ * or the metal temperature reached with a given fraction.  Creep life: a Larson–Miller-type rule of thumb,
+ * 25 000 h at 1200 K halving every 20 K.
+ */
+const M_HALF = 0.03;
+export function coolingModel(T4: number, T3: number, c: EngineInputs['cooling'], mFixedInlet: number) {
+  const Tc = T3 + c.coolantTempRise_K;
+  const epsOf = (m: number) => (c.effectivenessMax * m) / (m + M_HALF);
+  let mRow: number, infeasible = false;
+  if (c.mode === 'computed') {
+    const epsReq = Math.max(0, (T4 - c.targetMetal_K) / Math.max(T4 - Tc, 1));
+    if (epsReq >= 0.95 * c.effectivenessMax) { mRow = 0.25 / 1.6; infeasible = true; } else mRow = (M_HALF * epsReq) / (c.effectivenessMax - epsReq);
+  } else mRow = mFixedInlet / 1.6;
+  const eps = epsOf(mRow);
+  const Tmetal = T4 - eps * (T4 - Tc);
+  const life_h = 25000 * Math.pow(2, (1200 - Tmetal) / 20);
+  return { inletFrac: 1.6 * mRow, exitFrac: 0.6 * mRow, metal_K: Tmetal, effectiveness: eps, life_h, infeasible, Tcoolant: Tc };
+}
+
 export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   const warnings: string[] = [];
   const stations: Station[] = [];
@@ -74,7 +95,11 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
 
   // ---- ambient / flight
   const amb = isa(inp.flight.altitude_m, inp.flight.dT_isa, !!inp.flight.altIsGeopotential);
-  const air = Gas.air(inp.chemistry ?? 'equilibrium');
+  const fuel = FUELS[inp.fuel ?? 'jetA'];
+  const war = warFromRH(inp.humidity?.relative ?? 0, amb.T, amb.P);
+  const air = Gas.air(inp.chemistry ?? 'equilibrium', war, inp.fuel ?? 'jetA');
+  const LHV = inp.fuel && inp.fuel !== 'jetA' ? fuel.LHV_Jkg : inp.LHV_Jkg;
+  const hFuel = inp.fuel && inp.fuel !== 'jetA' ? fuel.h_Jkg : inp.burner.fuel_h_Jkg;
   const a0 = air.a(amb.T, amb.P);
   const V0 = inp.flight.mach * a0;
   const W0 = prov.W;
@@ -122,34 +147,50 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   /** overboard handling bleed at a compressor exit (turbojet / turboprop): flow removed, work already spent */
   const dumpOverboard = (f: Flow, frac: number): Flow => (frac > 0 ? { ...f, W: f.W * (1 - frac) } : f);
   const hpx = inp.HPX_W;
+  const coolFracs = (T3: number) => {
+    const cm = coolingModel(inp.burner.T4_K, T3, inp.cooling, inp.coolInletFrac);
+    return inp.cooling.mode === 'computed' ? { inlet: cm.inletFrac, exit: cm.exitFrac } : { inlet: inp.coolInletFrac, exit: inp.coolExitFrac };
+  };
+  const coolingBlock = (id: string, T4: number, T3: number, fracInlet: number) => {
+    const cm = coolingModel(T4, T3, { ...inp.cooling, mode: 'fixed' }, fracInlet);
+    const comp = components.find((c) => c.id === id)!;
+    comp.values.coolingFrac = fracInlet + 0.6 * (fracInlet / 1.6);
+    comp.values.metalTemp_K = cm.metal_K; comp.values.coolingEffectiveness = cm.effectiveness; comp.values.creepLife_h = cm.life_h; comp.values.coolantTemp_K = cm.Tcoolant;
+    if (inp.cooling.mode === 'computed' && coolingModel(inp.burner.T4_K, T3, inp.cooling, fracInlet).infeasible) warnings.push(`${comp.name}: target metal temperature ${inp.cooling.targetMetal_K} K is not reachable with the cooling effectiveness available; cooling flow capped at 25 %.`);
+    if (cm.metal_K > 1350) warnings.push(`${comp.name} metal temperature ${cm.metal_K.toFixed(0)} K is above typical single-crystal limits (~1350 K).`);
+  };
 
   if (inp.arch === 'turbojet') {
     const N = prov.speeds.HP;
     stations.push(station('2', 'Compressor inlet', f2, st2, 0.17));
     const op = prov.compressor('comp', f2, N, inp.comp);
-    const c = compressor(f2, op.PR, op.eff, [Math.min(0.5, geom.customerBleed_kgs / f2.W)]);
+    const cf0 = compressor(f2, op.PR, op.eff); // exit temperature first, for the cooling model
+    const cfr = coolFracs(cf0.out.Tt);
+    const c = compressor(f2, op.PR, op.eff, [cfr.inlet, cfr.exit, Math.min(0.5, geom.customerBleed_kgs / f2.W)]);
     if (op.residual !== undefined) R.comp_flow = op.residual;
     const f3 = dumpOverboard(c.out, geom.handlingBleedFrac);
     stations.push(station('3', 'Compressor exit', f3, staticFromMN(f3, inp.comp.MN), 0.42));
     compValues('comp', 'Compressor', op, c);
-    if (geom.customerBleed_kgs > 0 || geom.handlingBleedFrac > 0) components[components.length - 1].values.bleed_kgs = c.bleeds[0].W + c.out.W * geom.handlingBleedFrac;
+    if (geom.customerBleed_kgs > 0 || geom.handlingBleedFrac > 0) components[components.length - 1].values.bleed_kgs = c.bleeds[2].W + c.out.W * geom.handlingBleedFrac;
     T3 = f3.Tt; P3 = f3.Pt;
-    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
+    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel, LHV });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'Turbine inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.56));
     burnerBlock('burner', 'Combustor', b, inp.burner.dPqP);
     const req = (c.power + hpx) / inp.mechEff;
-    const top = prov.turbine('turb', b.out, N, [], inp.hpt, req, PRavail(b.out.Pt));
-    const t = turbineAtPR(b.out, top.PR, top.eff, []);
+    const coolingTJ: TurbineStream[] = [{ flow: c.bleeds[0], fracP: 1 }, { flow: c.bleeds[1], fracP: 0 }];
+    const top = prov.turbine('turb', b.out, N, coolingTJ, inp.hpt, req, PRavail(b.out.Pt));
+    const t = turbineAtPR(b.out, top.PR, top.eff, coolingTJ);
     if (top.residual !== undefined) R.turb_flow = top.residual;
     R.hp_power = (t.power * inp.mechEff - (c.power + hpx)) / Math.max(c.power, 1);
     stations.push(station('5', 'Turbine exit', t.out, staticFromMN(t.out, inp.hpt.MN), 0.68));
     turbValues('turb', 'Turbine', top, t.power, t.out.Tt);
+    coolingBlock('turb', b.out.Tt, f3.Tt, cfr.inlet);
     shafts.push({ name: 'Shaft', powerIn_W: t.power * inp.mechEff, powerOut_W: c.power + hpx, turbinePR: top.PR, rpm: N });
     let fNoz = t.out;
     if (inp.afterburner.enabled) {
-      const ab = burnerToT(t.out, inp.afterburner.T7_K, inp.afterburner.dPqP, inp.afterburner.eff, inp.burner.fuel_h_Jkg, inp.LHV_Jkg);
+      const ab = burnerToT(t.out, inp.afterburner.T7_K, inp.afterburner.dPqP, inp.afterburner.eff, hFuel, LHV);
       Wfuel += ab.Wfuel; fNoz = ab.out;
       stations.push(station('7', 'Afterburner exit', ab.out, staticFromMN(ab.out, 0.3), 0.82));
       components.push({ id: 'ab', kind: 'afterburner', name: 'Afterburner', values: { FAR_add: ab.FAR, Wfuel_kgs: ab.Wfuel, T7: ab.out.Tt } });
@@ -196,7 +237,9 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     const Whb = f25.W * geom.handlingBleedFrac;
     const f25c: Flow = Whb > 0 ? { ...f25, W: f25.W - Whb } : f25;
     const hop = prov.compressor('hpc', f25c, Nhp, inp.hpc);
-    const hpc = compressor(f25c, hop.PR, hop.eff, [inp.coolInletFrac, inp.coolExitFrac, Math.min(0.3, geom.customerBleed_kgs / f25c.W)]);
+    const hpc0 = compressor(f25c, hop.PR, hop.eff);
+    const cfr = coolFracs(hpc0.out.Tt);
+    const hpc = compressor(f25c, hop.PR, hop.eff, [cfr.inlet, cfr.exit, Math.min(0.3, geom.customerBleed_kgs / f25c.W)]);
     if (hop.residual !== undefined) R.hpc_flow = hop.residual;
     stations.push(station('3', 'HPC exit', hpc.out, staticFromMN(hpc.out, inp.hpc.MN), 0.50));
     compValues('hpc', 'HP compressor', hop, hpc);
@@ -205,7 +248,7 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     if (Whb > 0) components[components.length - 1].values.handlingBleed_kgs = Whb;
     T3 = hpc.out.Tt; P3 = hpc.out.Pt;
     if (hpc.out.Tt > 950) warnings.push(`HPC exit temperature ${hpc.out.Tt.toFixed(0)} K exceeds typical material limits (~950 K).`);
-    const b = prov.burner('burner', hpc.out, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
+    const b = prov.burner('burner', hpc.out, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel, LHV });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'HPT inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.59));
@@ -218,6 +261,7 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     R.hp_power = (hpt.power * inp.mechEff - (hpc.power + hpx)) / hpc.power;
     stations.push(station('45', 'HPT exit', hpt.out, staticFromMN(hpt.out, inp.hpt.MN), 0.66));
     turbValues('hpt', 'HP turbine', hop2, hpt.power, hpt.out.Tt);
+    coolingBlock('hpt', b.out.Tt, hpc.out.Tt, cfr.inlet);
     shafts.push({ name: 'HP shaft', powerIn_W: hpt.power * inp.mechEff, powerOut_W: hpc.power + hpx, turbinePR: hop2.PR, rpm: Nhp });
     let fIn = hpt.out;
     if (three) {
@@ -255,7 +299,7 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
       stations.push(station('6', 'Mixer exit', m.out, staticFromMN(m.out, m.MNout), 0.84));
       let fNoz = m.out;
       if (inp.afterburner.enabled) {
-        const ab = burnerToT(m.out, inp.afterburner.T7_K, inp.afterburner.dPqP, inp.afterburner.eff, inp.burner.fuel_h_Jkg, inp.LHV_Jkg);
+        const ab = burnerToT(m.out, inp.afterburner.T7_K, inp.afterburner.dPqP, inp.afterburner.eff, hFuel, LHV);
         Wfuel += ab.Wfuel; fNoz = ab.out;
         stations.push(station('7', 'Afterburner exit', ab.out, staticFromMN(ab.out, 0.3), 0.9));
         components.push({ id: 'ab', kind: 'afterburner', name: 'Afterburner', values: { FAR_add: ab.FAR, Wfuel_kgs: ab.Wfuel, T7: ab.out.Tt } });
@@ -277,24 +321,28 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     const Nhp = prov.speeds.HP, Npt = prov.speeds.PT;
     stations.push(station('2', 'Compressor inlet', f2, st2, 0.30));
     const op = prov.compressor('comp', f2, Nhp, inp.comp);
-    const c = compressor(f2, op.PR, op.eff, [Math.min(0.5, geom.customerBleed_kgs / f2.W)]);
+    const cf0 = compressor(f2, op.PR, op.eff);
+    const cfr = coolFracs(cf0.out.Tt);
+    const c = compressor(f2, op.PR, op.eff, [cfr.inlet, cfr.exit, Math.min(0.5, geom.customerBleed_kgs / f2.W)]);
     if (op.residual !== undefined) R.comp_flow = op.residual;
     const f3 = dumpOverboard(c.out, geom.handlingBleedFrac);
     stations.push(station('3', 'Compressor exit', f3, staticFromMN(f3, inp.comp.MN), 0.50));
     compValues('comp', 'Compressor', op, c);
     T3 = f3.Tt; P3 = f3.Pt;
-    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel: inp.burner.fuel_h_Jkg, LHV: inp.LHV_Jkg });
+    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel, LHV });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'Turbine inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.62));
     burnerBlock('burner', 'Combustor', b, inp.burner.dPqP);
     const req = (c.power + hpx) / inp.mechEff;
-    const top = prov.turbine('turb', b.out, Nhp, [], inp.hpt, req, PRavail(b.out.Pt) / 1.2);
-    const t = turbineAtPR(b.out, top.PR, top.eff, []);
+    const coolingTP: TurbineStream[] = [{ flow: c.bleeds[0], fracP: 1 }, { flow: c.bleeds[1], fracP: 0 }];
+    const top = prov.turbine('turb', b.out, Nhp, coolingTP, inp.hpt, req, PRavail(b.out.Pt) / 1.2);
+    const t = turbineAtPR(b.out, top.PR, top.eff, coolingTP);
     if (top.residual !== undefined) R.turb_flow = top.residual;
     R.hp_power = (t.power * inp.mechEff - (c.power + hpx)) / c.power;
     stations.push(station('45', 'Power turbine inlet', t.out, staticFromMN(t.out, inp.hpt.MN), 0.72));
     turbValues('turb', 'Gas-generator turbine', top, t.power, t.out.Tt);
+    coolingBlock('turb', b.out.Tt, f3.Tt, cfr.inlet);
     shafts.push({ name: 'HP shaft', powerIn_W: t.power * inp.mechEff, powerOut_W: c.power + hpx, turbinePR: top.PR, rpm: Nhp });
     const reqPT = inp.prop.shaftPower_W / inp.mechEff;
     const pop = prov.turbine('pt', t.out, Npt, [], inp.lpt, reqPT, PRavail(t.out.Pt));
@@ -329,12 +377,12 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   perf.TSFC_kg_Nh = perf.Fn > 0 ? (Wfuel * 3600) / perf.Fn : NaN;
   perf.TSFC_mg_Ns = perf.Fn > 0 ? (Wfuel * 1e6) / perf.Fn : NaN;
   perf.specificThrust = perf.Fn / W0;
-  perf.heatRate_W = Wfuel * inp.LHV_Jkg;
+  perf.heatRate_W = Wfuel * LHV;
   const kineticPowerIn = 0.5 * W0 * V0 * V0;
   perf.thermalEff = (kineticPowerOut - kineticPowerIn) / perf.heatRate_W;
   perf.propulsiveEff = V0 > 0 ? (perf.Fn * V0) / Math.max(kineticPowerOut - kineticPowerIn, 1e-9) : 0;
   perf.overallEff = V0 > 0 ? (perf.Fn * V0) / perf.heatRate_W : 0;
-  if (perf.FAR > 0.9 * 0.0678) warnings.push('Fuel/air ratio is close to stoichiometric.');
+  if (perf.FAR > 0.9 * fuel.stoichFAR) warnings.push('Fuel/air ratio is close to stoichiometric.');
 
   // ---- installed performance (optional): additive inlet drag, nacelle friction, afterbody drag
   const q0 = 0.5 * amb.rho * V0 * V0;
@@ -356,7 +404,8 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   const Wf = Wfuel;
   perf.EI_NOx_g_kg = 32 * Math.pow(P3 / 2965e3, 0.4) * Math.exp((T3 - 826) / 194);
   perf.EI_CO_g_kg = 0.4 + 40 * Math.exp(-(T3 - 450) / 110);
-  perf.NOx_g_s = perf.EI_NOx_g_kg * Wf; perf.CO_g_s = perf.EI_CO_g_kg * Wf; perf.CO2_g_s = 3160 * Wf;
+  perf.NOx_g_s = perf.EI_NOx_g_kg * Wf; perf.CO_g_s = perf.EI_CO_g_kg * Wf; perf.CO2_g_s = fuel.comp.C * 44.0095 * 1000 * Wf;
+  if (inp.fuel === 'hydrogen') { perf.EI_CO_g_kg = 0; perf.CO_g_s = 0; }
 
   // ---- jet mixing noise (Lighthill V^8 scaling, SAE ARP 876 style constant), OASPL at 1 m
   let pw = 0;

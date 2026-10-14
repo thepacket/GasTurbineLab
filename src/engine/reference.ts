@@ -8,7 +8,8 @@ export function inputsFromReferenceCase(c: any): EngineInputs {
   inp.flight = { altitude_m: i.alt_m, mach: i.mach, dT_isa: 0, W_kgs: i.W_kgs, altIsGeopotential: true };
   inp.inlet.ramRecovery = i.ram_recovery;
   inp.burner.T4_K = i.T4_K; inp.burner.dPqP = i.dPqP_b; inp.burner.eff = 1; inp.burner.fuel_h_Jkg = 0;
-  inp.mechEff = 1; inp.HPX_W = 0;
+  inp.mechEff = 1; inp.HPX_W = 0; inp.cooling = { ...inp.cooling, mode: 'fixed' }; inp.fuel = 'jetA'; inp.humidity = { relative: 0 };
+  if (c.architecture !== 'turbofan') { inp.coolInletFrac = 0; inp.coolExitFrac = 0; }
   if (c.architecture === 'turbojet') {
     inp.inlet.MN = 0.6;
     inp.comp = { PR: i.PR, eff: i.eff_c, MN: 0.2 };

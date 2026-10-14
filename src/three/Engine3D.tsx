@@ -6,6 +6,7 @@ import { Store } from '../state/store';
 import { buildGeometry, Geometry, Part, XR, profileAt } from '../viz/geometry';
 import { tempColor } from '../viz/color';
 import { fmt, kPa } from '../ui/format';
+import { canvasToPng } from '../ui/exportImage';
 
 /** Build a twisted, tapered blade: a thin cambered plate stacked along the span. */
 function bladeGeometry(span: number, chord: number, twist: number, thickness: number): THREE.BufferGeometry {
@@ -154,6 +155,19 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
   const wrap = useRef<HTMLDivElement>(null);
   const [cutaway, setCutaway] = useState(true);
   const [spin, setSpin] = useState(true);
+  const [orbit, setOrbit] = useState(false);
+  const touch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
+  const nudge = (dir: 'left' | 'right' | 'up' | 'down' | 'in' | 'out') => {
+    const st = sceneRef.current; if (!st) return;
+    const c = st.controls, cam = st.camera;
+    const off = cam.position.clone().sub(c.target);
+    const sph = new THREE.Spherical().setFromVector3(off);
+    if (dir === 'left') sph.theta -= 0.25; if (dir === 'right') sph.theta += 0.25;
+    if (dir === 'up') sph.phi = Math.max(0.1, sph.phi - 0.18); if (dir === 'down') sph.phi = Math.min(Math.PI - 0.1, sph.phi + 0.18);
+    if (dir === 'in') sph.radius *= 0.8; if (dir === 'out') sph.radius *= 1.25;
+    cam.position.copy(c.target).add(new THREE.Vector3().setFromSpherical(sph));
+    cam.lookAt(c.target);
+  };
   const [hover, setHover] = useState<{ x: number; y: number; name: string; T: number; P: number } | null>(null);
   const sceneRef = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; engine?: THREE.Group; pickables: THREE.Object3D[]; rotors: THREE.Object3D[] } | null>(null);
   const spinRef = useRef(spin); spinRef.current = spin;
@@ -162,7 +176,7 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
   // renderer setup
   useEffect(() => {
     const canvas = ref.current!, el = wrap.current!;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.localClippingEnabled = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -170,6 +184,8 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
     const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 100);
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    controls.autoRotateSpeed = 1.2;
     scene.add(new THREE.HemisphereLight(0xdfe6f0, 0x1a1c20, 1.1));
     const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(2, 3, 4); scene.add(key);
     const fill = new THREE.DirectionalLight(0x9fb7ff, 0.8); fill.position.set(-3, -1, -2); scene.add(fill);
@@ -251,9 +267,21 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
       <div className="overlay-tl">
         <span className="chip"><button className={cutaway ? 'on' : ''} onClick={() => setCutaway(!cutaway)}>{cutaway ? 'Cutaway' : 'Full casing'}</button></span>
         <span className="chip"><button className={spin ? 'on' : ''} onClick={() => setSpin(!spin)}>{spin ? 'Rotating' : 'Static'}</button></span>
+        <span className="chip"><button className={orbit ? 'on' : ''} onClick={() => { const st = sceneRef.current; if (st) st.controls.autoRotate = !orbit; setOrbit(!orbit); }}>{orbit ? 'Orbiting' : 'Auto-orbit'}</button></span>
         <span className="chip"><button onClick={() => { const st = sceneRef.current; if (st) { st.camera.userData.placed = false; st.camera.position.set(-3.4, 1.5, 4.8); st.controls.target.set(0, 0, 0); } }}>Reset view</button></span>
-        <span className="chip">drag to orbit · wheel / pinch to zoom · click a part</span>
+        <span className="chip"><button onClick={() => { const c = ref.current; if (c) canvasToPng(c, 'gas-turbine-lab-3d.png'); }} aria-label="Export 3D view as PNG">PNG</button></span>
+        {!touch && <span className="chip">drag to orbit · wheel / pinch to zoom · click a part</span>}
       </div>
+      {touch && (
+        <div className="touchpad" aria-label="3D view controls">
+          <button onClick={() => nudge('left')} aria-label="Rotate left">⟲</button>
+          <button onClick={() => nudge('right')} aria-label="Rotate right">⟳</button>
+          <button onClick={() => nudge('up')} aria-label="Tilt up">▲</button>
+          <button onClick={() => nudge('down')} aria-label="Tilt down">▼</button>
+          <button onClick={() => nudge('in')} aria-label="Zoom in">＋</button>
+          <button onClick={() => nudge('out')} aria-label="Zoom out">－</button>
+        </div>
+      )}
       {hover && <div className="tooltip" style={{ left: hover.x + 12, top: hover.y + 12 }}><b>{hover.name}</b><div className="num">Tt {fmt(hover.T, 0)} K · Pt {kPa(hover.P)} kPa</div></div>}
     </div>
   );

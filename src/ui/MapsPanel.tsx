@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Store } from '../state/store';
 import { COMPRESSOR_MAPS, TURBINE_MAPS } from '../engine/maps';
-import { CustomMap, loadCustomMaps, saveCustomMaps, parseCsvMap, parseJsonMap, generateCompressorMap } from '../engine/custommaps';
+import { CustomMap, loadCustomMaps, saveCustomMaps, parseCsvMap, parseJsonMap, generateCompressorMap, generateStageStackedMap } from '../engine/custommaps';
 import { MAP_FOR } from '../engine/offdesign';
 import { request } from '../engine/client';
 
@@ -14,6 +14,7 @@ export function MapsPanel({ store }: { store: Store }) {
   const [custom, setCustom] = useState<CustomMap[]>(() => loadCustomMaps());
   const [msg, setMsg] = useState<string | null>(null);
   const [gen, setGen] = useState({ name: 'My compressor', PRdes: 10, WcDes: 50, surgeMargin: 0.2 });
+  const [stk, setStk] = useState({ name: 'Stage-stacked HPC', stages: 8, PRdes: 12, WcDes: 50, vsvStages: 4, vsvGain: 0.35, stageLoading: 0.4 });
   const persist = (list: CustomMap[]) => { setCustom(list); saveCustomMaps(list); request({ type: 'maps', maps: list.map((m) => ({ id: m.id, kind: m.kind, data: m.data })) }).catch(() => { /* worker restarts lazily */ }); };
   const onFile = async (f: File, kind: 'compressor' | 'turbine' | 'auto') => {
     try {
@@ -75,6 +76,20 @@ export function MapsPanel({ store }: { store: Store }) {
           <button className="btn primary" onClick={() => { const data = generateCompressorMap({ PRdes: gen.PRdes, WcDes: gen.WcDes, surgeMargin: gen.surgeMargin }); const id = `custom:gen:${Date.now().toString(36)}`; persist([...custom, { id, name: gen.name, kind: 'compressor', data }]); setMsg(`Generated “${gen.name}”.`); }}>Generate</button>
         </div>
         <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Elliptical speed-line model: flow range and stall pressure ratio scale with corrected speed; efficiency peaks mid-map. Absolute values are rescaled to the design point anyway, so the shape is what matters.</div>
+      </div>
+      <div className="section">
+        <h3>Stage-stacked compressor map</h3>
+        <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
+          <label>name <input className="num" aria-label="Stacked map name" value={stk.name} onChange={(e) => setStk({ ...stk, name: e.target.value })} style={{ width: 150 }} /></label>
+          <label>stages <input className="num" aria-label="Stages" type="number" value={stk.stages} step={1} style={{ width: 55 }} onChange={(e) => setStk({ ...stk, stages: +e.target.value })} /></label>
+          <label>design PR <input className="num" aria-label="Stacked design PR" type="number" value={stk.PRdes} step={0.5} style={{ width: 65 }} onChange={(e) => setStk({ ...stk, PRdes: +e.target.value })} /></label>
+          <label>design Wc <input className="num" aria-label="Stacked design flow" type="number" value={stk.WcDes} step={1} style={{ width: 65 }} onChange={(e) => setStk({ ...stk, WcDes: +e.target.value })} /></label>
+          <label>stage loading ψ <input className="num" aria-label="Stage loading" type="number" value={stk.stageLoading} step={0.02} style={{ width: 60 }} onChange={(e) => setStk({ ...stk, stageLoading: +e.target.value })} /></label>
+          <label>VSV stages <input className="num" aria-label="VSV stages" type="number" value={stk.vsvStages} step={1} style={{ width: 55 }} onChange={(e) => setStk({ ...stk, vsvStages: +e.target.value })} /></label>
+          <label>VSV gain <input className="num" aria-label="VSV gain" type="number" value={stk.vsvGain} step={0.05} style={{ width: 60 }} onChange={(e) => setStk({ ...stk, vsvGain: +e.target.value })} /></label>
+          <button className="btn primary" onClick={() => { const data = generateStageStackedMap(stk); const id = `custom:stack:${Date.now().toString(36)}`; persist([...custom, { id, name: stk.name, kind: 'compressor', data }]); setMsg(`Generated stage-stacked map “${stk.name}”.`); }}>Stack stages</button>
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Each stage has a linear work characteristic and a parabolic loss bucket; stages are stacked on a mean line. Variable stators rotate the front stages' design flow coefficient with speed (gain 0 = fixed geometry), which is what keeps the front stages off stall at low corrected speed. Assign the result to the HPC to see the effect on the running line and surge margin off-design.</div>
       </div>
     </div>
   );

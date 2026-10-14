@@ -3,6 +3,7 @@ import { Architecture } from '../engine/types';
 import { PRESETS, REFERENCE_PRESETS } from '../engine/presets';
 import { ENGINES, calibrateEngine } from '../engine/engines';
 import { fmt } from './format';
+import { t } from './i18n';
 
 interface SliderProps { label: string; path: string; value: number; min: number; max: number; step: number; unit?: string; scale?: number; digits?: number; store: Store }
 function Slider({ label, path, value, min, max, step, unit, scale = 1, digits, store }: SliderProps) {
@@ -11,7 +12,7 @@ function Slider({ label, path, value, min, max, step, unit, scale = 1, digits, s
   const commit = (v: number) => { if (Number.isFinite(v)) store.set(path, v / scale); };
   return (
     <div className="control">
-      <label>{label}</label>
+      <label>{t(label)}</label>
       <div className="val">
         <input className="num" type="number" aria-label={label + (unit ? ` (${unit})` : '')} value={Number(shown.toFixed(d))} step={step * scale} onChange={(e) => commit(parseFloat(e.target.value))} />
         <span className="unit">{unit ?? ''}</span>
@@ -24,7 +25,7 @@ function Slider({ label, path, value, min, max, step, unit, scale = 1, digits, s
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="section">
-      <h3>{title}{hint && <span className="hint">{hint}</span>}</h3>
+      <h3>{t(title)}{hint && <span className="hint">{hint}</span>}</h3>
       {children}
     </div>
   );
@@ -56,21 +57,21 @@ export function Controls({ store }: { store: Store }) {
       <Section title="Architecture">
         <div className="segmented" style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
           {(['turbojet', 'turbofan', 'turboprop'] as Architecture[]).map((a) => (
-            <button key={a} className={arch === a ? 'on' : ''} onClick={() => store.dispatch({ type: 'arch', arch: a })}>{a[0].toUpperCase() + a.slice(1)}</button>
+            <button key={a} className={arch === a ? 'on' : ''} onClick={() => store.dispatch({ type: 'arch', arch: a })}>{t(a[0].toUpperCase() + a.slice(1))}</button>
           ))}
         </div>
         <div className="row" style={{ marginTop: 10 }}>
           <select className="select" value="" onChange={(e) => { const p = presets.find((x) => x.name === e.target.value); if (p) store.dispatch({ type: 'inputs', inputs: JSON.parse(JSON.stringify(p.inputs)), note: p.group === 'pyCycle reference' ? 'pyCycle reference case: inputs identical to the validation run.' : undefined }); }} aria-label="Load generic preset">
-            <option value="">Generic preset…</option>
+            <option value="">{t('Generic preset…')}</option>
             {['Turbojet', 'Turbofan', 'Turboprop', 'pyCycle reference'].map((g) => (
               <optgroup key={g} label={g}>{presets.filter((p) => p.group === g).map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}</optgroup>
             ))}
           </select>
-          <button className="btn" onClick={() => store.dispatch({ type: 'reset' })} title="Reset to defaults">Reset</button>
+          <button className="btn" onClick={() => store.dispatch({ type: 'reset' })} title="Reset to defaults">{t('Reset')}</button>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
           <select className="select" value="" onChange={(e) => { const spec = ENGINES.find((x) => x.name === e.target.value); if (spec) { const c = calibrateEngine(spec); store.dispatch({ type: 'inputs', inputs: c.inputs, note: c.note }); } }} aria-label="Load commercial engine">
-            <option value="">Commercial engine…</option>
+            <option value="">{t('Commercial engine…')}</option>
             {(['turbofan', 'turbojet', 'turboprop'] as const).map((a) => (
               <optgroup key={a} label={a[0].toUpperCase() + a.slice(1) + 's'}>
                 {ENGINES.filter((x) => x.arch === a).slice().sort((p, q) => p.maker.localeCompare(q.maker) || p.year - q.year).map((x) => <option key={x.name} value={x.name}>{x.maker} {x.name} · {x.application}</option>)}
@@ -88,8 +89,8 @@ export function Controls({ store }: { store: Store }) {
 
       <Section title="Operating point" hint={store.odBusy ? 'solving…' : undefined}>
         <div className="segmented" style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-          <button className={store.state.mode === 'design' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'design' })}>Design point</button>
-          <button className={store.state.mode === 'offdesign' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'offdesign' })}>Off-design</button>
+          <button className={store.state.mode === 'design' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'design' })}>{t('Design point')}</button>
+          <button className={store.state.mode === 'offdesign' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'offdesign' })}>{t('Off-design')}</button>
         </div>
         {store.state.mode === 'offdesign' ? (
           <div style={{ marginTop: 8 }}>
@@ -163,8 +164,6 @@ export function Controls({ store }: { store: Store }) {
             {i.spools === 3 && S({ label: 'IP compressor efficiency', path: 'ipc.eff', value: i.ipc.eff, min: 0.75, max: 0.95, step: 0.001 })}
             {S({ label: 'HPC pressure ratio', path: 'hpc.PR', value: i.hpc.PR, min: 2, max: 30, step: 0.1 })}
             {S({ label: 'HPC efficiency', path: 'hpc.eff', value: i.hpc.eff, min: 0.75, max: 0.95, step: 0.001 })}
-            {S({ label: 'Turbine cooling bleed (does work)', path: 'coolInletFrac', value: i.coolInletFrac, min: 0, max: 0.15, step: 0.005, unit: '% W25', scale: 100, digits: 1 })}
-            {S({ label: 'Turbine cooling bleed (exit)', path: 'coolExitFrac', value: i.coolExitFrac, min: 0, max: 0.1, step: 0.005, unit: '% W25', scale: 100, digits: 1 })}
           </Section>
         </>
       )}
@@ -275,7 +274,35 @@ export function Controls({ store }: { store: Store }) {
         {arch === 'turboprop' && S({ label: 'Power turbine', path: 'speeds.PT', value: i.speeds.PT, min: 3000, max: 45000, step: 10, unit: 'rpm' })}
       </Section>
 
-      <Section title="Fuel & gas model" hint="Jet-A, CEA polynomials">
+      <Section title="Turbine cooling" hint="effectiveness model">
+        <div className="control">
+          <label>Cooling flow</label>
+          <div className="segmented">
+            <button className={i.cooling.mode === 'fixed' ? 'on' : ''} onClick={() => store.set('cooling.mode', 'fixed')}>Fixed fractions</button>
+            <button className={i.cooling.mode === 'computed' ? 'on' : ''} onClick={() => store.set('cooling.mode', 'computed')}>From metal temperature</button>
+          </div>
+        </div>
+        {i.cooling.mode === 'fixed' ? (
+          <>
+            {S({ label: 'Cooling bleed entering before the first turbine row (does work)', path: 'coolInletFrac', value: i.coolInletFrac, min: 0, max: 0.2, step: 0.005, unit: '%', scale: 100, digits: 1 })}
+            {S({ label: 'Cooling bleed entering after the turbine (no work)', path: 'coolExitFrac', value: i.coolExitFrac, min: 0, max: 0.1, step: 0.005, unit: '%', scale: 100, digits: 1 })}
+          </>
+        ) : (
+          S({ label: 'Target blade metal temperature', path: 'cooling.targetMetal_K', value: i.cooling.targetMetal_K, min: 1000, max: 1400, step: 5, unit: 'K' })
+        )}
+        {S({ label: 'Maximum cooling effectiveness', path: 'cooling.effectivenessMax', value: i.cooling.effectivenessMax, min: 0.4, max: 0.85, step: 0.01 })}
+        {S({ label: 'Coolant temperature rise (pre-swirl, ducting)', path: 'cooling.coolantTempRise_K', value: i.cooling.coolantTempRise_K, min: 0, max: 150, step: 5, unit: 'K' })}
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>ε = (T4 − T_metal)/(T4 − T_coolant), ε(m) = ε_max·m/(m + 3 %). Metal temperature and a creep-life estimate (25 000 h at 1200 K, halving every 20 K) are reported under the turbine.</div>
+      </Section>
+
+      <Section title="Fuel & gas model" hint="CEA polynomials">
+        <div className="control">
+          <label>Fuel</label>
+          <select className="select" style={{ width: 'auto' }} value={i.fuel ?? 'jetA'} onChange={(e) => store.set('fuel', e.target.value)} aria-label="Fuel">
+            <option value="jetA">Jet-A (kerosene, C12H23)</option><option value="saf">Synthetic paraffinic kerosene (SAF)</option><option value="hydrogen">Hydrogen</option><option value="methane">Methane (LNG)</option>
+          </select>
+        </div>
+        {S({ label: 'Ambient relative humidity', path: 'humidity.relative', value: i.humidity?.relative ?? 0, min: 0, max: 1, step: 0.01, unit: '%', scale: 100, digits: 0 })}
         <div className="control">
           <label>Chemistry</label>
           <div className="segmented">

@@ -34,8 +34,12 @@ export function defaultInputs(arch: Architecture): EngineInputs {
     geometry: { customerBleed_kgs: 0, handlingBleedFrac: 0, A8scale: 1, vsvFlowGain: 0 },
     installation: { enabled: false, captureRatioDesign: 0.95, nacelleCf: 0.0025, afterbodyCd: 0.02 },
     inertia: { LP: 40, IP: 10, HP: 6, PT: 2 },
+    fuel: 'jetA',
+    humidity: { relative: 0 },
+    cooling: { mode: 'fixed', targetMetal_K: 1250, effectivenessMax: 0.7, coolantTempRise_K: 60 },
   };
   if (arch === 'turbojet') {
+    base.coolInletFrac = 0; base.coolExitFrac = 0;
     base.speeds = { LP: 8070, IP: 8070, HP: 8070, PT: 8070 };
     base.inertia = { LP: 0, IP: 0, HP: 12, PT: 0 };
   }
@@ -52,6 +56,7 @@ export function defaultInputs(arch: Architecture): EngineInputs {
     base.lpt = { eff: 0.91, MN: 0.35 };
     base.coreNozzle = { type: 'CV', Cv: 0.995 };
   } else if (arch === 'turboprop') {
+    base.coolInletFrac = 0; base.coolExitFrac = 0;
     base.flight = { altitude_m: 0, mach: 0, dT_isa: 0, W_kgs: 7 };
     base.inlet = { ramRecovery: 0.99, MN: 0.4 };
     base.comp = { PR: 10, eff: 0.83, MN: 0.25 };

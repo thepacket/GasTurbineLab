@@ -157,3 +157,7 @@ table.stations tr:hover td { background: var(--surface-2); cursor: pointer; }
 .moremenu button { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 13px; color: var(--text-primary); border-radius: 6px; }
 .moremenu button:hover { background: var(--surface-3); }
 .moremenu button svg { width: 18px; height: 18px; }
+
+.touchpad { position: absolute; right: 10px; bottom: 10px; display: grid; grid-template-columns: repeat(3, 44px); gap: 6px; }
+.touchpad button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--surface-1) 85%, transparent); color: var(--text-primary); font-size: 18px; }
+.touchpad button:active { background: var(--surface-3); }

@@ -8,7 +8,7 @@ import { decodeShare } from '../ui/share';
 import { loadCustomMaps } from '../engine/custommaps';
 loadCustomMaps();
 
-export type View = 'build' | 'section' | 'model' | 'results' | 'explore' | 'compare' | 'transient' | 'mission' | 'maps' | 'learn' | 'validate';
+export type View = 'build' | 'section' | 'model' | 'results' | 'explore' | 'compare' | 'transient' | 'mission' | 'optimize' | 'uncertainty' | 'maps' | 'gallery' | 'learn' | 'validate';
 
 export interface AppState {
   inputs: EngineInputs;
@@ -76,7 +76,7 @@ function load(): AppState {
     // merge with defaults so new fields get sane values
     const d = defaultInputs(parsed.inputs?.arch ?? 'turbofan');
     const inputs = { ...d, ...parsed.inputs };
-    for (const k of ['ipc', 'ipt', 'mixer', 'fanGear', 'speeds', 'prop', 'afterburner', 'geometry', 'installation', 'inertia'] as const) (inputs as any)[k] = { ...(d as any)[k], ...(parsed.inputs?.[k] ?? {}) };
+    for (const k of ['ipc', 'ipt', 'mixer', 'fanGear', 'speeds', 'prop', 'afterburner', 'geometry', 'installation', 'inertia', 'humidity', 'cooling'] as const) (inputs as any)[k] = { ...(d as any)[k], ...(parsed.inputs?.[k] ?? {}) };
     const od = { ...fallback.od, ...(parsed.od ?? {}) };
     return { ...fallback, ...parsed, inputs, od };
   } catch {

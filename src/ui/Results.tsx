@@ -2,9 +2,11 @@ import { EngineResult } from '../engine/types';
 import { Store } from '../state/store';
 import { fmt, kW, pct } from './format';
 import { U } from './units';
+import { t } from './i18n';
 import { Diagrams } from '../viz/Diagrams';
 import { MapCharts } from '../viz/MapChart';
 import { exportStationsCsv } from './csv';
+import { estimateWeight } from '../engine/weight';
 
 export function Results({ store, result }: { store: Store; result: EngineResult }) {
   const p = result.perf;
@@ -28,38 +30,50 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
       <div className="cards">
         {arch === 'turboprop' ? (
           <>
-            <div className="card hero"><div className="k">Shaft power delivered</div><div className="v">{C(u.power(p.shaftPower_W))}</div></div>
-            <div className="card"><div className="k">Propeller thrust</div><div className="v">{C(u.thrust(p.propThrust))}</div></div>
-            <div className="card"><div className="k">Net jet thrust</div><div className="v">{C(u.thrust(p.jetThrust))}</div></div>
-            <div className="card"><div className="k">Total net thrust</div><div className="v">{C(u.thrust(p.Fn))}</div></div>
-            <div className="card"><div className="k">PSFC</div><div className="v">{C(u.psfc(p.PSFC_kg_kWh))}</div></div>
-            <div className="card"><div className="k">Equivalent power</div><div className="v">{C(u.power(p.ESHP_W))}</div></div>
-            <div className="card"><div className="k">Fuel flow</div><div className="v">{C(u.fuelflow(p.Wfuel))}</div></div>
+            <div className="card hero"><div className="k">{t('Shaft power delivered')}</div><div className="v">{C(u.power(p.shaftPower_W))}</div></div>
+            <div className="card"><div className="k">{t('Propeller thrust')}</div><div className="v">{C(u.thrust(p.propThrust))}</div></div>
+            <div className="card"><div className="k">{t('Net jet thrust')}</div><div className="v">{C(u.thrust(p.jetThrust))}</div></div>
+            <div className="card"><div className="k">{t('Total net thrust')}</div><div className="v">{C(u.thrust(p.Fn))}</div></div>
+            <div className="card"><div className="k">{t('PSFC')}</div><div className="v">{C(u.psfc(p.PSFC_kg_kWh))}</div></div>
+            <div className="card"><div className="k">{t('Equivalent power')}</div><div className="v">{C(u.power(p.ESHP_W))}</div></div>
+            <div className="card"><div className="k">{t('Fuel flow')}</div><div className="v">{C(u.fuelflow(p.Wfuel))}</div></div>
           </>
         ) : (
           <>
-            <div className="card hero"><div className="k">Net thrust</div><div className="v">{C(u.thrust(p.Fn))}</div></div>
-            <div className="card"><div className="k">TSFC</div><div className="v">{C(u.tsfc(p.TSFC_kg_Nh))}</div></div>
-            <div className="card"><div className="k">TSFC</div><div className="v">{u.imp ? <>{fmt(p.TSFC_mg_Ns, 2)}<small>mg/(N·s)</small></> : <>{fmt(p.TSFC_kg_Nh, 4)}<small>kg/(N·h)</small></>}</div></div>
-            <div className="card"><div className="k">Specific thrust</div><div className="v">{C(u.specificThrust(p.specificThrust))}</div></div>
-            <div className="card"><div className="k">Gross thrust</div><div className="v">{C(u.thrust(p.Fg))}</div></div>
-            <div className="card"><div className="k">Ram drag</div><div className="v">{C(u.thrust(p.ramDrag))}</div></div>
-            {arch === 'turbofan' && !result.inputs.mixed && <div className="card"><div className="k">Bypass share of gross thrust</div><div className="v">{pct(p.Fg_byp / p.Fg, 0)}</div></div>}
-            <div className="card"><div className="k">Fuel flow</div><div className="v">{C(u.fuelflow(p.Wfuel))}</div></div>
+            <div className="card hero"><div className="k">{t('Net thrust')}</div><div className="v">{C(u.thrust(p.Fn))}</div></div>
+            <div className="card"><div className="k">{t('TSFC')}</div><div className="v">{C(u.tsfc(p.TSFC_kg_Nh))}</div></div>
+            <div className="card"><div className="k">{t('TSFC')}</div><div className="v">{u.imp ? <>{fmt(p.TSFC_mg_Ns, 2)}<small>mg/(N·s)</small></> : <>{fmt(p.TSFC_kg_Nh, 4)}<small>kg/(N·h)</small></>}</div></div>
+            <div className="card"><div className="k">{t('Specific thrust')}</div><div className="v">{C(u.specificThrust(p.specificThrust))}</div></div>
+            <div className="card"><div className="k">{t('Gross thrust')}</div><div className="v">{C(u.thrust(p.Fg))}</div></div>
+            <div className="card"><div className="k">{t('Ram drag')}</div><div className="v">{C(u.thrust(p.ramDrag))}</div></div>
+            {arch === 'turbofan' && !result.inputs.mixed && <div className="card"><div className="k">{t('Bypass share of gross thrust')}</div><div className="v">{pct(p.Fg_byp / p.Fg, 0)}</div></div>}
+            <div className="card"><div className="k">{t('Fuel flow')}</div><div className="v">{C(u.fuelflow(p.Wfuel))}</div></div>
           </>
         )}
         {result.inputs.installation.enabled && arch !== 'turboprop' && (
           <>
-            <div className="card"><div className="k">Installed net thrust</div><div className="v">{C(u.thrust(p.installedFn))}</div></div>
-            <div className="card"><div className="k">Installation drag</div><div className="v">{C(u.thrust(p.inletDrag + p.nacelleDrag + p.afterbodyDrag))}<small style={{ display: 'block', marginLeft: 0 }}>inlet {u.thrust(p.inletDrag).v} · nacelle {u.thrust(p.nacelleDrag).v} · afterbody {u.thrust(p.afterbodyDrag).v}</small></div></div>
+            <div className="card"><div className="k">{t('Installed net thrust')}</div><div className="v">{C(u.thrust(p.installedFn))}</div></div>
+            <div className="card"><div className="k">{t('Installation drag')}</div><div className="v">{C(u.thrust(p.inletDrag + p.nacelleDrag + p.afterbodyDrag))}<small style={{ display: 'block', marginLeft: 0 }}>inlet {u.thrust(p.inletDrag).v} · nacelle {u.thrust(p.nacelleDrag).v} · afterbody {u.thrust(p.afterbodyDrag).v}</small></div></div>
           </>
         )}
-        <div className="card"><div className="k">Overall pressure ratio</div><div className="v">{fmt(p.OPR, 1)}</div></div>
-        <div className="card"><div className="k">Fuel/air ratio</div><div className="v">{fmt(p.FAR, 4)}</div></div>
-        <div className="card"><div className="k">Thermal efficiency</div><div className="v">{pct(p.thermalEff)}</div></div>
-        <div className="card"><div className="k">Propulsive efficiency</div><div className="v">{p.V0 > 0 ? pct(p.propulsiveEff) : '–'}</div></div>
-        <div className="card"><div className="k">Overall efficiency</div><div className="v">{p.V0 > 0 ? pct(p.overallEff) : '–'}</div></div>
+        <div className="card"><div className="k">{t('Overall pressure ratio')}</div><div className="v">{fmt(p.OPR, 1)}</div></div>
+        <div className="card"><div className="k">{t('Fuel/air ratio')}</div><div className="v">{fmt(p.FAR, 4)}</div></div>
+        <div className="card"><div className="k">{t('Thermal efficiency')}</div><div className="v">{pct(p.thermalEff)}</div></div>
+        <div className="card"><div className="k">{t('Propulsive efficiency')}</div><div className="v">{p.V0 > 0 ? pct(p.propulsiveEff) : '–'}</div></div>
+        <div className="card"><div className="k">{t('Overall efficiency')}</div><div className="v">{p.V0 > 0 ? pct(p.overallEff) : '–'}</div></div>
       </div>
+
+      {!result.offDesign && (() => { try { const w = estimateWeight(result); return (
+        <div className="section">
+          <h3>Weight & size <span className="hint">correlation estimate</span></h3>
+          <div className="kv">
+            <span className="k">Dry mass</span><span className="v">{fmt(w.total_kg, 0)} kg</span>
+            <span className="k">{arch === 'turboprop' ? 'Power / weight' : 'Thrust / weight'}</span><span className="v">{arch === 'turboprop' ? fmt(w.powerToWeight_kW_kg, 2) + ' kW/kg' : fmt(w.thrustToWeight, 1)}</span>
+            <span className="k">Length · max diameter</span><span className="v">{u.length(w.length_m).v} · {u.length(w.diameter_m).v} {u.length(1).u}</span>
+            {w.parts.map((p) => <span key={p.name} style={{ display: 'contents' }}><span className="k" style={{ paddingLeft: 12, color: 'var(--text-muted)' }}>{p.name}</span><span className="v" style={{ color: 'var(--text-secondary)' }}>{fmt(p.mass_kg, 0)} kg</span></span>)}
+          </div>
+        </div>
+      ); } catch { return null; } })()}
 
       <div className="section">
         <h3>Emissions & noise <span className="hint">P3–T3 correlations, Lighthill jet noise · estimates</span></h3>
@@ -72,7 +86,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
       </div>
 
       <div className="section">
-        <h3>Shaft power balance</h3>
+        <h3>{t('Shaft power balance')}</h3>
         {result.shafts.map((s) => {
           const max = Math.max(s.powerIn_W, s.powerOut_W, 1);
           return (
@@ -91,7 +105,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
       <MapCharts design={store.state.inputs} result={result} />
 
       <div className="section" style={{ padding: 0 }}>
-        <h3 style={{ padding: '12px 14px 0' }}>Stations<span className="hint"><button className="btn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => exportStationsCsv(result)}>Export CSV</button></span></h3>
+        <h3 style={{ padding: '12px 14px 0' }}>{t('Stations')}<span className="hint"><button className="btn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => exportStationsCsv(result)}>Export CSV</button></span></h3>
         <div style={{ overflowX: 'auto' }}>
           <table className="stations">
             <thead><tr><th>St.</th><th>Pt {u.pressure(1).u}</th><th>Tt {u.temperature(1).u}</th><th>W {u.massflow(1).u}</th><th>Ps {u.pressure(1).u}</th><th>M</th><th>V {u.velocity(1).u}</th><th>A {u.area(1).u}</th></tr></thead>
@@ -109,7 +123,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
       </div>
 
       <div className="section">
-        <h3>Components</h3>
+        <h3>{t('Components')}</h3>
         {result.components.map((c) => (
           <details key={c.id} open={sel === c.id} onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) store.dispatch({ type: 'select', id: c.id }); }}>
             <summary style={{ cursor: 'pointer', padding: '4px 0', color: sel === c.id ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{c.name}</summary>
