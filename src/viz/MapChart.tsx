@@ -40,7 +40,7 @@ function OneMap({ name, map, sc, NcDes, op, des }: { name: string; map: any; sc:
   return (
     <div className="chart">
       <h4>{name} map</h4>
-      <div className="sub">corrected flow vs pressure ratio · speed lines {speeds[0] * 100}–{speeds[speeds.length - 1] * 100} % of map design speed · {map.name} map scaled to the design point</div>
+      <div className="sub">corrected flow vs pressure ratio · speed lines {Math.round(speeds[0] * 100)}–{Math.round(speeds[speeds.length - 1] * 100)} % of map design speed · {map.name} map scaled to the design point</div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${name} compressor map`}>
         <g className="axis"><line x1={m.l} x2={W - m.r} y1={H - m.b} y2={H - m.b} /><line x1={m.l} x2={m.l} y1={m.t} y2={H - m.b} /></g>
         {Array.from({ length: ticksX + 1 }, (_, k) => xmin + ((xmax - xmin) * k) / ticksX).map((v) => <text key={v} x={sx(v)} y={H - m.b + 13} textAnchor="middle">{fmt(v, 0)}</text>)}
