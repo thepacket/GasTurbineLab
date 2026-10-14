@@ -13,7 +13,7 @@ function Slider({ label, path, value, min, max, step, unit, scale = 1, digits, s
     <div className="control">
       <label>{label}</label>
       <div className="val">
-        <input className="num" type="number" value={Number(shown.toFixed(d))} step={step * scale} onChange={(e) => commit(parseFloat(e.target.value))} />
+        <input className="num" type="number" aria-label={label + (unit ? ` (${unit})` : '')} value={Number(shown.toFixed(d))} step={step * scale} onChange={(e) => commit(parseFloat(e.target.value))} />
         <span className="unit">{unit ?? ''}</span>
       </div>
       <input type="range" min={min * scale} max={max * scale} step={step * scale} value={shown} onChange={(e) => commit(parseFloat(e.target.value))} aria-label={label} />
@@ -38,7 +38,7 @@ function OdSlider(p: Omit<SliderProps, 'store'> & { store: Store }) {
   return (
     <div className="control">
       <label>{rest.label}</label>
-      <div className="val"><input className="num" type="number" value={Number(shown.toFixed(d))} step={rest.step * (rest.scale ?? 1)} onChange={(e) => commit(parseFloat(e.target.value))} /><span className="unit">{rest.unit ?? ''}</span></div>
+      <div className="val"><input className="num" type="number" aria-label={rest.label + (rest.unit ? ` (${rest.unit})` : '')} value={Number(shown.toFixed(d))} step={rest.step * (rest.scale ?? 1)} onChange={(e) => commit(parseFloat(e.target.value))} /><span className="unit">{rest.unit ?? ''}</span></div>
       <input type="range" min={rest.min * (rest.scale ?? 1)} max={rest.max * (rest.scale ?? 1)} step={rest.step * (rest.scale ?? 1)} value={shown} onChange={(e) => commit(parseFloat(e.target.value))} aria-label={rest.label} />
     </div>
   );

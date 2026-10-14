@@ -8,7 +8,7 @@
   --line-strong: #4a4b48;
   --text-primary: #ffffff;
   --text-secondary: #c3c2b7;
-  --text-muted: #8b8a82;
+  --text-muted: #9c9b92;
   --accent: #3987e5;
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
   --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
@@ -31,6 +31,9 @@
   --good: #1baf7a; --warn: #eda100; --bad: #e34948;
 }
 * { box-sizing: border-box; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.segmented button[aria-pressed="true"], .segmented button.on { background: var(--surface-3); color: var(--text-primary); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text-primary); font-family: var(--font); font-size: 14px; line-height: 1.4; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
 button, input, select { font: inherit; color: inherit; }

@@ -17,6 +17,7 @@ export interface AppState {
   od: OffDesignInputs;
   compare: EngineInputs | null;
   compareLabel: string | null;
+  units: 'SI' | 'imperial';
 }
 
 type Action =
@@ -29,6 +30,7 @@ type Action =
   | { type: 'od'; path: string; value: unknown }
   | { type: 'compare'; inputs: EngineInputs | null; label: string | null }
   | { type: 'load'; state: Partial<AppState> }
+  | { type: 'units'; units: 'SI' | 'imperial' }
   | { type: 'reset' };
 
 const KEY = 'gtl.state.v1';
@@ -51,6 +53,7 @@ function reducer(s: AppState, a: Action): AppState {
     case 'od': return { ...s, od: setPath(s.od, a.path, a.value) };
     case 'compare': return { ...s, compare: a.inputs, compareLabel: a.label };
     case 'load': return { ...s, ...a.state };
+    case 'units': return { ...s, units: a.units };
     case 'reset': return { ...s, inputs: defaultInputs(s.inputs.arch), selected: null, note: null };
   }
 }
@@ -60,7 +63,7 @@ export function odFromDesign(i: EngineInputs): OffDesignInputs {
 }
 
 function load(): AppState {
-  const fallback: AppState = { inputs: defaultInputs('turbofan'), selected: null, view: 'build', note: null, mode: 'design', od: odFromDesign(defaultInputs('turbofan')), compare: null, compareLabel: null };
+  const fallback: AppState = { inputs: defaultInputs('turbofan'), selected: null, view: 'build', note: null, mode: 'design', od: odFromDesign(defaultInputs('turbofan')), compare: null, compareLabel: null, units: 'SI' };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
@@ -79,8 +82,8 @@ function load(): AppState {
 export function useEngineStore() {
   const [state, dispatch] = useReducer(reducer, undefined, load);
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify({ inputs: state.inputs, view: state.view, note: state.note, mode: state.mode, od: state.od, compare: state.compare, compareLabel: state.compareLabel })); } catch { /* ignore */ }
-  }, [state.inputs, state.view, state.note, state.mode, state.od, state.compare, state.compareLabel]);
+    try { localStorage.setItem(KEY, JSON.stringify({ inputs: state.inputs, view: state.view, note: state.note, mode: state.mode, od: state.od, compare: state.compare, compareLabel: state.compareLabel, units: state.units })); } catch { /* ignore */ }
+  }, [state.inputs, state.view, state.note, state.mode, state.od, state.compare, state.compareLabel, state.units]);
 
   // a shared link (#d=...) overrides the stored state once
   useEffect(() => {

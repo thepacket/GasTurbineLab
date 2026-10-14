@@ -83,8 +83,8 @@ export function Explore({ inputs, od, initialMode }: { inputs: EngineInputs; od:
       <div className="explore-controls">
         <div className="segmented"><button className={mode === 'design' ? 'on' : ''} onClick={() => setMode('design')}>Design sweeps</button><button className={mode === 'offdesign' ? 'on' : ''} onClick={() => setMode('offdesign')}>Off-design sweeps</button></div>
         <label>Sweep <select value={param.id} onChange={(e) => { setPid(e.target.value); setRange(null); }}>{avail.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
-        <label>from <input className="num" type="number" style={{ width: 90 }} value={Number((lo * sc).toFixed(3))} onChange={(e) => setRange({ min: parseFloat(e.target.value) / sc, max: hi })} /></label>
-        <label>to <input className="num" type="number" style={{ width: 90 }} value={Number((hi * sc).toFixed(3))} onChange={(e) => setRange({ min: lo, max: parseFloat(e.target.value) / sc })} /></label>
+        <label>from <input className="num" type="number" aria-label="Sweep from" style={{ width: 90 }} value={Number((lo * sc).toFixed(3))} onChange={(e) => setRange({ min: parseFloat(e.target.value) / sc, max: hi })} /></label>
+        <label>to <input className="num" type="number" aria-label="Sweep to" style={{ width: 90 }} value={Number((hi * sc).toFixed(3))} onChange={(e) => setRange({ min: lo, max: parseFloat(e.target.value) / sc })} /></label>
         <label>Family <select value={param2?.id ?? 'none'} onChange={(e) => setSecond(e.target.value)}><option value="none">none</option>{avail.filter((p) => p.id !== param.id).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
         <label>Chemistry <select value={chem} onChange={(e) => setChem(e.target.value as any)}><option value="frozen">frozen (fast)</option><option value="equilibrium">equilibrium</option></select></label>
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>

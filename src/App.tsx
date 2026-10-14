@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useEngineStore, View } from './state/store';
 import { useBreakpoint } from './ui/useBreakpoint';
 import { Controls } from './ui/Controls';
 import { Results } from './ui/Results';
 import { CrossSection } from './viz/CrossSection';
-import { Engine3D } from './three/Engine3D';
-import { Explore } from './viz/Explore';
-import { Validation } from './ui/Validation';
-import { Compare } from './ui/Compare';
+const Engine3D = lazy(() => import('./three/Engine3D').then((m) => ({ default: m.Engine3D })));
+const Explore = lazy(() => import('./viz/Explore').then((m) => ({ default: m.Explore })));
+const Validation = lazy(() => import('./ui/Validation').then((m) => ({ default: m.Validation })));
+const Compare = lazy(() => import('./ui/Compare').then((m) => ({ default: m.Compare })));
 import { shareUrl } from './ui/share';
 import { EngineResult } from './engine/types';
 
@@ -54,6 +54,7 @@ export default function App() {
       {bp === 'desktop' && (
         <div className="segmented">{(['section', 'explore', 'compare', 'validate'] as View[]).map((v) => <button key={v} className={(view === v || (v === 'section' && !['explore', 'compare', 'validate'].includes(view))) ? 'on' : ''} onClick={() => setView(v)}>{VIEWS.find((x) => x.id === v)!.label}</button>)}</div>
       )}
+      <button className="iconbtn" style={{ width: 'auto', padding: '0 8px', fontSize: 12, fontWeight: 600 }} title="Toggle display units" aria-pressed={store.state.units === 'imperial'} onClick={() => store.dispatch({ type: 'units', units: store.state.units === 'SI' ? 'imperial' : 'SI' })}>{store.state.units === 'SI' ? 'SI' : 'US'}</button>
       <button className="iconbtn" title={copied ? 'Link copied' : 'Copy a link to this design'} onClick={share} aria-label="Copy share link">{copied ? <Icon d="M5 12l5 5L20 7" /> : <Icon d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" />}</button>
       <button className="iconbtn" title="Toggle theme" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle colour theme">
         {theme === 'dark' ? <Icon d="M12 3a9 9 0 1 0 9 9c-5 1-9-3-9-9z" /> : <Icon d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7l1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2l-1.4-1.4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z" />}
@@ -106,9 +107,9 @@ export default function App() {
           {view === 'compare' && !('error' in store.design) && <Compare store={store} a={store.design} />}
           {view === 'validate' && <Validation />}
         </section>
-        <nav className="tabbar">{VIEWS.map((v) => <button key={v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)}><Icon d={v.icon} />{v.label}</button>)}</nav>
+        <nav className="tabbar" aria-label="Views">{VIEWS.map((v) => <button key={v.id} className={view === v.id ? 'on' : ''} aria-current={view === v.id ? 'page' : undefined} onClick={() => setView(v.id)}><Icon d={v.icon} />{v.label}</button>)}</nav>
       </div>
     );
   }
-  return <div className="app">{header}{main}</div>;
+  return <div className="app">{header}<Suspense fallback={<div className="main" style={{ display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>Loading…</div>}>{main}</Suspense></div>;
 }

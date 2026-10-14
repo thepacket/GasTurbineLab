@@ -1,14 +1,28 @@
 # Gas Turbine Lab
 
-A design-point gas-turbine cycle laboratory that runs entirely in the browser (installable PWA, no server-side code). Assemble a **turbojet**, **two-spool separate-flow turbofan** or **free-turbine turboprop**, then explore altitude, Mach number, bypass ratio, pressure ratios, turbine inlet temperature and component efficiencies. Results are shown on an engine cross-section, on a procedurally generated 3D cutaway, in station tables, T–s diagrams and parametric sweeps.
+A gas-turbine cycle laboratory that runs entirely in the browser (installable PWA, no server-side code). Assemble a **turbojet** (with afterburner), a **turbofan** (two or three spools, separate or mixed flow, direct-drive or geared fan) or a **free-turbine turboprop** (with reduction gearbox and propeller), solve the design point, then run the fixed engine **off-design** across throttle, altitude and Mach number on scaled component maps. Results are shown on an engine cross-section, on a procedurally generated 3D cutaway, in station tables, T–s diagrams, compressor maps and parametric sweeps, and can be compared, shared by link and exported to CSV.
 
 ## Thermodynamic model
 
-* **Gas properties**: NASA CEA 9-coefficient polynomials (the `janaf` set shipped with pyCycle) for Ar, CO₂, H₂O, N₂, O₂. Composition is carried as element amounts per kg (pyCycle's `b0` convention); products are frozen and fully oxidised. Air composition and Jet-A (C₁₂H₂₃) definitions are identical to pyCycle's.
+* **Gas properties**: NASA CEA 9-coefficient polynomials (the `janaf` set shipped with pyCycle). Composition is carried as element amounts per kg (pyCycle's `b0` convention). Above 1000 K the composition is solved by **Gibbs-free-energy minimisation** over N₂, O₂, Ar, CO₂, H₂O, CO, H₂, OH, NO, O and H (CEA's element-potential iteration); a frozen complete-combustion mode is available. Air composition and Jet-A (C₁₂H₂₃) definitions are identical to pyCycle's.
 * **Absolute enthalpies** (including formation enthalpy) so combustion is an enthalpy-conserving mix. Fuel enthalpy defaults to 0 kJ/kg, pyCycle's convention; it is adjustable.
-* **Components**: ISA-1976 atmosphere, inlet ram recovery, compressors with isentropic efficiency and exit bleeds, combustor with ΔP/P and combustion efficiency, turbines with per-stream cooling-flow expansion (pyCycle's bleed model), convergent or convergent–divergent nozzles with velocity coefficient, afterburner (turbojet), actuator-disc propeller with gearbox and profile efficiency (turboprop).
-* **Shaft balances** are solved for each spool: turbine pressure ratio is found such that turbine power × mechanical efficiency equals compressor power plus power extraction (or the requested shaft power for the power turbine).
+* **Components**: ISA-1976 atmosphere, inlet ram recovery, compressors with isentropic efficiency and exit bleeds, combustor with ΔP/P and combustion efficiency, turbines with per-stream cooling-flow expansion (pyCycle's bleed model), convergent or convergent–divergent nozzles with velocity coefficient, afterburner (turbojet and mixed turbofan), constant-area **mixer** (mass, impulse and energy conservation), **fan drive gearbox** and **propeller reduction gearbox** with explicit speeds, actuator-disc propeller with profile efficiency and tip-Mach warning.
+* **Shaft balances** are solved for each spool (LP, IP, HP, power turbine): turbine pressure ratio is found such that turbine power × mechanical efficiency equals compressor power plus power extraction (or the requested shaft power for the power turbine).
 * **Statics** at every station are computed for the sizing Mach numbers, which gives flow areas; the cross-section and 3D geometry scale with those areas.
+
+## Off-design operation
+
+The design point fixes nozzle throat and mixer areas and scales the NPSS-style component maps distributed with pyCycle (fan, LPC, HPC, HPT, LPT) so that each passes through its design flow, pressure ratio, efficiency and corrected speed. Off-design, the unknowns are inlet mass flow, bypass ratio, spool speeds, fuel/air ratio, compressor R-lines and turbine pressure ratios; the residuals are map-flow continuity at every compressor and turbine, shaft power balances, nozzle throat and mixer static-pressure matching, and the throttle target (T4, fuel flow or HP spool speed). A Newton solver with finite-difference Jacobian, backtracking and continuation from the design throttle solves 5 (turbojet) to 12 (three-spool turbofan) unknowns in a web worker. Results include corrected speeds, surge margins and the operating point drawn on each compressor map. Turboprops run with a constant-speed power turbine and a propeller load setting.
+
+## Views
+
+* **Build**: architecture, layout, presets, catalogue, operating point (design / off-design) and every component parameter; SI inputs with a SI / US display-unit toggle in the header.
+* **Section**: parametric SVG cross-section coloured by total temperature or pressure with station callouts; **3D**: Three.js cutaway with rotating blade rows and click-to-inspect parts.
+* **Results**: performance cards, shaft balances with speeds, T–s and station profiles, compressor maps, station table (CSV export), component details.
+* **Explore**: design-point sweeps (new design per point) or off-design sweeps (fixed engine) with optional parameter families, computed in a worker; CSV export.
+* **Compare**: the live design against a pinned snapshot or any catalogue engine, with overlaid diagrams.
+* **Validate**: every station and performance figure against pyCycle.
+* **Share**: the link button encodes the complete design, operating point and comparison in the URL (`#d=`).
 
 ## Commercial engine catalogue
 
@@ -16,7 +30,7 @@ A design-point gas-turbine cycle laboratory that runs entirely in the browser (i
 
 ## Validation against pyCycle
 
-`reference/pycycle_reference.py` builds the same three architectures in NASA's [pyCycle](https://github.com/OpenMDAO/pyCycle) (CEA equilibrium thermodynamics) and writes `src/data/pycycle_reference.json`. The app's **Validate** tab compares every station and performance figure. Agreement is within 0.4 % on thrust and 0.7 % on fuel flow for eight cases spanning sea-level static to Mach 2 at 15 km; the residual is dissociation enthalpy that equilibrium chemistry absorbs at high turbine inlet temperature. `npm test` enforces these tolerances.
+`reference/pycycle_reference.py` builds the same three architectures in NASA's [pyCycle](https://github.com/OpenMDAO/pyCycle) (CEA equilibrium thermodynamics) and writes `src/data/pycycle_reference.json`. The app's **Validate** tab compares every station and performance figure. With equilibrium chemistry the agreement is within 0.05 % on every station and 0.01 % on thrust and fuel flow for eight cases spanning sea-level static to Mach 2 at 15 km; the frozen model stays within 1 %. `npm test` enforces these tolerances.
 
 To regenerate the reference (needs Python ≤ 3.11 and numpy < 2 for pyCycle 4.4):
 
@@ -31,12 +45,13 @@ reference/venv/bin/python reference/pycycle_reference.py > src/data/pycycle_refe
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # vitest: pyCycle comparison
+npm test           # vitest: pyCycle comparison, engine catalogue, off-design solver
+npm run test:e2e   # Playwright: desktop, tablet and phone layouts, off-design worker, PWA, share links
 npm run build      # static bundle + service worker in dist/
 node scripts/icons.mjs   # regenerate PWA icons from public/icons/icon.svg
 ```
 
-Layouts: desktop (three panes), tablet (controls + tabbed content), phone (bottom tab bar). Theme follows a toggle in the header.
+Layouts: desktop (three panes), tablet (controls + tabbed content), phone (bottom tab bar). Theme and display units follow toggles in the header. GitHub Actions runs type-check, unit tests, build and the Playwright suite on every push.
 
 ## Deployment (Fly.io)
 
@@ -49,8 +64,11 @@ fly deploy
 ## Project layout
 
 ```
-src/engine/      thermodynamics and cycle solver (gas.ts, components.ts, cycle.ts)
-src/data/        janaf polynomial coefficients, pyCycle reference results
+src/engine/      gas model (gas.ts, equilibrium.ts), components, generic core (core.ts),
+                 design wrapper (cycle.ts), maps and off-design solver (maps.ts, offdesign.ts),
+                 engine catalogue (engines.ts), worker (worker.ts)
+src/data/        janaf polynomial coefficients, component maps, pyCycle reference results
+e2e/             Playwright layout and PWA tests
 src/viz/         SVG cross-section, shared parametric geometry, charts, explorer
 src/three/       Three.js procedural cutaway model
 src/ui/          controls, results, validation, formatting

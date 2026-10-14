@@ -4,6 +4,7 @@ import { Store } from '../state/store';
 import { buildGeometry, XR, Part } from './geometry';
 import { tempColor, thermalGradient, T_MIN, T_MAX } from './color';
 import { fmt, kPa } from '../ui/format';
+import { U } from '../ui/units';
 
 type Overlay = 'T' | 'P';
 
@@ -12,6 +13,7 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
   const [overlay, setOverlay] = useState<Overlay>('T');
   const [hover, setHover] = useState<{ x: number; y: number; title: string; lines: string[] } | null>(null);
   const sel = store.state.selected;
+  const u = U(store.state.units);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
   useEffect(() => {
@@ -60,7 +62,7 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
         {/* gas path fills (both halves) */}
         {geo.parts.filter((p) => p.tip.length > 0 && p.kind !== 'gearbox').map((p) => (
           <g key={p.id} className="part" style={{ cursor: 'pointer' }} onClick={() => pick(p.id)}
-            onMouseMove={(e) => onEnter(e, p.name, [`Tt out ${fmt(p.T, 0)} K`, `Pt out ${kPa(p.P)} kPa`])}>
+            onMouseMove={(e) => onEnter(e, p.name, [`Tt out ${u.temperature(p.T).v} ${u.temperature(p.T).u}`, `Pt out ${u.pressure(p.P).v} ${u.pressure(p.P).u}`])}>
             {[1, -1].map((m) => <path key={m} d={pathOf(p.hub, p.tip, m)} fill={colorOf(p)} opacity={p.kind === 'inlet' || p.kind === 'nozzle' || p.kind === 'duct' || p.kind === 'afterburner' ? 0.9 : 0.75} stroke={sel === p.id ? 'var(--text-primary)' : 'none'} strokeWidth={2} />)}
           </g>
         ))}
@@ -121,13 +123,13 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
             const id = 'st' + mk.id;
             const active = sel === id;
             return (
-              <g key={mk.id} style={{ cursor: 'pointer' }} onClick={() => pick(id)} onMouseMove={(e) => onEnter(e, `Station ${s.id} · ${s.name}`, [`Pt ${kPa(s.Pt)} kPa   Tt ${fmt(s.Tt, 1)} K`, `W ${fmt(s.W, 2)} kg/s   M ${fmt(s.MN, 2)}`, `Ps ${kPa(s.Ps)} kPa   V ${fmt(s.V, 0)} m/s`])}>
+              <g key={mk.id} style={{ cursor: 'pointer' }} onClick={() => pick(id)} onMouseMove={(e) => onEnter(e, `Station ${s.id} · ${s.name}`, [`Pt ${u.pressure(s.Pt).v} ${u.pressure(s.Pt).u}   Tt ${u.temperature(s.Tt).v} ${u.temperature(s.Tt).u}`, `W ${u.massflow(s.W).v} ${u.massflow(s.W).u}   M ${fmt(s.MN, 2)}`, `Ps ${u.pressure(s.Ps).v} ${u.pressure(s.Ps).u}   V ${u.velocity(s.V).v} ${u.velocity(s.V).u}`])}>
                 <line x1={x} x2={x} y1={cy - pr(mk.rOut)} y2={cy + pr(mk.rOut)} stroke={active ? 'var(--text-primary)' : 'var(--text-muted)'} strokeWidth={active ? 1.5 : 0.8} strokeDasharray="3 3" />
                 <line x1={x} x2={x} y1={yEdge} y2={up ? yLab + 30 * k : yLab - 2} stroke={active ? 'var(--text-primary)' : 'var(--line-strong)'} strokeWidth={0.8} />
                 <g transform={`translate(${x},${yLab}) scale(${k})`}>
                   <rect x={-34} y={-2} width={68} height={32} rx={5} fill={active ? 'var(--surface-3)' : 'var(--surface-1)'} stroke={active ? 'var(--accent)' : 'var(--line)'} />
                   <text textAnchor="middle" y={11} fontSize={11} fontWeight={700} fill="var(--text-primary)">{s.id}</text>
-                  <text textAnchor="middle" y={24} fontSize={9.5} fill="var(--text-secondary)" className="num">{overlay === 'T' ? `${fmt(s.Tt, 0)} K` : `${kPa(s.Pt)} kPa`}</text>
+                  <text textAnchor="middle" y={24} fontSize={9.5} fill="var(--text-secondary)" className="num">{overlay === 'T' ? `${u.temperature(s.Tt).v} ${u.temperature(s.Tt).u}` : `${u.pressure(s.Pt).v} ${u.pressure(s.Pt).u}`}</text>
                 </g>
               </g>
             );
@@ -136,7 +138,7 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
       </svg>
       <div className="overlay-tl">
         <span className="chip">Colour: <button className={overlay === 'T' ? 'on' : ''} onClick={() => setOverlay('T')}>Tt</button> · <button className={overlay === 'P' ? 'on' : ''} onClick={() => setOverlay('P')}>Pt</button></span>
-        <span className="chip">{result.inputs.arch} · length ≈ {fmt(geo.length, 1)} m · max Ø {fmt(2 * geo.rMax, 2)} m</span>
+        <span className="chip">{result.inputs.arch}{result.offDesign ? ' · off-design' : ''} · length ≈ {u.length(geo.length).v} {u.length(geo.length).u} · max Ø {u.length(2 * geo.rMax).v} {u.length(2 * geo.rMax).u}</span>
       </div>
       <div className="legend">
         {overlay === 'T' ? <><span>{T_MIN} K</span><div className="ramp" style={{ background: thermalGradient }} /><span>{T_MAX} K</span></> : <><span>{kPa(result.stations[0].Ps)} kPa</span><div className="ramp" style={{ background: 'linear-gradient(90deg, var(--seq-100), var(--seq-400), var(--seq-700))' }} /><span>{kPa(pMax)} kPa</span></>}

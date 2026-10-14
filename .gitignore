@@ -5,3 +5,7 @@ dev-dist
 .DS_Store
 reference/venv*
 .fly
+test-results
+playwright-report
+lighthouse*.html
+lighthouse*.json
