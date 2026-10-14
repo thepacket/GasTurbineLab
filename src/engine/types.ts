@@ -82,6 +82,8 @@ export interface EngineInputs {
   /** fuel type and ambient humidity */
   fuel: 'jetA' | 'saf' | 'hydrogen' | 'methane';
   humidity: { relative: number }; // 0..1 relative humidity at the ambient condition
+  /** secondary air system: orifice network sized at the design point; off-design flows follow the gas-path pressures */
+  sas?: { enabled: boolean; interstageFrac: number; leakFrac: number; cavityPressureFrac: number };
   /** turbine cooling model: fixed fractions, or computed from a target blade metal temperature */
   cooling: { mode: 'fixed' | 'computed'; targetMetal_K: number; effectivenessMax: number; coolantTempRise_K: number };
 }

@@ -5,7 +5,7 @@
  * residuals to zero.
  */
 import { EngineInputs, EngineResult } from './types';
-import { evaluate, designProvider, Provider } from './core';
+import { evaluate, designProvider, Provider, SasAreas, orificeArea, coolingModel } from './core';
 import { CompressorMap, TurbineMap, CompScalars, TurbScalars, correctedFlow, correctedSpeed, paramFlow, paramSpeed } from './maps';
 import { burnerAtFAR, TurbineStream } from './components';
 import { Flow } from './flow';
@@ -36,6 +36,8 @@ export interface DesignPoint {
   nozzleAreas: Record<string, number>;
   mixerAreas?: { Acore: number; Abyp: number };
   mapNames: Record<string, string>;
+  sasAreas?: SasAreas;
+  designHptPR?: number;
 }
 
 export const MAP_FOR: Record<string, string> = { fan: 'Fan', lpc: 'LPC', ipc: 'LPC', hpc: 'HPC', comp: 'HPC', hpt: 'HPT', ipt: 'LPT', lpt: 'LPT', turb: 'HPT', pt: 'LPT' };
@@ -66,7 +68,21 @@ export function makeDesignPoint(inp: EngineInputs): DesignPoint {
     } else if (c.kind === 'nozzle') nozzleAreas[c.id] = c.values.Ath_m2;
   }
   const mx = result.components.find((c) => c.kind === 'mixer');
-  return { inputs: inp, result, comps, turbs, nozzleAreas, mixerAreas: mx ? { Acore: mx.values.Acore_m2, Abyp: mx.values.Abyp_m2 } : undefined, mapNames };
+  // secondary air system: size orifices to pass the design cooling / customer / leak flows at design pressures
+  let sasAreas: SasAreas | undefined, designHptPR: number | undefined;
+  if (inp.arch === 'turbofan' && inp.sas?.enabled) {
+    const hpc = result.components.find((c) => c.id === 'hpc')!, hpt = result.components.find((c) => c.id === 'hpt')!;
+    const s3 = st('3'), s25 = st('25'), s4 = st('4');
+    const W25 = s25.W, P3 = s3.Pt, T3 = s3.Tt, P4 = s4.Pt, P45 = P4 / hpt.values.PR;
+    const cm = inp.cooling.mode === 'computed' ? coolingModel(inp.burner.T4_K, T3, inp.cooling, inp.coolInletFrac) : null;
+    const fin = cm ? cm.inletFrac : inp.coolInletFrac, fex = cm ? cm.exitFrac : inp.coolExitFrac;
+    void hpc;
+    const wIn = Math.max(fin * W25, 1e-6), wEx = Math.max(fex * W25, 1e-6), wCu = Math.max(inp.geometry.customerBleed_kgs, 1e-6), wLk = Math.max(inp.sas.leakFrac * W25, 1e-6);
+    const Pfeed = s25.Pt * inp.sas.interstageFrac + (1 - inp.sas.interstageFrac) * P3, Pcav = P45 * inp.sas.cavityPressureFrac;
+    sasAreas = { coolInlet: orificeArea(wIn, P3, T3, P4 * 0.97), coolExit: orificeArea(wEx, P3, T3, P45), customer: orificeArea(wCu, P3, T3, Math.min(P3 * 0.5, 4e5)), leak: orificeArea(wLk, P3, T3, 101325), interstageSeal: orificeArea(0.01 * W25, Math.max(Pfeed, Pcav * 1.05), s25.Tt, Pcav) };
+    designHptPR = hpt.values.PR;
+  }
+  return { inputs: inp, result, comps, turbs, nozzleAreas, mixerAreas: mx ? { Acore: mx.values.Acore_m2, Abyp: mx.values.Abyp_m2 } : undefined, mapNames, sasAreas, designHptPR };
 }
 
 /** Names of the unknowns for an architecture. */
@@ -85,7 +101,7 @@ function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<strin
   const speeds = fs ? { ...fs, PT: inp.speeds.PT } : { LP: x.N_LP ?? inp.speeds.LP, IP: x.N_IP ?? inp.speeds.IP, HP: x.N_HP, PT: inp.speeds.PT };
   const geometry = { ...inp.geometry, ...(od.geometry ?? {}) };
   return {
-    W: x.W, BPR: x.BPR ?? inp.BPR, speeds, residuals, geometry,
+    W: x.W, BPR: x.BPR ?? inp.BPR, speeds, residuals, geometry, sasAreas: dp.sasAreas, designHptPR: dp.designHptPR,
     compressor: (id, inlet, N, _d) => {
       const c = dp.comps[id];
       const Nc = correctedSpeed(N, inlet.Tt);

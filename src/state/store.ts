@@ -76,7 +76,7 @@ function load(): AppState {
     // merge with defaults so new fields get sane values
     const d = defaultInputs(parsed.inputs?.arch ?? 'turbofan');
     const inputs = { ...d, ...parsed.inputs };
-    for (const k of ['ipc', 'ipt', 'mixer', 'fanGear', 'speeds', 'prop', 'afterburner', 'geometry', 'installation', 'inertia', 'humidity', 'cooling'] as const) (inputs as any)[k] = { ...(d as any)[k], ...(parsed.inputs?.[k] ?? {}) };
+    for (const k of ['ipc', 'ipt', 'mixer', 'fanGear', 'speeds', 'prop', 'afterburner', 'geometry', 'installation', 'inertia', 'humidity', 'cooling', 'sas'] as const) (inputs as any)[k] = { ...(d as any)[k], ...(parsed.inputs?.[k] ?? {}) };
     const od = { ...fallback.od, ...(parsed.od ?? {}) };
     return { ...fallback, ...parsed, inputs, od };
   } catch {

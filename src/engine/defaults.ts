@@ -34,6 +34,7 @@ export function defaultInputs(arch: Architecture): EngineInputs {
     geometry: { customerBleed_kgs: 0, handlingBleedFrac: 0, A8scale: 1, vsvFlowGain: 0 },
     installation: { enabled: false, captureRatioDesign: 0.95, nacelleCf: 0.0025, afterbodyCd: 0.02 },
     inertia: { LP: 40, IP: 10, HP: 6, PT: 2 },
+    sas: { enabled: false, interstageFrac: 0.5, leakFrac: 0.004, cavityPressureFrac: 0.9 },
     fuel: 'jetA',
     humidity: { relative: 0 },
     cooling: { mode: 'fixed', targetMetal_K: 1250, effectivenessMax: 0.7, coolantTempRise_K: 60 },

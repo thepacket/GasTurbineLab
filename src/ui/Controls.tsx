@@ -260,6 +260,20 @@ export function Controls({ store }: { store: Store }) {
         <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Variable stator gain: map corrected flow × (1 + gain·(Nc/Nc,des − 1)) on the fan and HPC. Negative gain closes stators at low speed.</div>
       </Section>
 
+      {arch === 'turbofan' && (
+        <Section title="Secondary air system" hint="orifice network, off-design">
+          <label className="toggle"><input type="checkbox" checked={!!i.sas?.enabled} onChange={(e) => store.set('sas.enabled', e.target.checked)} /> Compute bleed and cooling flows from pressures off-design</label>
+          {i.sas?.enabled && (
+            <>
+              {S({ label: 'Interstage seal feed pressure (0 = P25, 1 = P3)', path: 'sas.interstageFrac', value: i.sas.interstageFrac, min: 0, max: 1, step: 0.05 })}
+              {S({ label: 'Turbine cavity pressure / P45', path: 'sas.cavityPressureFrac', value: i.sas.cavityPressureFrac, min: 0.6, max: 1.1, step: 0.01 })}
+              {S({ label: 'Overboard leakage at design', path: 'sas.leakFrac', value: i.sas.leakFrac, min: 0, max: 0.02, step: 0.001, unit: '% W25', scale: 100, digits: 1 })}
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Orifices are sized at the design point to pass the design cooling, customer and leakage flows. Off-design, each flow follows the compressible orifice law on the gas-path pressures; a reversed interstage seal is flagged as hot-gas ingestion.</div>
+            </>
+          )}
+        </Section>
+      )}
+
       <Section title="Installation" hint="nacelle, inlet, afterbody">
         <label className="toggle"><input type="checkbox" checked={i.installation.enabled} onChange={(e) => store.set('installation.enabled', e.target.checked)} /> Report installed thrust</label>
         {i.installation.enabled && (

@@ -30,7 +30,21 @@ export interface Provider {
   residuals: Record<string, number>;
   /** effective variable geometry / bleed settings for this evaluation */
   geometry: EngineInputs['geometry'];
+  /** secondary-air orifice areas (Cd·A, m²) sized at the design point; undefined at design */
+  sasAreas?: SasAreas;
+  designHptPR?: number;
 }
+export interface SasAreas { coolInlet: number; coolExit: number; customer: number; leak: number; interstageSeal: number }
+/** Choked/unchoked compressible orifice mass flow (kg/s) for Cd·A (m²), upstream Pt/Tt and downstream P. */
+export function orificeFlow(cdA: number, Pt: number, Tt: number, Pd: number, R = 287, gamma = 1.4): number {
+  const pr = Math.max(Pd / Pt, 1e-6);
+  const crit = Math.pow(2 / (gamma + 1), gamma / (gamma - 1));
+  const k = Math.sqrt(gamma / (R * Tt));
+  if (pr <= crit) return cdA * Pt * k * Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)));
+  return cdA * Pt * k * Math.sqrt((2 / (gamma - 1)) * (Math.pow(pr, 2 / gamma) - Math.pow(pr, (gamma + 1) / gamma)));
+}
+/** Cd·A that passes flow W from (Pt, Tt) to Pd. */
+export function orificeArea(W: number, Pt: number, Tt: number, Pd: number): number { return W / Math.max(orificeFlow(1, Pt, Tt, Pd), 1e-12); }
 
 function station(id: string, name: string, f: Flow, st: StaticState, x: number, stream: Station['stream'] = 'core'): Station {
   const g = f.gas;
@@ -147,6 +161,7 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   /** overboard handling bleed at a compressor exit (turbojet / turboprop): flow removed, work already spent */
   const dumpOverboard = (f: Flow, frac: number): Flow => (frac > 0 ? { ...f, W: f.W * (1 - frac) } : f);
   const hpx = inp.HPX_W;
+  const dpHptPR = prov.designHptPR;
   const coolFracs = (T3: number) => {
     const cm = coolingModel(inp.burner.T4_K, T3, inp.cooling, inp.coolInletFrac);
     return inp.cooling.mode === 'computed' ? { inlet: cm.inletFrac, exit: cm.exitFrac } : { inlet: inp.coolInletFrac, exit: inp.coolExitFrac };
@@ -238,8 +253,24 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     const f25c: Flow = Whb > 0 ? { ...f25, W: f25.W - Whb } : f25;
     const hop = prov.compressor('hpc', f25c, Nhp, inp.hpc);
     const hpc0 = compressor(f25c, hop.PR, hop.eff);
-    const cfr = coolFracs(hpc0.out.Tt);
-    const hpc = compressor(f25c, hop.PR, hop.eff, [cfr.inlet, cfr.exit, Math.min(0.3, geom.customerBleed_kgs / f25c.W)]);
+    let cfr = coolFracs(hpc0.out.Tt);
+    let custFrac = Math.min(0.3, geom.customerBleed_kgs / f25c.W + (inp.sas?.enabled && !prov.sasAreas ? inp.sas.leakFrac : 0)); // design: leakage as an overboard bleed
+    let sasValues: Record<string, number> | null = null;
+    if (prov.sasAreas) {
+      // orifice network: sinks at the HPT inlet (P4), HPT exit cavity (P45 ≈ P4/PR_hpt,des), customer manifold (fixed), overboard leak (ambient)
+      const A = prov.sasAreas; const P3 = hpc0.out.Pt, T3 = hpc0.out.Tt;
+      const P4 = P3 * (1 - inp.burner.dPqP), P45 = P4 / (dpHptPR ?? 3), Pcust = Math.min(P3 * 0.5, 4e5);
+      const wIn = orificeFlow(A.coolInlet, P3, T3, P4 * 0.97), wEx = orificeFlow(A.coolExit, P3, T3, P45), wCu = orificeFlow(A.customer, P3, T3, Pcust), wLk = orificeFlow(A.leak, P3, T3, amb.P);
+      // interstage seal: feed from the booster exit (P25·frac) against the LPT cavity (P45·cavity fraction); reverse flow = hot gas ingestion
+      const Pfeed = f25.Pt * (inp.sas?.interstageFrac ?? 0.5) + (1 - (inp.sas?.interstageFrac ?? 0.5)) * P3, Pcav = P45 * (inp.sas?.cavityPressureFrac ?? 0.9);
+      const wSeal = Pfeed >= Pcav ? orificeFlow(A.interstageSeal, Pfeed, f25.Tt, Pcav) : -orificeFlow(A.interstageSeal, Pcav, 900, Pfeed);
+      cfr = { inlet: wIn / f25c.W, exit: wEx / f25c.W };
+      custFrac = Math.min(0.3, (wCu + wLk) / f25c.W);
+      sasValues = { coolInlet_kgs: wIn, coolExit_kgs: wEx, customer_kgs: wCu, leak_kgs: wLk, interstageSeal_kgs: wSeal, sealReversed: wSeal < 0 ? 1 : 0, P3_Pa: P3, P4_Pa: P4, P45_Pa: P45, Pseal_feed_Pa: Pfeed, Pcavity_Pa: Pcav };
+      if (wSeal < 0) warnings.push('Secondary air: interstage seal reversed — hot gas ingestion into the turbine cavity at this operating point.');
+    }
+    const hpc = compressor(f25c, hop.PR, hop.eff, [cfr.inlet, cfr.exit, custFrac]);
+    if (sasValues) components.push({ id: 'sas', kind: 'duct', name: 'Secondary air system', values: sasValues });
     if (hop.residual !== undefined) R.hpc_flow = hop.residual;
     stations.push(station('3', 'HPC exit', hpc.out, staticFromMN(hpc.out, inp.hpc.MN), 0.50));
     compValues('hpc', 'HP compressor', hop, hpc);
