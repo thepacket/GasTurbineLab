@@ -78,6 +78,20 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
         </div>
       ); } catch { return null; } })()}
 
+      {(() => { const sas = result.components.find((c) => c.id === 'sas'); if (!sas) return null; const v = sas.values; const W25 = result.stations.find((s) => s.id === '25')?.W ?? 1; return (
+        <div className="section">
+          <h3>Secondary air system <span className="hint">orifice network at gas-path pressures</span></h3>
+          {v.sealReversed ? <div className="warn"><span>⚠</span><span>Interstage seal reversed: hot gas ingestion into the turbine cavity.</span></div> : null}
+          <div className="kv">
+            <span className="k">HPT inlet cooling (does work)</span><span className="v">{fmt(v.coolInlet_kgs, 3)} kg/s · {fmt((100 * v.coolInlet_kgs) / W25, 2)} % W25</span>
+            <span className="k">HPT exit cooling</span><span className="v">{fmt(v.coolExit_kgs, 3)} kg/s · {fmt((100 * v.coolExit_kgs) / W25, 2)} %</span>
+            <span className="k">Customer bleed (fixed manifold)</span><span className="v">{fmt(v.customer_kgs, 3)} kg/s</span>
+            <span className="k">Overboard leakage</span><span className="v">{fmt(v.leak_kgs, 3)} kg/s</span>
+            <span className="k">Interstage seal flow</span><span className="v" style={{ color: v.sealReversed ? 'var(--bad)' : undefined }}>{fmt(v.interstageSeal_kgs, 3)} kg/s · feed {u.pressure(v.Pseal_feed_Pa).v} vs cavity {u.pressure(v.Pcavity_Pa).v} {u.pressure(1).u}</span>
+            <span className="k">P3 · P4 · P45</span><span className="v">{u.pressure(v.P3_Pa).v} · {u.pressure(v.P4_Pa).v} · {u.pressure(v.P45_Pa).v} {u.pressure(1).u}</span>
+          </div>
+        </div>
+      ); })()}
       <Certification store={store} result={result} />
 
       <div className="section">

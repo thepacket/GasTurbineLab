@@ -37,6 +37,15 @@ The design point fixes nozzle throat and mixer areas and scales the NPSS-style c
 * **Report**: a self-contained HTML engineering report (inputs, performance, shafts, cross-section, stations, components, weight) opened for printing or saving as PDF; PNG export of the cross-section, charts and the 3D view.
 * **Mobile and language**: touch rotate/tilt/zoom buttons and auto-orbit in the 3D view; English/French interface toggle.
 
+## Control, thermal, secondary air and certification (fourth round)
+
+* **FADEC** (Transient tab): closed-loop PI control of N1, N2 or thrust with a demand ramp, an acceleration schedule of Wf/P3 against corrected HP speed, a deceleration floor, a handling bleed valve that opens below a set N2, and a variable-stator gain. Demand and measured values are plotted together with the limiter activity.
+* **Maps from blade geometry** (Maps tab): per-stage mean radius, blade height, rotor inlet and exit metal angles, stator exit angle and solidity through mean-line velocity triangles, Carter's deviation rule and Lieblein diffusion-factor losses; turbines from nozzle throat area (choking flow) and a Smith-chart efficiency surface. A consistent-defaults generator starts the design at zero incidence.
+* **Heat soak and tip clearance** (Transient tab): casing and disc temperatures lag the compressor exit temperature with their own time constants; clearance follows casing, disc and centrifugal growth; the HPC and HPT efficiencies carry a clearance penalty relative to the design clearance, which reproduces the efficiency dip after a slam acceleration.
+* **Secondary air system** (Build → Secondary air system): an orifice network sized at the design point passes the cooling, customer and leakage flows; off-design, each flow follows the compressible orifice law on the gas-path pressures and the interstage seal is checked for reversal (hot-gas ingestion).
+* **Certification** (Results): the ICAO Annex 16 LTO cycle at 100/85/30/7 % rated thrust with Dp/Foo for NOx, CO and HC against the CAEP/8 NOx limit and the fixed CO/HC limits, plus a simplified Heidmann fan-noise estimate alongside jet noise.
+* **Validation breadth**: `reference/pycycle_offdesign.py` adds six pyCycle off-design points (turbojet and HBPR turbofan through pyCycle's multi-point model with the same maps) and a mixed-flow design point with pyCycle's mixer; the lab reproduces all of them to better than 0.05 %. The mixer gained pyCycle's designed-stream convention.
+
 ## Views
 
 * **Build**: architecture, layout, presets, catalogue, operating point (design / off-design) and every component parameter; SI inputs with a SI / US display-unit toggle in the header.
