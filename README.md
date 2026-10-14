@@ -10,6 +10,10 @@ A design-point gas-turbine cycle laboratory that runs entirely in the browser (i
 * **Shaft balances** are solved for each spool: turbine pressure ratio is found such that turbine power × mechanical efficiency equals compressor power plus power extraction (or the requested shaft power for the power turbine).
 * **Statics** at every station are computed for the sizing Mach numbers, which gives flow areas; the cross-section and 3D geometry scale with those areas.
 
+## Commercial engine catalogue
+
+`src/engine/engines.ts` lists 59 airline, regional and business engines (CFM56 and LEAP, CF6, GE90, GEnx, GE9X, JT8D, JT9D, PW2000/PW4000, PW1000G, V2500, GP7200, Conway, Spey, Tay, RB211, Trent, BR715, AE 3007, TFE731, HTF7000, FJ44; the Avon, JT3C, JT4A, CJ805, CJ610 and Olympus 593 turbojets; and the Dart, 501-D13, TPE331, PT6A, PW100/PW150, CT7, AE 2100, 250 and Catalyst turboprops). Only publicly published nominal figures are used: take-off thrust or shaft power, bypass ratio, overall pressure ratio, fan or propeller diameter and airflow where the manufacturer quotes it. Turbine inlet temperature, the pressure-ratio split, cooling flows and component efficiencies are not public; they are assigned by generation and T4 (or airflow, when T4 would fall below a plausible floor) is calibrated so the model reproduces the published rating at sea-level static ISA conditions. The note shown under the preset menu states exactly which values are published and which are estimated. `npm test` checks that every catalogue entry reproduces its rating within 0.5 %.
+
 ## Validation against pyCycle
 
 `reference/pycycle_reference.py` builds the same three architectures in NASA's [pyCycle](https://github.com/OpenMDAO/pyCycle) (CEA equilibrium thermodynamics) and writes `src/data/pycycle_reference.json`. The app's **Validate** tab compares every station and performance figure. Agreement is within 0.4 % on thrust and 0.7 % on fuel flow for eight cases spanning sea-level static to Mach 2 at 15 km; the residual is dissociation enthalpy that equilibrium chemistry absorbs at high turbine inlet temperature. `npm test` enforces these tolerances.

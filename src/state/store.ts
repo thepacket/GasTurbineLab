@@ -9,12 +9,13 @@ export interface AppState {
   inputs: EngineInputs;
   selected: string | null; // component or station id highlighted across views
   view: View;
+  note: string | null; // provenance note of the loaded preset
 }
 
 type Action =
   | { type: 'set'; path: string; value: unknown }
   | { type: 'arch'; arch: Architecture }
-  | { type: 'inputs'; inputs: EngineInputs }
+  | { type: 'inputs'; inputs: EngineInputs; note?: string }
   | { type: 'select'; id: string | null }
   | { type: 'view'; view: View }
   | { type: 'reset' };
@@ -31,16 +32,16 @@ function setPath(obj: any, path: string, value: unknown): any {
 function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
     case 'set': return { ...s, inputs: setPath(s.inputs, a.path, a.value) };
-    case 'arch': return { ...s, inputs: defaultInputs(a.arch), selected: null };
-    case 'inputs': return { ...s, inputs: a.inputs, selected: null };
+    case 'arch': return { ...s, inputs: defaultInputs(a.arch), selected: null, note: null };
+    case 'inputs': return { ...s, inputs: a.inputs, selected: null, note: a.note ?? null };
     case 'select': return { ...s, selected: a.id };
     case 'view': return { ...s, view: a.view };
-    case 'reset': return { ...s, inputs: defaultInputs(s.inputs.arch), selected: null };
+    case 'reset': return { ...s, inputs: defaultInputs(s.inputs.arch), selected: null, note: null };
   }
 }
 
 function load(): AppState {
-  const fallback: AppState = { inputs: defaultInputs('turbofan'), selected: null, view: 'build' };
+  const fallback: AppState = { inputs: defaultInputs('turbofan'), selected: null, view: 'build', note: null };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
@@ -56,8 +57,8 @@ function load(): AppState {
 export function useEngineStore() {
   const [state, dispatch] = useReducer(reducer, undefined, load);
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify({ inputs: state.inputs, view: state.view })); } catch { /* ignore */ }
-  }, [state.inputs, state.view]);
+    try { localStorage.setItem(KEY, JSON.stringify({ inputs: state.inputs, view: state.view, note: state.note })); } catch { /* ignore */ }
+  }, [state.inputs, state.view, state.note]);
 
   const result: EngineResult | { error: string } = useMemo(() => {
     try { return solveEngine(state.inputs); } catch (e: any) { return { error: e?.message ?? String(e) }; }

@@ -1,6 +1,7 @@
 import { Store } from '../state/store';
 import { Architecture } from '../engine/types';
 import { PRESETS, REFERENCE_PRESETS } from '../engine/presets';
+import { ENGINES, calibrateEngine } from '../engine/engines';
 import { fmt } from './format';
 
 interface SliderProps { label: string; path: string; value: number; min: number; max: number; step: number; unit?: string; scale?: number; digits?: number; store: Store }
@@ -43,21 +44,37 @@ export function Controls({ store }: { store: Store }) {
           ))}
         </div>
         <div className="row" style={{ marginTop: 10 }}>
-          <select className="select" value="" onChange={(e) => { const p = presets.find((x) => x.name === e.target.value); if (p) store.dispatch({ type: 'inputs', inputs: JSON.parse(JSON.stringify(p.inputs)) }); }} aria-label="Load preset">
-            <option value="">Load a preset…</option>
+          <select className="select" value="" onChange={(e) => { const p = presets.find((x) => x.name === e.target.value); if (p) store.dispatch({ type: 'inputs', inputs: JSON.parse(JSON.stringify(p.inputs)), note: p.group === 'pyCycle reference' ? 'pyCycle reference case: inputs identical to the validation run.' : undefined }); }} aria-label="Load generic preset">
+            <option value="">Generic preset…</option>
             {['Turbojet', 'Turbofan', 'Turboprop', 'pyCycle reference'].map((g) => (
               <optgroup key={g} label={g}>{presets.filter((p) => p.group === g).map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}</optgroup>
             ))}
           </select>
           <button className="btn" onClick={() => store.dispatch({ type: 'reset' })} title="Reset to defaults">Reset</button>
         </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <select className="select" value="" onChange={(e) => { const spec = ENGINES.find((x) => x.name === e.target.value); if (spec) { const c = calibrateEngine(spec); store.dispatch({ type: 'inputs', inputs: c.inputs, note: c.note }); } }} aria-label="Load commercial engine">
+            <option value="">Commercial engine…</option>
+            {(['turbofan', 'turbojet', 'turboprop'] as const).map((a) => (
+              <optgroup key={a} label={a[0].toUpperCase() + a.slice(1) + 's'}>
+                {ENGINES.filter((x) => x.arch === a).slice().sort((p, q) => p.maker.localeCompare(q.maker) || p.year - q.year).map((x) => <option key={x.name} value={x.name}>{x.maker} {x.name} · {x.application}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        {store.state.note && (
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.45 }}>
+            {store.state.note}
+            {!store.state.note.startsWith('pyCycle') && <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>Take-off rating at sea level, ISA, static. Internal values are estimates; only the published figures are manufacturer data.</div>}
+          </div>
+        )}
       </Section>
 
       <Section title="Flight condition" hint="ISA 1976">
         {S({ label: 'Altitude', path: 'flight.altitude_m', value: i.flight.altitude_m, min: 0, max: 20000, step: 100, unit: 'm' })}
         {S({ label: 'Mach number', path: 'flight.mach', value: i.flight.mach, min: 0, max: 2.5, step: 0.01, unit: 'M' })}
         {S({ label: 'ΔT from ISA', path: 'flight.dT_isa', value: i.flight.dT_isa, min: -40, max: 40, step: 1, unit: 'K' })}
-        {S({ label: 'Inlet mass flow', path: 'flight.W_kgs', value: i.flight.W_kgs, min: 1, max: arch === 'turboprop' ? 30 : 1200, step: arch === 'turboprop' ? 0.1 : 1, unit: 'kg/s' })}
+        {S({ label: 'Inlet mass flow', path: 'flight.W_kgs', value: i.flight.W_kgs, min: 1, max: arch === 'turboprop' ? 30 : 2000, step: arch === 'turboprop' ? 0.1 : 1, unit: 'kg/s' })}
       </Section>
 
       <Section title="Inlet">
