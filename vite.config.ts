@@ -1,0 +1,36 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon.png'],
+      manifest: {
+        name: 'Gas Turbine Lab',
+        short_name: 'TurbineLab',
+        description: 'Design-point cycle analysis of turbojet, turbofan and turboprop engines with station thermodynamics, thrust, fuel consumption and shaft power balance.',
+        theme_color: '#0f1113',
+        background_color: '#0f1113',
+        display: 'standalone',
+        orientation: 'any',
+        start_url: '/',
+        scope: '/',
+        categories: ['education', 'utilities'],
+        icons: [
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,json,woff2}'],
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        navigateFallback: '/index.html',
+      },
+    }),
+  ],
+  build: { target: 'es2020', sourcemap: false, chunkSizeWarningLimit: 1500 },
+});
