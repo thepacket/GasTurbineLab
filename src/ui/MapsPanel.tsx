@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Store } from '../state/store';
 import { COMPRESSOR_MAPS, TURBINE_MAPS } from '../engine/maps';
-import { CustomMap, loadCustomMaps, saveCustomMaps, parseCsvMap, parseJsonMap, generateCompressorMap, generateStageStackedMap } from '../engine/custommaps';
+import { CustomMap, loadCustomMaps, saveCustomMaps, parseCsvMap, parseJsonMap, generateCompressorMap, generateStageStackedMap, generateGeometryCompressorMap, generateGeometryTurbineMap, defaultStageGeometry, StageGeometry } from '../engine/custommaps';
 import { MAP_FOR } from '../engine/offdesign';
 import { request } from '../engine/client';
 
@@ -14,6 +14,8 @@ export function MapsPanel({ store }: { store: Store }) {
   const [custom, setCustom] = useState<CustomMap[]>(() => loadCustomMaps());
   const [msg, setMsg] = useState<string | null>(null);
   const [gen, setGen] = useState({ name: 'My compressor', PRdes: 10, WcDes: 50, surgeMargin: 0.2 });
+  const [geo, setGeo] = useState<{ name: string; Ndes: number; WcDes: number; vsvGain: number; stages: StageGeometry[] }>({ name: 'Geometry HPC', Ndes: 14000, WcDes: 50, vsvGain: 0.3, stages: defaultStageGeometry({ stages: 6, Ndes_rpm: 14000, WcDes: 50, rMean_m: 0.3 }) });
+  const [tgeo, setTgeo] = useState({ name: 'Geometry HPT', stages: 2, rMean_m: 0.32, bladeHeight_m: 0.05, nozzleExitAngle_deg: 70, Ndes: 14000, PRdes: 4 });
   const [stk, setStk] = useState({ name: 'Stage-stacked HPC', stages: 8, PRdes: 12, WcDes: 50, vsvStages: 4, vsvGain: 0.35, stageLoading: 0.4 });
   const persist = (list: CustomMap[]) => { setCustom(list); saveCustomMaps(list); request({ type: 'maps', maps: list.map((m) => ({ id: m.id, kind: m.kind, data: m.data })) }).catch(() => { /* worker restarts lazily */ }); };
   const onFile = async (f: File, kind: 'compressor' | 'turbine' | 'auto') => {
@@ -89,6 +91,44 @@ export function MapsPanel({ store }: { store: Store }) {
           <label>VSV gain <input className="num" aria-label="VSV gain" type="number" value={stk.vsvGain} step={0.05} style={{ width: 60 }} onChange={(e) => setStk({ ...stk, vsvGain: +e.target.value })} /></label>
           <button className="btn primary" onClick={() => { const data = generateStageStackedMap(stk); const id = `custom:stack:${Date.now().toString(36)}`; persist([...custom, { id, name: stk.name, kind: 'compressor', data }]); setMsg(`Generated stage-stacked map “${stk.name}”.`); }}>Stack stages</button>
         </div>
+      </div>
+      <div className="section">
+        <h3>Compressor map from blade geometry</h3>
+        <div className="row" style={{ flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+          <label>name <input className="num" aria-label="Geometry map name" value={geo.name} onChange={(e) => setGeo({ ...geo, name: e.target.value })} style={{ width: 140 }} /></label>
+          <label>design speed <input className="num" aria-label="Design speed" type="number" value={geo.Ndes} step={100} style={{ width: 80 }} onChange={(e) => setGeo({ ...geo, Ndes: +e.target.value })} /> rpm</label>
+          <label>design Wc <input className="num" aria-label="Geometry design flow" type="number" value={geo.WcDes} step={1} style={{ width: 65 }} onChange={(e) => setGeo({ ...geo, WcDes: +e.target.value })} /> kg/s</label>
+          <label>VSV gain <input className="num" aria-label="Geometry VSV gain" type="number" value={geo.vsvGain} step={0.05} style={{ width: 60 }} onChange={(e) => setGeo({ ...geo, vsvGain: +e.target.value })} /></label>
+          <button className="btn" onClick={() => setGeo({ ...geo, stages: defaultStageGeometry({ stages: geo.stages.length, Ndes_rpm: geo.Ndes, WcDes: geo.WcDes, rMean_m: geo.stages[0]?.rMean_m ?? 0.3 }) })}>Consistent defaults</button>
+          <button className="btn" onClick={() => setGeo({ ...geo, stages: [...geo.stages, { ...geo.stages[geo.stages.length - 1], vsv: false }] })}>Add stage</button>
+          <button className="btn" onClick={() => setGeo({ ...geo, stages: geo.stages.slice(0, -1) })} disabled={geo.stages.length < 2}>Remove stage</button>
+          <button className="btn primary" onClick={() => { try { const data = generateGeometryCompressorMap({ stages: geo.stages, Ndes_rpm: geo.Ndes, WcDes: geo.WcDes, vsvGain: geo.vsvGain }); const id = `custom:geo:${Date.now().toString(36)}`; persist([...custom, { id, name: geo.name, kind: 'compressor', data }]); setMsg(`Generated geometry map “${geo.name}”.`); } catch (e: any) { setMsg(`Geometry map failed: ${e.message}`); } }}>Build from geometry</button>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="stations">
+            <thead><tr><th>Stage</th><th>r mean (m)</th><th>blade height (m)</th><th>rotor inlet angle (°)</th><th>rotor exit angle (°)</th><th>stator exit angle (°)</th><th>solidity</th><th>VSV</th></tr></thead>
+            <tbody>{geo.stages.map((st, i) => {
+              const set = (patch: Partial<StageGeometry>) => setGeo({ ...geo, stages: geo.stages.map((q, k) => (k === i ? { ...q, ...patch } : q)) });
+              const cell = (k: keyof StageGeometry, step: number) => <td><input className="num" aria-label={`Stage ${i + 1} ${k}`} type="number" style={{ width: 70 }} value={st[k] as number} step={step} onChange={(e) => set({ [k]: +e.target.value } as any)} /></td>;
+              return <tr key={i}><td>{i + 1}</td>{cell('rMean_m', 0.01)}{cell('bladeHeight_m', 0.005)}{cell('rotorInletAngle_deg', 1)}{cell('rotorExitAngle_deg', 1)}{cell('statorExitAngle_deg', 1)}{cell('solidity', 0.05)}<td><input type="checkbox" aria-label={`Stage ${i + 1} variable stator`} checked={!!st.vsv} onChange={(e) => set({ vsv: e.target.checked })} /></td></tr>;
+            })}</tbody>
+          </table>
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Mean-line velocity triangles per stage: Carter's deviation at the rotor exit, Lieblein diffusion-factor and incidence losses, continuity on density between stages; variable stators add inlet swirl at low speed. Angles from axial.</div>
+      </div>
+      <div className="section">
+        <h3>Turbine map from geometry</h3>
+        <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
+          <label>name <input className="num" aria-label="Turbine geometry map name" value={tgeo.name} onChange={(e) => setTgeo({ ...tgeo, name: e.target.value })} style={{ width: 140 }} /></label>
+          <label>stages <input className="num" aria-label="Turbine stages" type="number" value={tgeo.stages} step={1} style={{ width: 50 }} onChange={(e) => setTgeo({ ...tgeo, stages: +e.target.value })} /></label>
+          <label>r mean <input className="num" aria-label="Turbine mean radius" type="number" value={tgeo.rMean_m} step={0.01} style={{ width: 65 }} onChange={(e) => setTgeo({ ...tgeo, rMean_m: +e.target.value })} /> m</label>
+          <label>blade height <input className="num" aria-label="Turbine blade height" type="number" value={tgeo.bladeHeight_m} step={0.005} style={{ width: 65 }} onChange={(e) => setTgeo({ ...tgeo, bladeHeight_m: +e.target.value })} /> m</label>
+          <label>nozzle exit angle <input className="num" aria-label="Nozzle exit angle" type="number" value={tgeo.nozzleExitAngle_deg} step={1} style={{ width: 60 }} onChange={(e) => setTgeo({ ...tgeo, nozzleExitAngle_deg: +e.target.value })} /> °</label>
+          <label>design speed <input className="num" aria-label="Turbine design speed" type="number" value={tgeo.Ndes} step={100} style={{ width: 80 }} onChange={(e) => setTgeo({ ...tgeo, Ndes: +e.target.value })} /> rpm</label>
+          <label>design PR <input className="num" aria-label="Turbine design PR" type="number" value={tgeo.PRdes} step={0.1} style={{ width: 60 }} onChange={(e) => setTgeo({ ...tgeo, PRdes: +e.target.value })} /></label>
+          <button className="btn primary" onClick={() => { const data = generateGeometryTurbineMap({ stages: tgeo.stages, rMean_m: tgeo.rMean_m, bladeHeight_m: tgeo.bladeHeight_m, nozzleExitAngle_deg: tgeo.nozzleExitAngle_deg, Ndes_rpm: tgeo.Ndes, PRdes: tgeo.PRdes }); const id = `custom:tgeo:${Date.now().toString(36)}`; persist([...custom, { id, name: tgeo.name, kind: 'turbine', data }]); setMsg(`Generated turbine map “${tgeo.name}”.`); }}>Build turbine map</button>
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Nozzle throat area sets the choking flow; the flow unchokes below the critical pressure ratio; efficiency follows a Smith-chart surface in stage loading and flow coefficient.</div>
         <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Each stage has a linear work characteristic and a parabolic loss bucket; stages are stacked on a mean line. Variable stators rotate the front stages' design flow coefficient with speed (gain 0 = fixed geometry), which is what keeps the front stages off stall at low corrected speed. Assign the result to the HPC to see the effect on the running line and surge margin off-design.</div>
       </div>
     </div>
