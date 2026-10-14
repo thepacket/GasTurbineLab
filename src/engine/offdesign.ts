@@ -18,6 +18,8 @@ export interface OffDesignInputs {
   propPower_W?: number; // turboprop: power absorbed by the propeller (constant-speed governor)
   geometry?: Partial<EngineInputs['geometry']>; // variable geometry / bleed overrides
   installation?: boolean; // installed thrust in the Fn throttle target
+  /** multiplicative deltas on component efficiency and flow (e.g. from tip-clearance changes): id -> {eff, Wc} */
+  deltas?: Record<string, { eff?: number; Wc?: number }>;
 }
 export interface SolveOptions {
   /** transient mode: spool speeds are states, not unknowns; shaft power imbalance is reported instead */
@@ -92,17 +94,19 @@ function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<strin
       const [rlo, rhi] = c.map.RlineRange;
       const Rl = Math.min(rhi, Math.max(rlo, x['Rl_' + id])); // clamped to the tabulated R-lines; the penalty term below keeps the solver consistent
       const m = c.map.read(c.sc, Nc, Rl);
-      const vsv = (id === 'fan' || id === 'hpc' || id === 'comp') ? 1 + geometry.vsvFlowGain * (Nc / c.NcDes - 1) : 1;
+      const d = od.deltas?.[id];
+      const vsv = ((id === 'fan' || id === 'hpc' || id === 'comp') ? 1 + geometry.vsvFlowGain * (Nc / c.NcDes - 1) : 1) * (d?.Wc ?? 1);
       const Wc = correctedFlow(inlet.W, inlet.Tt, inlet.Pt);
       const pen = (x['Rl_' + id] - Rl);
-      return { PR: m.PR, eff: m.eff, residual: (m.Wc * vsv) / Wc - 1 + pen, extra: { Nc_pct: 100 * (Nc / c.NcDes), Rline: Rl, surgeMargin_pct: c.map.surgeMargin(c.sc, Nc, Rl), rpm: N, Wc } };
+      return { PR: m.PR, eff: m.eff * (d?.eff ?? 1), residual: (m.Wc * vsv) / Wc - 1 + pen, extra: { Nc_pct: 100 * (Nc / c.NcDes), Rline: Rl, surgeMargin_pct: c.map.surgeMargin(c.sc, Nc, Rl), rpm: N, Wc, effDelta: (d?.eff ?? 1) - 1 } };
     },
     turbine: (id, inlet, N, _cooling: TurbineStream[], _d, _powerReq, _PRmax) => {
       const t = dp.turbs[id];
       const PR = Math.max(1.01, x['PR_' + id]);
       const m = t.map.read(t.sc, paramSpeed(N, inlet.Tt), PR);
+      const d = od.deltas?.[id];
       const Wp = paramFlow(inlet.W, inlet.Tt, inlet.Pt);
-      return { PR, eff: m.eff, residual: m.Wp / Wp - 1, extra: { Np_pct: 100 * m.NpMap / t.map.d.defaults.NpMap, rpm: N } };
+      return { PR, eff: m.eff * (d?.eff ?? 1), residual: (m.Wp * (d?.Wc ?? 1)) / Wp - 1, extra: { Np_pct: 100 * m.NpMap / t.map.d.defaults.NpMap, rpm: N, effDelta: (d?.eff ?? 1) - 1 } };
     },
     burner: (_id, inlet: Flow, d) => {
       const b = burnerAtFAR(inlet, x.FAR, d.dPqP, d.eff, d.hFuel, d.LHV);

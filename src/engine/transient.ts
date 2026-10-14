@@ -42,10 +42,28 @@ export interface Controller {
   vsvGain: number; // variable-stator flow gain while running (geometry.vsvFlowGain)
 }
 export const DEFAULT_CONTROLLER: Controller = { mode: 'open', target: 1.0, targetRamp_s: 1.0, Kp: 1.5, Ki: 2.0, accelSchedule: [{ Nc: 0.6, ratioUnit: 1.35 }, { Nc: 0.8, ratioUnit: 1.25 }, { Nc: 1.0, ratioUnit: 1.1 }], decelFloor: 0.25, bleedValve: { openBelowN2: 0.75, frac: 0.06 }, vsvGain: 0 };
-export interface TransientInputs { od: OffDesignInputs; schedule: FuelSchedule; duration_s: number; dt_s: number; start?: StartInputs; controller?: Controller }
+/**
+ * Heat soak and tip clearance.  Casing and disc temperatures follow the local gas
+ * temperature as first-order lags; the clearance is the cold build clearance plus
+ * casing growth minus disc growth (thermal) and blade/disc centrifugal growth.
+ * Efficiency falls ~ k·(δ/h) and the flow capacity slightly with it.
+ */
+export interface ThermalInputs {
+  enabled: boolean;
+  tauCasing_s: number; tauDisc_s: number; // thermal time constants
+  alpha_1perK: number; // thermal expansion coefficient (nickel alloy ~1.3e-5)
+  coldClearance_mm: number; // HPC/HPT cold build clearance
+  bladeHeight_mm: number; // representative rear HPC / HPT blade height
+  rCasing_mm: number; // casing radius
+  centrifugalGrowth_mm: number; // blade + disc growth at design speed (∝ N²)
+  effPerClearance: number; // Δη per unit (δ/h): ~1.0–2.0
+}
+export const DEFAULT_THERMAL: ThermalInputs = { enabled: false, tauCasing_s: 8, tauDisc_s: 90, alpha_1perK: 1.3e-5, coldClearance_mm: 1.2, bladeHeight_mm: 25, rCasing_mm: 350, centrifugalGrowth_mm: 0.9, effPerClearance: 1.5 };
+export interface TransientInputs { od: OffDesignInputs; schedule: FuelSchedule; duration_s: number; dt_s: number; start?: StartInputs; controller?: Controller; thermal?: ThermalInputs }
 export interface TransientSample {
   t: number; Wf: number; WfCmd: number; limited: boolean; lit?: boolean; starter?: boolean;
   demand?: number; measured?: number; bleedOpen?: boolean;
+  Tcasing?: number; Tdisc?: number; clearance_mm?: number; effDeltaHPC?: number;
   N: Record<string, number>; Npct: Record<string, number>; Fn: number; T4: number; T5: number; P3: number;
   SM: Record<string, number>; Wc: Record<string, number>; PR: Record<string, number>; converged: boolean;
 }
@@ -79,8 +97,27 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
   const ctl = ti.controller && ti.controller.mode !== 'open' ? ti.controller : null;
   const sched = ti.controller;
   let geomOverride: Partial<typeof inp.geometry> = {};
+  // thermal states: start in equilibrium with the start operating point
+  const th = ti.thermal?.enabled ? ti.thermal : null;
+  const hotId = inp.arch === 'turbofan' ? 'hpc' : 'comp';
+  const T3of = (r: EngineResult) => r.stations.find((q) => q.id === '3')!.Tt;
+  const T3start = T3of(start.result);
+  let Tcasing = st ? 288.15 : T3start, Tdisc = st ? 288.15 : T3start;
+  const T3des = dp.result.stations.find((q) => q.id === '3')!.Tt;
+  const clearanceOf = (Tc: number, Td: number, nHP: number) => {
+    if (!th) return { delta_mm: NaN, effDelta: 0 };
+    const growthCasing = th.alpha_1perK * (Tc - 288.15) * th.rCasing_mm;
+    const growthDisc = th.alpha_1perK * (Td - 288.15) * th.rCasing_mm * 0.92 + th.centrifugalGrowth_mm * nHP * nHP;
+    const delta = Math.max(0.05, th.coldClearance_mm + growthCasing - growthDisc);
+    // efficiency relative to the design-point clearance (so the design point carries no penalty)
+    const gcD = th.alpha_1perK * (T3des - 288.15) * th.rCasing_mm, gdD = th.alpha_1perK * (T3des - 288.15) * th.rCasing_mm * 0.92 + th.centrifugalGrowth_mm;
+    const deltaDes = Math.max(0.05, th.coldClearance_mm + gcD - gdD);
+    const effDelta = -th.effPerClearance * (delta - deltaDes) / th.bladeHeight_mm;
+    return { delta_mm: delta, effDelta };
+  };
+  let deltas: Record<string, { eff?: number; Wc?: number }> | undefined;
   const stepRate = (sp: typeof speeds, WfNow: number): { dN: Record<string, number>; r: EngineResult; conv: boolean; xr: Record<string, number> } | null => {
-    const s = solveOffDesign(dp, { ...ti.od, geometry: { ...(ti.od.geometry ?? {}), ...geomOverride }, throttle: { mode: 'Wf', value: Math.max(WfNow, 2e-4 * WfDes) } }, x, { fixedSpeeds: sp });
+    const s = solveOffDesign(dp, { ...ti.od, geometry: { ...(ti.od.geometry ?? {}), ...geomOverride }, deltas, throttle: { mode: 'Wf', value: Math.max(WfNow, 2e-4 * WfDes) } }, x, { fixedSpeeds: sp });
     if (!Number.isFinite(s.norm)) return null;
     const imb = s.result.offDesign?.shaftImbalance_W ?? {};
     const dN: Record<string, number> = {};
@@ -115,6 +152,9 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
       const bleedOpen = n2 < sched.bleedValve.openBelowN2 && sched.bleedValve.frac > 0;
       geomOverride = { handlingBleedFrac: bleedOpen ? sched.bleedValve.frac : (ti.od.geometry?.handlingBleedFrac ?? inp.geometry.handlingBleedFrac), vsvFlowGain: sched.vsvGain };
     }
+    // thermal state → clearance → efficiency deltas for this step
+    let clr = { delta_mm: NaN, effDelta: 0 };
+    if (th) { clr = clearanceOf(Tcasing, Tdisc, speeds.HP / inp.speeds.HP); deltas = { [hotId]: { eff: 1 + clr.effDelta, Wc: 1 + 0.3 * clr.effDelta }, [inp.arch === 'turbofan' ? 'hpt' : 'turb']: { eff: 1 + 0.6 * clr.effDelta } }; }
     // fuel command: open-loop ramp, or PI controller on the demanded quantity
     const f = Math.min(1, Math.max(0, (t - ti.schedule.rampStart_s) / Math.max(ti.schedule.rampDuration_s, 1e-6)));
     let WfCmd = st ? (lit ? st.lightOffFuelFrac * WfDes + (WfEnd - st.lightOffFuelFrac * WfDes) * f : 0) : Wf0(start) + (WfEnd - Wf0(start)) * f;
@@ -151,7 +191,8 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     if (limited) { const r2 = stepRate(speeds, WfNow); if (r2) r1 = r2; }
     Wf = WfNow; x = r1.xr;
     if (ctl) lastMeasured = measure(r1.r, speeds);
-    samples.push({ ...sample(t, Wf, WfCmd, limited, speeds, inp, r1.r, r1.conv), lit, starter: starterOn, demand: ctl ? demand : undefined, measured: ctl ? lastMeasured : undefined, bleedOpen: sched ? (geomOverride.handlingBleedFrac ?? 0) > (ti.od.geometry?.handlingBleedFrac ?? inp.geometry.handlingBleedFrac) : undefined });
+    samples.push({ ...sample(t, Wf, WfCmd, limited, speeds, inp, r1.r, r1.conv), lit, starter: starterOn, demand: ctl ? demand : undefined, measured: ctl ? lastMeasured : undefined, bleedOpen: sched ? (geomOverride.handlingBleedFrac ?? 0) > (ti.od.geometry?.handlingBleedFrac ?? inp.geometry.handlingBleedFrac) : undefined, Tcasing: th ? Tcasing : undefined, Tdisc: th ? Tdisc : undefined, clearance_mm: th ? clr.delta_mm : undefined, effDeltaHPC: th ? clr.effDelta : undefined });
+    if (th) { const T3 = T3of(r1.r); Tcasing += (ti.dt_s / th.tauCasing_s) * (T3 - Tcasing); Tdisc += (ti.dt_s / th.tauDisc_s) * (T3 - Tdisc); }
     // Heun (RK2) step on speeds
     if (i < n) {
       const k1 = r1.dN;
