@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Store } from '../state/store';
 import { request } from '../engine/client';
-import { TransientResult, TransientSample, FuelSchedule, StartInputs } from '../engine/transient';
+import { TransientResult, TransientSample, FuelSchedule, StartInputs, Controller, DEFAULT_CONTROLLER } from '../engine/transient';
 import { LineChart, Series } from '../viz/charts';
 import { fmt } from './format';
 import { MapTrajectory } from '../viz/MapChart';
@@ -12,6 +12,7 @@ export function TransientView({ store }: { store: Store }) {
   const inputs = store.state.inputs;
   const [sch, setSch] = useState<FuelSchedule>({ ...DEFAULT, T4start: Math.round(inputs.burner.T4_K * 0.75) });
   const [duration, setDuration] = useState(8);
+  const [ctl, setCtl] = useState<Controller>({ ...DEFAULT_CONTROLLER, target: inputs.arch === 'turbofan' ? 0.95 : 0.98 });
   const [start, setStart] = useState<StartInputs>({ enabled: false, starterTorque_Nm: Math.round(inputs.inertia.HP * 60), starterCutout: 0.45, lightOffSpeed: 0.18, lightOffT3min_K: 290, lightOffFuelFrac: 0.06, frictionPower_W: Math.round(inputs.flight.W_kgs * 150) });
   const [samples, setSamples] = useState<TransientSample[]>([]);
   const [result, setResult] = useState<TransientResult | null>(null);
@@ -19,7 +20,7 @@ export function TransientView({ store }: { store: Store }) {
   const [error, setError] = useState<string | null>(null);
   const run = () => {
     setBusy(true); setError(null); setResult(null); setSamples([]);
-    request<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start } }, (p: TransientSample[]) => setSamples(p))
+    request<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start, controller: ctl } }, (p: TransientSample[]) => setSamples(p))
       .then((r) => { setResult(r); setSamples(r.samples); setBusy(false); })
       .catch((e) => { setError(e.message); setBusy(false); });
   };
@@ -54,6 +55,23 @@ export function TransientView({ store }: { store: Store }) {
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Spool inertias: {Object.entries(inputs.inertia).filter(([k, v]) => v > 0 && (inputs.speeds as any)[k] > 0).map(([k, v]) => `${k} ${v} kg·m²`).join(', ')} (Build → Inertia). Operating point from the off-design panel ({store.state.od.altitude_m} m, M {store.state.od.mach}). Frozen chemistry.</span>
         {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
       </div>
+      <div className="explore-controls" style={{ borderTop: 0 }}>
+        <strong>FADEC</strong>
+        <label>mode <select value={ctl.mode} onChange={(e) => setCtl({ ...ctl, mode: e.target.value as Controller['mode'], target: e.target.value === 'Fn' ? Math.round(('error' in store.design ? 1e5 : store.design.perf.Fn)) : e.target.value === 'open' ? ctl.target : 0.95 })} aria-label="Controller mode">
+          <option value="open">open loop (fuel schedule)</option>{inputs.arch === 'turbofan' && <option value="N1">N1 control</option>}<option value="N2">N2 control</option><option value="Fn">thrust control</option></select></label>
+        {ctl.mode !== 'open' && (
+          <>
+            <label>target <input className="num" type="number" aria-label="Controller target" style={{ width: 80 }} value={ctl.target} step={ctl.mode === 'Fn' ? 1000 : 0.01} onChange={(e) => setCtl({ ...ctl, target: +e.target.value })} /> {ctl.mode === 'Fn' ? 'N' : '× design'}</label>
+            <label>ramp <input className="num" type="number" aria-label="Target ramp" style={{ width: 55 }} value={ctl.targetRamp_s} step={0.1} onChange={(e) => setCtl({ ...ctl, targetRamp_s: +e.target.value })} /> s</label>
+            <label>Kp <input className="num" type="number" aria-label="Proportional gain" style={{ width: 55 }} value={ctl.Kp} step={0.1} onChange={(e) => setCtl({ ...ctl, Kp: +e.target.value })} /></label>
+            <label>Ki <input className="num" type="number" aria-label="Integral gain" style={{ width: 55 }} value={ctl.Ki} step={0.1} onChange={(e) => setCtl({ ...ctl, Ki: +e.target.value })} /></label>
+          </>
+        )}
+        <label>accel schedule Wf/P3 (× design) at Nc 0.6 / 0.8 / 1.0: {ctl.accelSchedule.map((pt, i) => <input key={i} className="num" type="number" aria-label={`Accel limit at Nc ${pt.Nc}`} style={{ width: 55, marginRight: 4 }} value={pt.ratioUnit} step={0.05} onChange={(e) => setCtl({ ...ctl, accelSchedule: ctl.accelSchedule.map((q, k) => (k === i ? { ...q, ratioUnit: +e.target.value } : q)) })} />)}</label>
+        <label>decel floor <input className="num" type="number" aria-label="Deceleration floor" style={{ width: 55 }} value={ctl.decelFloor} step={0.05} onChange={(e) => setCtl({ ...ctl, decelFloor: +e.target.value })} /></label>
+        <label>bleed valve open below N2 <input className="num" type="number" aria-label="Bleed valve threshold" style={{ width: 55 }} value={ctl.bleedValve.openBelowN2} step={0.01} onChange={(e) => setCtl({ ...ctl, bleedValve: { ...ctl.bleedValve, openBelowN2: +e.target.value } })} /> × design, {' '}<input className="num" type="number" aria-label="Bleed valve fraction" style={{ width: 55 }} value={ctl.bleedValve.frac} step={0.01} onChange={(e) => setCtl({ ...ctl, bleedValve: { ...ctl.bleedValve, frac: +e.target.value } })} /> of core flow</label>
+        <label>VSV gain <input className="num" type="number" aria-label="VSV gain" style={{ width: 55 }} value={ctl.vsvGain} step={0.05} onChange={(e) => setCtl({ ...ctl, vsvGain: +e.target.value })} /></label>
+      </div>
       {result?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {samples.length > 1 && (
         <>
@@ -67,6 +85,7 @@ export function TransientView({ store }: { store: Store }) {
           </div>
           <div className="charts">
             <LineChart title="Spool speeds" series={spools.map((k, i) => s((x) => x.Npct[k], k + ' spool', i))} xLabel="time (s)" yLabel="% design" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
+            {ctl.mode !== 'open' && samples[0]?.demand !== undefined && <LineChart title={`Controller: ${ctl.mode} demand vs measured`} series={[s((x) => (ctl.mode === 'Fn' ? (x.demand ?? NaN) / 1000 : 100 * (x.demand ?? NaN)), 'demand', 1), s((x) => (ctl.mode === 'Fn' ? (x.measured ?? NaN) / 1000 : 100 * (x.measured ?? NaN)), 'measured', 0)]} xLabel="time (s)" yLabel={ctl.mode === 'Fn' ? 'kN' : '% design'} xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 1)} />}
             <LineChart title="Fuel flow" sub="command vs delivered (after limiter)" series={[s((x) => x.WfCmd, 'commanded', 1), s((x) => x.Wf, 'delivered', 0)]} xLabel="time (s)" yLabel="kg/s" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
             <LineChart title="Net thrust" series={[s((x) => x.Fn / 1000, 'thrust')]} xLabel="time (s)" yLabel="kN" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
             <LineChart title="Surge margins" series={comps.map((c, i) => s((x) => x.SM[c], c.toUpperCase(), i))} xLabel="time (s)" yLabel="%" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />

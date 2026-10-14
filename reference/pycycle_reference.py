@@ -20,7 +20,7 @@ def solver(grp):
     grp.nonlinear_solver.options['atol'] = 1e-8
     grp.nonlinear_solver.options['rtol'] = 1e-8
     grp.nonlinear_solver.options['iprint'] = -1
-    grp.nonlinear_solver.options['maxiter'] = 60
+    grp.nonlinear_solver.options['maxiter'] = 100
     grp.nonlinear_solver.options['solve_subsystems'] = True
     grp.nonlinear_solver.options['max_sub_solves'] = 100
     grp.nonlinear_solver.linesearch = om.BoundsEnforceLS()
