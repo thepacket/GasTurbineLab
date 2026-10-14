@@ -168,6 +168,13 @@ export function Controls({ store }: { store: Store }) {
       </Section>
 
       <Section title="Fuel & gas model" hint="Jet-A, CEA polynomials">
+        <div className="control">
+          <label>Chemistry</label>
+          <div className="segmented">
+            <button className={(i.chemistry ?? 'equilibrium') === 'equilibrium' ? 'on' : ''} onClick={() => store.set('chemistry', 'equilibrium')}>Equilibrium</button>
+            <button className={i.chemistry === 'frozen' ? 'on' : ''} onClick={() => store.set('chemistry', 'frozen')}>Frozen</button>
+          </div>
+        </div>
         {S({ label: 'Fuel enthalpy as supplied', path: 'burner.fuel_h_Jkg', value: i.burner.fuel_h_Jkg, min: -2000e3, max: 500e3, step: 10e3, unit: 'kJ/kg', scale: 1e-3, digits: 0 })}
         {S({ label: 'Lower heating value (efficiency metrics)', path: 'LHV_Jkg', value: i.LHV_Jkg, min: 40e6, max: 45e6, step: 0.1e6, unit: 'MJ/kg', scale: 1e-6, digits: 1 })}
         <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>

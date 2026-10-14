@@ -16,9 +16,9 @@ export function compressor(inp: Flow, PR: number, eff: number, bleedFracs: numbe
   const g = inp.gas;
   const Pt2 = inp.Pt * PR;
   const Tideal = g.isentropicT(inp.Tt, inp.Pt, Pt2);
-  const hIdeal = g.h(Tideal);
+  const hIdeal = g.h(Tideal, Pt2);
   const ht2 = inp.ht + (hIdeal - inp.ht) / eff;
-  const Tt2 = g.TfromH(ht2, Tideal);
+  const Tt2 = g.TfromH(ht2, Pt2, Tideal);
   const bleeds: Flow[] = [];
   let Wout = inp.W;
   for (const f of bleedFracs) {
@@ -27,7 +27,7 @@ export function compressor(inp: Flow, PR: number, eff: number, bleedFracs: numbe
     bleeds.push({ gas: g, Pt: Pt2, Tt: Tt2, ht: ht2, W: Wb });
   }
   const power = inp.W * (ht2 - inp.ht); // all flow (incl. bleed) is compressed to exit
-  const effPoly = (g.R * Math.log(PR)) / (g.s0(Tt2) - g.s0(inp.Tt)); // dS=0 -> ratio of ideal to actual entropy-based work
+  const effPoly = (g.R * Math.log(PR)) / (g.s(Tt2, Pt2) - g.s(inp.Tt, inp.Pt) + g.R * Math.log(PR)); // polytropic efficiency from entropy rise
   return { out: { gas: g, Pt: Pt2, Tt: Tt2, ht: ht2, W: Wout }, power, effPoly, bleeds };
 }
 
@@ -47,7 +47,7 @@ export function turbineAtPR(main: Flow, PR: number, eff: number, cooling: Turbin
   for (const s of streams) {
     const g = s.f.gas;
     const Tideal = g.isentropicT(s.f.Tt, s.Pt, PtOut);
-    const hIdeal = g.h(Tideal);
+    const hIdeal = g.h(Tideal, PtOut);
     const hOut = s.f.ht - eff * (s.f.ht - hIdeal);
     power += s.f.W * (s.f.ht - hOut);
     Hsum += s.f.W * hOut;
@@ -57,7 +57,7 @@ export function turbineAtPR(main: Flow, PR: number, eff: number, cooling: Turbin
   }
   const ht = Hsum / Wtot;
   const gOut = gas!;
-  const Tt = gOut.TfromH(ht, main.Tt / Math.pow(PR, 0.25));
+  const Tt = gOut.TfromH(ht, PtOut, main.Tt / Math.pow(PR, 0.25));
   return { out: { gas: gOut, Pt: PtOut, Tt, ht, W: Wtot }, power, PR };
 }
 
@@ -95,11 +95,11 @@ export function burnerToT(inp: Flow, T4: number, dPqP: number, eff: number, hFue
   let far = 0.02;
   for (let i = 0; i < 60; i++) {
     const s = state(far);
-    const T = s.gas.TfromH(s.ht, T4);
+    const T = s.gas.TfromH(s.ht, Pt, T4);
     const F = T - T4;
     const d = 1e-5;
     const s2 = state(far + d);
-    const T2 = s2.gas.TfromH(s2.ht, T);
+    const T2 = s2.gas.TfromH(s2.ht, Pt, T);
     const dF = (T2 - T) / d;
     let step = -F / dF;
     step = Math.max(-0.01, Math.min(0.01, step));
@@ -108,7 +108,7 @@ export function burnerToT(inp: Flow, T4: number, dPqP: number, eff: number, hFue
     if (Math.abs(F) < 1e-6) break;
   }
   const s = state(far);
-  const Tt = s.gas.TfromH(s.ht, T4);
+  const Tt = s.gas.TfromH(s.ht, Pt, T4);
   return { out: { gas: s.gas, Pt, Tt, ht: s.ht, W: s.Wout }, FAR: far, Wfuel: s.Wf };
 }
 

@@ -8,7 +8,7 @@ function station(id: string, name: string, f: Flow, st: StaticState, x: number, 
   const g = f.gas;
   return {
     id, name, Pt: f.Pt, Tt: f.Tt, ht: f.ht, s: g.s(f.Tt, f.Pt), W: f.W, FAR: g.far,
-    Ps: st.Ps, Ts: st.Ts, V: st.V, MN: st.MN, A: st.A, gamma: g.gamma(f.Tt), cp: g.cp(f.Tt), R: g.R, x, stream,
+    Ps: st.Ps, Ts: st.Ts, V: st.V, MN: st.MN, A: st.A, gamma: g.gamma(f.Tt, f.Pt), cp: g.cp(f.Tt, f.Pt), R: g.Rlocal(f.Tt, f.Pt), x, stream,
   };
 }
 
@@ -37,8 +37,8 @@ export function solveEngine(inp: EngineInputs): EngineResult {
 
   // ---- ambient / flight
   const amb = isa(inp.flight.altitude_m, inp.flight.dT_isa, !!inp.flight.altIsGeopotential);
-  const air = Gas.air();
-  const a0 = air.a(amb.T);
+  const air = Gas.air(inp.chemistry ?? 'equilibrium');
+  const a0 = air.a(amb.T, amb.P);
   const V0 = inp.flight.mach * a0;
   const W0 = inp.flight.W_kgs;
   const f0 = totalFromStatic(air, amb.T, amb.P, V0, W0);

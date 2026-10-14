@@ -52,6 +52,8 @@ export interface EngineInputs {
   };
   /** lower heating value used only for efficiency reporting */
   LHV_Jkg: number;
+  /** gas chemistry: CEA-style equilibrium (default) or frozen complete combustion */
+  chemistry?: 'equilibrium' | 'frozen';
 }
 
 export interface Station {

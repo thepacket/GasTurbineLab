@@ -23,6 +23,7 @@ export function defaultInputs(arch: Architecture): EngineInputs {
     afterburner: { enabled: false, T7_K: 2000, dPqP: 0.05, eff: 0.95 },
     prop: { shaftPower_W: 1.4e6, gearboxEff: 0.985, propEff: 0.9, diameter_m: 3.9 },
     LHV_Jkg: 43.0e6,
+    chemistry: 'equilibrium',
   };
   if (arch === 'turbofan') {
     base.flight = { altitude_m: 11000, mach: 0.8, dT_isa: 0, W_kgs: 170 };
