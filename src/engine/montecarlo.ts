@@ -4,7 +4,7 @@ import { solveEngine } from './cycle';
 
 export interface UncertainInput { path: string; label: string; sigma: number; min?: number; max?: number }
 export interface MonteCarloInputs { inputs: UncertainInput[]; samples: number; seed: number }
-export interface MonteCarloResult { Fn: number[]; TSFC: number[]; T3: number[]; Wf: number[]; eth: number[]; stats: Record<string, { mean: number; sd: number; p5: number; p50: number; p95: number }>; failures: number; truncated: number; sensitivity: { label: string; dFn_pct: number; dTSFC_pct: number }[] }
+export interface MonteCarloResult { Fn: number[]; TSFC: number[]; T3: number[]; Wf: number[]; eth: number[]; stats: Record<string, { mean: number; sd: number; p5: number; p50: number; p95: number }>; failures: number; truncated: number; sensitivity: { label: string; dFn_pct: number; dTSFC_pct: number; delta: number; bounded: boolean }[] }
 
 /** Physical bounds: efficiencies, recoveries and coefficients cannot exceed 1; losses and flows cannot be negative. */
 export const UNCERTAIN: UncertainInput[] = [
@@ -51,9 +51,13 @@ export function runMonteCarlo(base: EngineInputs, mc: MonteCarloInputs, progress
   }
   // one-at-a-time sensitivities (+1 sigma)
   const ref = solveEngine(b);
+  // one-at-a-time: +1σ, clipped to the input's physical bound; the perturbation actually applied is reported
   const sensitivity = mc.inputs.map((u) => {
-    const v = getPath(b, u.path); if (typeof v !== 'number') return { label: u.label, dFn_pct: 0, dTSFC_pct: 0 };
-    try { const res = solveEngine(setPath(b, u.path, v + u.sigma)); return { label: u.label, dFn_pct: (res.perf.Fn / ref.perf.Fn - 1) * 100, dTSFC_pct: (res.perf.TSFC_mg_Ns / ref.perf.TSFC_mg_Ns - 1) * 100 }; } catch { return { label: u.label, dFn_pct: NaN, dTSFC_pct: NaN }; }
+    const v = getPath(b, u.path); if (typeof v !== 'number') return { label: u.label, dFn_pct: 0, dTSFC_pct: 0, delta: 0, bounded: false };
+    const target = Math.min(u.max ?? Infinity, Math.max(u.min ?? -Infinity, v + u.sigma));
+    const delta = target - v, bounded = Math.abs(delta - u.sigma) > 1e-12;
+    if (Math.abs(delta) < 1e-12) return { label: u.label, dFn_pct: 0, dTSFC_pct: 0, delta: 0, bounded: true };
+    try { const res = solveEngine(setPath(b, u.path, target)); return { label: u.label, dFn_pct: (res.perf.Fn / ref.perf.Fn - 1) * 100, dTSFC_pct: (res.perf.TSFC_mg_Ns / ref.perf.TSFC_mg_Ns - 1) * 100, delta, bounded }; } catch { return { label: u.label, dFn_pct: NaN, dTSFC_pct: NaN, delta, bounded }; }
   });
   return { Fn, TSFC, T3, Wf, eth, stats: { Fn: stats(Fn), TSFC: stats(TSFC), T3: stats(T3), Wf: stats(Wf), eth: stats(eth) }, failures, truncated, sensitivity };
 }

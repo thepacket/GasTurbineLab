@@ -19,7 +19,6 @@ import { shareUrl } from './ui/share';
 import { t, getLang, setLang, initLang, onLangChange } from './ui/i18n';
 import { openReport } from './ui/Report';
 import { svgToPng } from './ui/exportImage';
-import { loadCustomMaps } from './engine/custommaps';
 initLang();
 import { EngineResult } from './engine/types';
 
@@ -63,10 +62,7 @@ export default function App() {
   useEffect(() => onLangChange(() => setLangTick((x) => x + 1)), []);
   const exportSection = () => { const svg = document.querySelector('svg.cross') as SVGSVGElement | null; if (svg) svgToPng(svg, 'gas-turbine-lab-section.png').catch(() => {}); };
   const share = async () => {
-    // custom maps referenced by the design travel with the link so the recipient can solve off-design
-    const used = new Set(Object.values(store.state.inputs.mapIds ?? {}).filter((id) => id.startsWith('custom:')));
-    const maps = loadCustomMaps().filter((m) => used.has(m.id)).map((m) => ({ id: m.id, kind: m.kind, data: m.data }));
-    const url = await shareUrl({ inputs: store.state.inputs, od: store.state.od, mode: store.state.mode, note: store.state.note, compare: store.state.compare, maps: maps.length ? maps : undefined });
+    const url = await shareUrl({ inputs: store.state.inputs, od: store.state.od, mode: store.state.mode, note: store.state.note, compare: store.state.compare });
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { prompt('Copy this link', url); }
   };
 
@@ -74,7 +70,7 @@ export default function App() {
     <header className="header">
       <div className="brand">
         <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="13" stroke="var(--accent)" strokeWidth="2" /><path d="M16 5c3 4 3 8 0 11s-3 7 0 11M5 16c4-3 8-3 11 0s7 3 11 0" stroke="var(--series-2)" strokeWidth="2" strokeLinecap="round" /><circle cx="16" cy="16" r="2.5" fill="var(--text-primary)" /></svg>
-        <span>Gas Turbine Lab</span>{bp === 'desktop' && <small>{t('cycle, off-design, transient and mission analysis')}</small>}
+        <span>Gas Turbine Lab</span>{bp === 'desktop' && <small>{t('cycle, off-design, transient and mission analysis')}</small>}<small className="ver" title="Build version (git commit · build time)">{__APP_VERSION__}</small>
       </div>
       <div className="spacer" />
       {bp === 'tablet' && (

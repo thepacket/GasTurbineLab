@@ -1,8 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execSync } from 'node:child_process';
+
+const gitHash = (() => { try { return execSync('git rev-parse --short HEAD').toString().trim(); } catch { return 'dev'; } })();
+const buildTime = new Date().toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(`${gitHash} · ${buildTime}`) },
   plugins: [
     react(),
     VitePWA({
@@ -29,6 +34,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,json,woff2}'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: '/index.html',
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

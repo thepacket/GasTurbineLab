@@ -33,8 +33,8 @@ function setPath(obj: any, path: string, value: unknown): any {
   c[h] = rest.length ? setPath(obj[h] ?? {}, rest.join('.'), value) : value; return c;
 }
 
-self.onmessage = (e: MessageEvent<WorkerRequest>) => {
-  const msg = e.data;
+/** Handle one request; `post` receives progress and the final response. Exported so it can be tested without a Worker. */
+export function handleRequest(msg: WorkerRequest, post: (r: WorkerResponse) => void) {
   try {
     if (msg.type === 'maps') {
       for (const m of msg.maps) registerCustomMap(m.id, m.kind, m.data);
@@ -92,8 +92,10 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   } catch (err: any) {
     post({ id: msg.id, ok: false, error: err?.message ?? String(err) });
   }
-};
-function post(r: WorkerResponse) { (self as unknown as Worker).postMessage(r); }
+}
+if (typeof self !== 'undefined' && typeof (self as any).postMessage === 'function' && typeof window === 'undefined') {
+  self.onmessage = (e: MessageEvent<WorkerRequest>) => handleRequest(e.data, (r) => (self as unknown as Worker).postMessage(r));
+}
 /** Only what the explorer plots, to keep messages small. */
 function slim(r: ReturnType<typeof solveEngine>) {
   const bad = r.warnings.some((w) => w.includes('cannot'));

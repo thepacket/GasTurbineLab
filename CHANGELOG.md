@@ -53,3 +53,11 @@ Following an external review of code, engineering and interface:
 - Every analysis (LTO, optimisation, uncertainty, mission, transient) keeps a snapshot of its inputs and shows a stale banner when the design changes; "Apply best design" is disabled when stale.
 - Outputs carry provenance badges: reference-checked, uncalibrated model, correlation estimate; the certification panel is named "Certification estimates"; a sticky status bar summarises the operating point and solver state.
 - Advanced control sections collapse by default; segmented toggles expose `aria-pressed`; cross-section parts, callouts and station rows are keyboard operable.
+
+## Review fixes, second pass (2026-10-15)
+- Shared links keep every valid optional setting: mixer designed stream and bypass Mach, geopotential altitude flag, chemistry and fuel, and off-design geometry, installation and component-delta overrides.
+- Custom-map packaging moved into the share function, so Gallery links and header links both carry the maps a design references.
+- The optimiser's stale check covers bounds, evaluation budget, the operating point and the architecture.
+- One-at-a-time sensitivities are clipped to the physical bounds and the perturbation actually applied is shown.
+- A worker-registration test exercises the request handler directly: an off-design request with a custom map fails before registration and succeeds after.
+- The build version (commit · time) is shown in the header; the service worker claims clients immediately and checks for updates hourly and on every return to the tab, so installed copies pick up new deployments without a second reload.

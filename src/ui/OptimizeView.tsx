@@ -26,7 +26,7 @@ export function OptimizeView({ store }: { store: Store }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const design = 'error' in store.design ? null : store.design;
-  const stale = useStale({ inputs, objective, sel, cons, smCheck });
+  const stale = useStale({ inputs, objective, sel, bounds, cons, smCheck, maxEvals, od: store.state.od, arch: inputs.arch });
   const run = () => {
     setBusy(true); setError(null); setRes(null); setTrace([]); stale.snapshot();
     const vars = avail.filter((v) => sel.includes(v.path)).map((v) => ({ ...v, min: bounds[v.path]?.[0] ?? v.min, max: bounds[v.path]?.[1] ?? v.max }));

@@ -82,9 +82,9 @@ export function UncertaintyView({ store }: { store: Store }) {
             <Histogram title="Compressor exit temperature" values={res.T3} unit="K" digits={0} />
           </div>
           <div className="section">
-            <h3>One-at-a-time sensitivities (+1σ)</h3>
-            <table className="stations"><thead><tr><th>Input</th><th>Δ thrust</th><th>Δ TSFC</th></tr></thead>
-              <tbody>{res.sensitivity.map((s) => <tr key={s.label}><td>{s.label}</td><td className="num">{fmt(s.dFn_pct, 2)} %</td><td className="num">{fmt(s.dTSFC_pct, 2)} %</td></tr>)}</tbody></table>
+            <h3>One-at-a-time sensitivities <span className="hint">+1σ, clipped to the physical bound where it would exceed it</span></h3>
+            <table className="stations"><thead><tr><th>Input</th><th>Perturbation applied</th><th>Δ thrust</th><th>Δ TSFC</th></tr></thead>
+              <tbody>{res.sensitivity.map((s) => <tr key={s.label}><td>{s.label}</td><td className="num">{s.delta >= 0 ? '+' : ''}{fmt(s.delta, 4)}{s.bounded ? ' (bounded)' : ''}</td><td className="num">{fmt(s.dFn_pct, 2)} %</td><td className="num">{fmt(s.dTSFC_pct, 2)} %</td></tr>)}</tbody></table>
           </div>
         </>
       )}

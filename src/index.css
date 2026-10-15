@@ -174,3 +174,5 @@ table.stations tr:focus-visible td { outline: 2px solid var(--accent); outline-o
 .section.collapsed { padding-bottom: 10px; }
 svg.cross g[role="button"]:focus-visible > * { outline: 2px solid var(--accent); }
 svg.cross g[role="button"]:focus { outline: none; }
+.brand .ver { font-family: var(--mono); font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+@media (max-width: 759px) { .brand .ver { display: none; } }
