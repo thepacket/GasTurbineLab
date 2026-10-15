@@ -48,7 +48,41 @@ npm run test:e2e   # layout and feature tests in a headless browser (Playwright)
 npm run build      # production bundle with service worker in dist/
 ```
 
-Deployment: `fly deploy --build-arg GIT_SHA=$(git rev-parse --short HEAD)` builds the `Dockerfile` (Node build stage, nginx runtime) and runs one shared-CPU machine in Toronto that stops when idle.
+## Fly.io deployment
+
+The live app is hosted at [gas-turbine-lab.fly.dev](https://gas-turbine-lab.fly.dev/). Deployment is manual; pushing to GitHub runs CI but does not deploy the app.
+
+[fly.toml](fly.toml) targets the existing `gas-turbine-lab` app in Toronto (`yyz`), using one shared CPU and 256 MB of memory. The machine stops when idle and starts on incoming requests, so the first visit after an idle period can take longer. HTTPS is enforced, and nginx listens internally on port 8080.
+
+The multi-stage [Dockerfile](Dockerfile) builds the static PWA with Node.js 22, then copies it into an nginx 1.27 image. Fly.io only serves static files: solvers and analyses run in the browser, including Web Workers. Python is used locally to regenerate reference data and is not included in the deployed app. No database or persistent volume is required.
+
+### Deploy an update
+
+Install and authenticate the Fly.io CLI with access to the existing app, and the GitHub CLI with access to this repository. Run these commands from the repository root.
+
+1. Commit and push the changes. Check that `git status --short` is empty, then find the CI run for that exact commit:
+
+   ```bash
+   gh run list --workflow CI --commit "$(git rev-parse HEAD)"
+   gh run view RUN_ID
+   gh run watch RUN_ID --exit-status
+   ```
+
+   Replace `RUN_ID` with the matching run ID. Proceed only after CI completes successfully. Local test passes do not replace this check; CI also rejects browser tests that only pass on retry.
+
+2. Deploy the checked-out commit:
+
+   ```bash
+   fly deploy --build-arg GIT_SHA="$(git rev-parse --short HEAD)"
+   ```
+
+   The build argument supplies the commit shown alongside the build time in the app header. It is required because `.git` is excluded from the Docker build context. This command updates the existing app named in `fly.toml`; use a separately provisioned app and configuration for your own deployment.
+
+3. Confirm Fly.io reports a successful deployment, then open the live app in a desktop browser and check that the header shows the deployed commit. Check that the HTML loads its current hashed JavaScript bundle and that `/sw.js` precaches that same bundle.
+
+The [nginx configuration](deploy/nginx.conf) caches hashed assets for a year and requests revalidation for HTML, the service worker and the manifest. An installed PWA can initially display its previous cached build; reconnect or reload and verify the header version before judging the deployment. The app checks for updates on startup, when returning to the tab and after reconnection, while retaining offline use.
+
+See [docs/development.md](docs/development.md#deployment) for the development and release workflow.
 
 ## Status and limits
 
