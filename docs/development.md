@@ -101,4 +101,14 @@ See [validation.md](validation.md). The Python environment is not part of the re
 
 `npm run licenses` assembles project, pyCycle and browser dependency license texts under `public/`; `npm run build` runs it automatically and precaches those files. Keep generated notices committed alongside dependency changes. Do not replace the pyCycle data license with MIT. See [../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) and [public-release.md](public-release.md).
 
-Run reference generators with `OPENMDAO_REPORTS=0` to avoid creating bulky HTML reports. `*_out/` and local Python environments are ignored; older generated reports are still tracked and must be addressed before publication. Neither Python nor its virtual environment is part of the deployed app.
+Run reference generators with `OPENMDAO_REPORTS=0` to avoid creating bulky HTML reports. `*_out/` and local Python environments are ignored; older generated reports were removed from the current tree but remain in Git history. Neither Python nor its virtual environment is part of the deployed app.
+
+### Source and secret audits
+
+`node reference/check-catalogue-provenance.mjs` checks that every catalogue preset and numeric field has a current provenance status. CI runs this check; it detects stale claims but cannot verify a publication or license by itself. The [source ledger](../reference/catalogue-provenance.json) explicitly retains unresolved fields.
+
+To verify pyCycle tables, check out upstream commit `ee7e16126a7a54b5fe35292c53b7eb4e9572620b`, then run `python3 reference/verify-pycycle-data.py /path/to/pyCycle`. This uses only the Python standard library, verifies source-file hashes, and parses literals without executing upstream Python. It does not require OpenMDAO or NumPy.
+
+Download the exact EASA workbook linked in `reference/estimate_references.json`, then run `python3 reference/verify-emissions-reference.py /path/to/workbook.xlsx`. The verifier rejects a different edition/hash and checks attributed cells. Do not commit the whole workbook.
+
+`bash scripts/scan-secrets.sh` downloads checksum-pinned Gitleaks 8.30.1 into a temporary directory, scans all available Git refs and non-ignored working files, redacts findings, then deletes its temporary files. It requires curl, tar, shasum and Python 3. CI checks out full history and runs the same command with read-only repository permissions and no persisted checkout credentials. No scanner guarantees absence of secrets; inspect alerts privately and rotate any confirmed credential before publication.

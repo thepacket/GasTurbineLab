@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/OpenMDAO/pyCycle",
+  "commit": "ee7e16126a7a54b5fe35292c53b7eb4e9572620b",
+  "verificationDate": "2026-10-15",
+  "method": "Exact structural/numerical comparison using verify-pycycle-data.py. This pins a verified equivalent source, not the unknown original extraction revision. No numerical changes or unit conversions.",
+  "license": "Apache-2.0",
+  "sourceFilesSha256": {
+    "pycycle/thermo/cea/thermo_data/janaf.py": "6c611b84a0899d42aea69120c2747ec7691d7b9d106fdec417af636db3ddaba6",
+    "pycycle/maps/Fan_map.py": "9ef95614291bd8b03da3e15475d4479315417ce6769f254f87724515813ceae2",
+    "pycycle/maps/LPC_map.py": "aed0fe682f98e0d41b7dc29b1168be99226b4b084504f45aa4b4d67961284941",
+    "pycycle/maps/HPC_map.py": "c6ddf2b3eb60a1c38cfd3cf39badbb2e848cbf2fe3175245284cd239464a5e7b",
+    "pycycle/maps/axi5.py": "97ae8537270879cb5c47ed34193e5ba5eb5a2808b6e549b5615862c1a5279fcd",
+    "pycycle/maps/ncp01.py": "0cc8ae9a730027920b8e0a81a82b353778e418e33b4282338780b28d550b810d",
+    "pycycle/maps/HPT_map.py": "f9d8b4a8f32ed0664accc4a4489e64b35792e0598be2b817f13cff65650e9c94",
+    "pycycle/maps/LPT_map.py": "54d65b84ec50807f879c64a857aae37000c71472daef9ebcffb568e0420ad088",
+    "pycycle/maps/lpt2269.py": "6805fd014a98f244420b7ec867f5bc5d183f43d973c7178d26ae89afa96157fa",
+    "pycycle/maps/hpt1269.py": "5a09ba0053faab511aa808ff460fcb84f45315bcb5ad27d0bf19b14915d9b8fd"
+  }
+}

@@ -1,11 +1,10 @@
 /**
- * Catalogue of commercial engines with publicly published nominal data
- * (manufacturer brochures, type-certificate data sheets, Jane's).  Only the
- * overall figures are public: take-off thrust or shaft power, bypass ratio,
- * overall pressure ratio, fan diameter / airflow.  Internal quantities (T4,
- * component efficiencies, pressure-ratio split, cooling flows) are NOT public
- * and are estimated by generation, then T4 is calibrated so the model
- * reproduces the published take-off rating at sea-level static ISA conditions.
+ * Nominal commercial-engine presets, not manufacturer performance decks.
+ * Per-entry evidence and unresolved fields: reference/catalogue-provenance.json.
+ * The original source list mentioned brochures, TCDS and Jane's without exact
+ * citations; unverified legacy values must not be treated as measured data.
+ * Internal T4, efficiencies, pressure splits and cooling are model assumptions.
+ * T4 is calibrated to the nominal preset rating at sea-level static ISA.
  */
 import { Architecture, EngineInputs } from './types';
 import { defaultInputs } from './defaults';

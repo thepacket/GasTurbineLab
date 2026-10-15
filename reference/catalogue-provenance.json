@@ -1,0 +1,1941 @@
+{
+  "reviewDate": "2026-10-15",
+  "scope": "Complete entry inventory, partial source verification. Unverified values are legacy model inputs, not confirmed manufacturer data. No numerical values were changed during this provenance audit.",
+  "originalSourceWarning": "The previous catalogue header cited brochures, TCDS and Jane's without a source ledger. This audit cannot reconstruct that original extraction history; identifying independent corroboration does not prove original copying rights.",
+  "sources": {
+    "easa-emissions-2026-03": {
+      "url": "https://www.easa.europa.eu/en/downloads/131424/en",
+      "edition": "03/2026",
+      "sha256": "57a9ff572458ad3a3141afc1aea932b5faa5796d279f0ac74600b27869302530",
+      "sheet": "Gaseous Emissions and Smoke",
+      "columns": {
+        "uid": "A",
+        "engine": "D",
+        "BPR": "G",
+        "OPR": "H",
+        "thrust_kN": "I",
+        "dataStatus": "J",
+        "superseded": "K"
+      },
+      "terms": "https://www.easa.europa.eu/en/copyright-disclaimer"
+    }
+  },
+  "entries": [
+    {
+      "name": "CFM56-3B1",
+      "catalogueInputs": {
+        "year": 1984,
+        "thrust_kN": 88.9644,
+        "BPR": 6,
+        "OPR": 27.5,
+        "fanDiameter_m": 1.52,
+        "airflow_kgs": 297
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 66,
+          "uid": "1CM004",
+          "identification": "CFM56-3-B1",
+          "dataStatus": "R",
+          "values": {
+            "BPR": 5.1,
+            "OPR": 22.44,
+            "thrust_kN": 89.41
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.9,
+            "OPR": 5.06,
+            "thrust_kN": -0.4456
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CFM56-5B4",
+      "catalogueInputs": {
+        "year": 1994,
+        "thrust_kN": 120.10194,
+        "BPR": 5.7,
+        "OPR": 32.6,
+        "fanDiameter_m": 1.735,
+        "airflow_kgs": 385
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 87,
+          "uid": "2CM014",
+          "identification": "CFM56-5B4",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 5.9,
+            "OPR": 27.1,
+            "thrust_kN": 117.9
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": -0.2,
+            "OPR": 5.5,
+            "thrust_kN": 2.20194
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CFM56-5C4",
+      "catalogueInputs": {
+        "year": 1993,
+        "thrust_kN": 151.23948000000001,
+        "BPR": 6.4,
+        "OPR": 37.4,
+        "fanDiameter_m": 1.836,
+        "airflow_kgs": 466
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 109,
+          "uid": "2CM015",
+          "identification": "CFM56-5C4",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 6.6,
+            "OPR": 31.15,
+            "thrust_kN": 151.25
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": -0.2,
+            "OPR": 6.25,
+            "thrust_kN": -0.01052
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CFM56-7B27",
+      "catalogueInputs": {
+        "year": 1997,
+        "thrust_kN": 121.436406,
+        "BPR": 5.1,
+        "OPR": 32.7,
+        "fanDiameter_m": 1.55,
+        "airflow_kgs": 355
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 146,
+          "uid": "3CM034",
+          "identification": "CFM56-7B27",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 5.0,
+            "OPR": 28.63,
+            "thrust_kN": 121.44
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.1,
+            "OPR": 4.07,
+            "thrust_kN": -0.003594
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "LEAP-1A26",
+      "catalogueInputs": {
+        "year": 2016,
+        "thrust_kN": 120.6357264,
+        "BPR": 11,
+        "OPR": 33.3,
+        "fanDiameter_m": 1.98
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "LEAP-1B28",
+      "catalogueInputs": {
+        "year": 2017,
+        "thrust_kN": 130.40846574,
+        "BPR": 8.6,
+        "OPR": 40,
+        "fanDiameter_m": 1.76
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CF6-50C2",
+      "catalogueInputs": {
+        "year": 1971,
+        "thrust_kN": 233.53155,
+        "BPR": 4.26,
+        "OPR": 29.3,
+        "fanDiameter_m": 2.19,
+        "airflow_kgs": 670
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 295,
+          "uid": "3GE074",
+          "identification": "CF6-50C2",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 4.3,
+            "OPR": 28.44,
+            "thrust_kN": 230.4
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": -0.04,
+            "OPR": 0.86,
+            "thrust_kN": 3.13155
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "url": "https://www.geaerospace.com/commercial/aircraft-engines/cf6",
+          "interpretation": "Family range only; no exact -50C2 column."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CF6-80C2B1F",
+      "catalogueInputs": {
+        "year": 1985,
+        "thrust_kN": 257.551938,
+        "BPR": 5.31,
+        "OPR": 30.4,
+        "fanDiameter_m": 2.36,
+        "airflow_kgs": 800
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 330,
+          "uid": "1GE024",
+          "identification": "CF6-80C2B1F",
+          "dataStatus": "R",
+          "values": {
+            "BPR": 5.1,
+            "OPR": 30.13,
+            "thrust_kN": 254.3
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.21,
+            "OPR": 0.27,
+            "thrust_kN": 3.251938
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 361,
+          "uid": "07P27GE218",
+          "identification": "CF6-80C2B1F",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 5.11215,
+            "OPR": 31.0386499727817,
+            "thrust_kN": 254.2602552
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.19785,
+            "OPR": -0.63865,
+            "thrust_kN": 3.291683
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "url": "https://www.geaerospace.com/commercial/aircraft-engines/cf6",
+          "interpretation": "Family range only; no exact -80C2B1F column."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CF34-3B1",
+      "catalogueInputs": {
+        "year": 1995,
+        "thrust_kN": 41.0125884,
+        "BPR": 6.2,
+        "OPR": 21,
+        "fanDiameter_m": 1.12
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "url": "https://www.geaerospace.com/commercial/aircraft-engines/cf34",
+          "interpretation": "CF34 Comparison: family -3 column agrees with 9220 lbf and OPR 21; does not separately identify -3B1."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CF34-8C5",
+      "catalogueInputs": {
+        "year": 2001,
+        "thrust_kN": 61.3409538,
+        "BPR": 5,
+        "OPR": 28,
+        "fanDiameter_m": 1.17
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "url": "https://www.geaerospace.com/commercial/aircraft-engines/cf34",
+          "interpretation": "CF34 Comparison: family -8C column agrees with 13790 lbf and OPR 28; does not separately identify -8C5."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "GE90-94B",
+      "catalogueInputs": {
+        "year": 1995,
+        "thrust_kN": 416.798214,
+        "BPR": 8.4,
+        "OPR": 40,
+        "fanDiameter_m": 3.12,
+        "airflow_kgs": 1400
+      },
+      "verifiedFields": {
+        "thrust_kN": {
+          "url": "https://www.geaerospace.com/pl/node/5141",
+          "locator": "GE90 Engine Model Comparison, -94B column",
+          "basis": "Nominal figure independently corroborated; does not validate internal cycle parameters."
+        },
+        "OPR": {
+          "url": "https://www.geaerospace.com/pl/node/5141",
+          "locator": "GE90 Engine Model Comparison, -94B column",
+          "basis": "Nominal figure independently corroborated; does not validate internal cycle parameters."
+        }
+      },
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 397,
+          "uid": "8GE100",
+          "identification": "GE90-94B",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 8.33,
+            "OPR": 40.53,
+            "thrust_kN": 432.8
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.07,
+            "OPR": -0.53,
+            "thrust_kN": -16.001786
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 398,
+          "uid": "9GE128",
+          "identification": "GE90-94B",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 8.33,
+            "OPR": 40.82,
+            "thrust_kN": 430.92
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.07,
+            "OPR": -0.82,
+            "thrust_kN": -14.121786
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "BPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "GE90-115B",
+      "catalogueInputs": {
+        "year": 2003,
+        "thrust_kN": 512.879766,
+        "BPR": 9,
+        "OPR": 42,
+        "fanDiameter_m": 3.25,
+        "airflow_kgs": 1642
+      },
+      "verifiedFields": {
+        "thrust_kN": {
+          "url": "https://www.geaerospace.com/pl/node/5141",
+          "locator": "GE90 Engine Model Comparison, -115B column",
+          "basis": "Nominal figure independently corroborated; does not validate internal cycle parameters."
+        },
+        "OPR": {
+          "url": "https://www.geaerospace.com/pl/node/5141",
+          "locator": "GE90 Engine Model Comparison, -115B column",
+          "basis": "Nominal figure independently corroborated; does not validate internal cycle parameters."
+        }
+      },
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 372,
+          "uid": "07P27GE240",
+          "identification": "GE90-115B",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 6.9648,
+            "OPR": 43.2267283614589,
+            "thrust_kN": 513.947623959728
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 2.0352,
+            "OPR": -1.226728,
+            "thrust_kN": -1.067858
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "BPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "GEnx-1B76",
+      "catalogueInputs": {
+        "year": 2011,
+        "thrust_kN": 338.509542,
+        "BPR": 9.1,
+        "OPR": 43,
+        "fanDiameter_m": 2.82
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "GE9X-105B1A",
+      "catalogueInputs": {
+        "year": 2020,
+        "thrust_kN": 489.30420000000004,
+        "BPR": 9.9,
+        "OPR": 52,
+        "fanDiameter_m": 3.4
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "url": "https://www.geaerospace.com/commercial/aircraft-engines/ge9x",
+          "interpretation": "Family page gives approximately 10 BPR, 60 OPR and 134-inch front fan; does not verify the catalogue take-off OPR assumption of 52."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Passport 20-19BB1A",
+      "catalogueInputs": {
+        "year": 2018,
+        "thrust_kN": 84.1603224,
+        "BPR": 5.6,
+        "OPR": 45,
+        "fanDiameter_m": 1.32
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 461,
+          "uid": "07P27GE241",
+          "identification": "Passport20-19BB1A",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 5.89733,
+            "OPR": 41.3079069134458,
+            "thrust_kN": 84.1599242734607
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": -0.29733,
+            "OPR": 3.692093,
+            "thrust_kN": 0.000398
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "JT8D-9A",
+      "catalogueInputs": {
+        "year": 1964,
+        "thrust_kN": 64.49919,
+        "BPR": 1.04,
+        "OPR": 15.9,
+        "fanDiameter_m": 1,
+        "airflow_kgs": 144,
+        "FPR": 1.9
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs",
+        "FPR"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "JT8D-219",
+      "catalogueInputs": {
+        "year": 1980,
+        "thrust_kN": 96.52637399999999,
+        "BPR": 1.77,
+        "OPR": 19.2,
+        "fanDiameter_m": 1.25,
+        "airflow_kgs": 221,
+        "FPR": 1.95
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 535,
+          "uid": "1PW019",
+          "identification": "JT8D-219",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 1.7,
+            "OPR": 20.27,
+            "thrust_kN": 96.52
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.07,
+            "OPR": -1.07,
+            "thrust_kN": 0.006374
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 536,
+          "uid": "4PW071",
+          "identification": "JT8D-219",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 1.7,
+            "OPR": 20.27,
+            "thrust_kN": 96.52
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.07,
+            "OPR": -1.07,
+            "thrust_kN": 0.006374
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs",
+        "FPR"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "JT9D-7R4G2",
+      "catalogueInputs": {
+        "year": 1982,
+        "thrust_kN": 243.54004500000002,
+        "BPR": 4.8,
+        "OPR": 26.7,
+        "fanDiameter_m": 2.37,
+        "airflow_kgs": 769
+      },
+      "verifiedFields": {
+        "BPR": {
+          "source": "easa-emissions-2026-03",
+          "row": 558,
+          "basis": "Exact numeric agreement for this field only."
+        }
+      },
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 558,
+          "uid": "1PW029",
+          "identification": "JT9D-7R4G2",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 4.8,
+            "OPR": 26.3,
+            "thrust_kN": 243.5
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.0,
+            "OPR": 0.4,
+            "thrust_kN": 0.040045
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW2037",
+      "catalogueInputs": {
+        "year": 1984,
+        "thrust_kN": 164.58414000000002,
+        "BPR": 6,
+        "OPR": 27.6,
+        "fanDiameter_m": 1.99,
+        "airflow_kgs": 608
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 654,
+          "uid": "4PW072",
+          "identification": "PW2037",
+          "dataStatus": "R",
+          "values": {
+            "BPR": 5.71,
+            "OPR": 26.7,
+            "thrust_kN": 166.35
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.29,
+            "OPR": 0.9,
+            "thrust_kN": -1.76586
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "url": "https://www.prattwhitney.com/en/products/commercial-engines/pw2000",
+          "interpretation": "Family page lists PW2037 and thrust range; exact numerical spec table not available in fetched text."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW4062",
+      "catalogueInputs": {
+        "year": 1987,
+        "thrust_kN": 275.78964,
+        "BPR": 4.85,
+        "OPR": 32,
+        "fanDiameter_m": 2.39,
+        "airflow_kgs": 773
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 706,
+          "uid": "12PW102",
+          "identification": "PW4062",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 4.6,
+            "OPR": 31.0,
+            "thrust_kN": 275.8
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.25,
+            "OPR": 1.0,
+            "thrust_kN": -0.01036
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW4084",
+      "catalogueInputs": {
+        "year": 1995,
+        "thrust_kN": 373.65047999999996,
+        "BPR": 6.4,
+        "OPR": 34.4,
+        "fanDiameter_m": 2.84,
+        "airflow_kgs": 1180
+      },
+      "verifiedFields": {
+        "BPR": {
+          "source": "easa-emissions-2026-03",
+          "row": 685,
+          "basis": "Exact numeric agreement for this field only."
+        }
+      },
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 685,
+          "uid": "8PW089",
+          "identification": "PW4084",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 6.4,
+            "OPR": 36.2,
+            "thrust_kN": 369.6
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.0,
+            "OPR": -1.8,
+            "thrust_kN": 4.05048
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW1127G-JM",
+      "catalogueInputs": {
+        "year": 2016,
+        "thrust_kN": 120.4355565,
+        "BPR": 12.5,
+        "OPR": 38,
+        "fanDiameter_m": 2.06
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 569,
+          "uid": "15PW105",
+          "identification": "PW1127G-JM",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 12.2,
+            "OPR": 32.11,
+            "thrust_kN": 120.44
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.3,
+            "OPR": 5.89,
+            "thrust_kN": -0.004443
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 584,
+          "uid": "01P18PW153",
+          "identification": "PW1127G-JM",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 12.28,
+            "OPR": 31.66,
+            "thrust_kN": 120.43
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.22,
+            "OPR": 6.34,
+            "thrust_kN": 0.005556
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 598,
+          "uid": "01P22PW163",
+          "identification": "PW1127G-JM",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 12.280546,
+            "OPR": 31.6575311592319,
+            "thrust_kN": 120.435034028735
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.219454,
+            "OPR": 6.342469,
+            "thrust_kN": 0.000522
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW1524G",
+      "catalogueInputs": {
+        "year": 2016,
+        "thrust_kN": 106.75728,
+        "BPR": 12,
+        "OPR": 38,
+        "fanDiameter_m": 1.85
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 620,
+          "uid": "16PW111",
+          "identification": "PW1524G",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 11.05,
+            "OPR": 38.67,
+            "thrust_kN": 108.53
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.95,
+            "OPR": -0.67,
+            "thrust_kN": -1.77272
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 644,
+          "uid": "04P20PW196",
+          "identification": "PW1524G",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 11.05,
+            "OPR": 38.67,
+            "thrust_kN": 108.53
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.95,
+            "OPR": -0.67,
+            "thrust_kN": -1.77272
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "V2527-A5",
+      "catalogueInputs": {
+        "year": 1993,
+        "thrust_kN": 117.87783,
+        "BPR": 4.8,
+        "OPR": 27.2,
+        "fanDiameter_m": 1.6,
+        "airflow_kgs": 355
+      },
+      "verifiedFields": {
+        "OPR": {
+          "source": "easa-emissions-2026-03",
+          "row": 484,
+          "basis": "Exact numeric agreement for this field only."
+        }
+      },
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 484,
+          "uid": "1IA003",
+          "identification": "V2527-A5",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 4.82,
+            "OPR": 27.2,
+            "thrust_kN": 111.2
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": -0.02,
+            "OPR": 0.0,
+            "thrust_kN": 6.67783
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "GP7270",
+      "catalogueInputs": {
+        "year": 2007,
+        "thrust_kN": 332.4377217,
+        "BPR": 8.7,
+        "OPR": 43.9,
+        "fanDiameter_m": 2.95
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 221,
+          "uid": "9EA001",
+          "identification": "GP7270",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 8.71,
+            "OPR": 36.62,
+            "thrust_kN": 332.39
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": -0.01,
+            "OPR": 7.28,
+            "thrust_kN": 0.047722
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Conway RCo.12 Mk 508",
+      "catalogueInputs": {
+        "year": 1959,
+        "thrust_kN": 77.84385,
+        "BPR": 0.3,
+        "OPR": 14,
+        "airflow_kgs": 122,
+        "FPR": 2.4
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "airflow_kgs",
+        "FPR"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Spey 512-14DW",
+      "catalogueInputs": {
+        "year": 1968,
+        "thrust_kN": 55.825161,
+        "BPR": 0.64,
+        "OPR": 20.7,
+        "airflow_kgs": 94,
+        "FPR": 2.6
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "airflow_kgs",
+        "FPR"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Tay 650-15",
+      "catalogueInputs": {
+        "year": 1988,
+        "thrust_kN": 67.168122,
+        "BPR": 3.1,
+        "OPR": 16.6,
+        "fanDiameter_m": 1.14,
+        "airflow_kgs": 187
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "RB211-535E4",
+      "catalogueInputs": {
+        "year": 1984,
+        "thrust_kN": 191.71828200000002,
+        "BPR": 4.3,
+        "OPR": 25.8,
+        "fanDiameter_m": 1.88,
+        "airflow_kgs": 522,
+        "spools": 3
+      },
+      "verifiedFields": {
+        "OPR": {
+          "source": "easa-emissions-2026-03",
+          "row": 736,
+          "basis": "Exact numeric agreement for this field only."
+        }
+      },
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 736,
+          "uid": "3RR028",
+          "identification": "RB211-535E4",
+          "dataStatus": "R",
+          "values": {
+            "BPR": 4.1,
+            "OPR": 25.8,
+            "thrust_kN": 178.4
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.2,
+            "OPR": 0.0,
+            "thrust_kN": 13.318282
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 737,
+          "uid": "5RR038",
+          "identification": "RB211-535E4",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 4.1,
+            "OPR": 26.0,
+            "thrust_kN": 178.4
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.2,
+            "OPR": -0.2,
+            "thrust_kN": 13.318282
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "fanDiameter_m",
+        "airflow_kgs",
+        "spools"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "RB211-524H",
+      "catalogueInputs": {
+        "year": 1989,
+        "thrust_kN": 269.56213199999996,
+        "BPR": 4.3,
+        "OPR": 33,
+        "fanDiameter_m": 2.19,
+        "airflow_kgs": 728,
+        "spools": 3
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 731,
+          "uid": "1RR011",
+          "identification": "RB211-524H",
+          "dataStatus": "R",
+          "values": {
+            "BPR": 4.2,
+            "OPR": 34.0,
+            "thrust_kN": 264.4
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.1,
+            "OPR": -1.0,
+            "thrust_kN": 5.162132
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs",
+        "spools"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Trent 772B-60",
+      "catalogueInputs": {
+        "year": 1995,
+        "thrust_kN": 316.268442,
+        "BPR": 5,
+        "OPR": 36.4,
+        "fanDiameter_m": 2.47,
+        "airflow_kgs": 920,
+        "spools": 3
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs",
+        "spools"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Trent 892",
+      "catalogueInputs": {
+        "year": 1996,
+        "thrust_kN": 400.33979999999997,
+        "BPR": 5.8,
+        "OPR": 41,
+        "fanDiameter_m": 2.79,
+        "airflow_kgs": 1200,
+        "spools": 3
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 768,
+          "uid": "2RR027",
+          "identification": "Trent 892",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 5.7,
+            "OPR": 41.38,
+            "thrust_kN": 411.48
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.1,
+            "OPR": -0.38,
+            "thrust_kN": -11.1402
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs",
+        "spools"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Trent 970-84",
+      "catalogueInputs": {
+        "year": 2007,
+        "thrust_kN": 348.29562599999997,
+        "BPR": 8.5,
+        "OPR": 39,
+        "fanDiameter_m": 2.95,
+        "airflow_kgs": 1245,
+        "spools": 3
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 776,
+          "uid": "01P18RR103",
+          "identification": "Trent 970-84",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 8.45,
+            "OPR": 38.0,
+            "thrust_kN": 338.7
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.05,
+            "OPR": 1.0,
+            "thrust_kN": 9.595626
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs",
+        "spools"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Trent 1000-C",
+      "catalogueInputs": {
+        "year": 2011,
+        "thrust_kN": 330.94756800000005,
+        "BPR": 10,
+        "OPR": 50,
+        "fanDiameter_m": 2.85,
+        "spools": 3
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "url": "https://www.rolls-royce.com/products-and-services/civil-aerospace/wide-body/trent-1000.aspx",
+          "interpretation": "Family description gives 10:1 BPR, not a separate -C rating table."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "spools"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Trent XWB-84",
+      "catalogueInputs": {
+        "year": 2015,
+        "thrust_kN": 374.540124,
+        "BPR": 9.6,
+        "OPR": 50,
+        "fanDiameter_m": 3,
+        "spools": 3
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 876,
+          "uid": "01P18RR124",
+          "identification": "Trent XWB-84",
+          "dataStatus": "C/R",
+          "values": {
+            "BPR": 9.01,
+            "OPR": 41.1,
+            "thrust_kN": 379.0
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.59,
+            "OPR": 8.9,
+            "thrust_kN": -4.459876
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "spools"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "BR715-A1-30",
+      "catalogueInputs": {
+        "year": 1999,
+        "thrust_kN": 93.41261999999999,
+        "BPR": 4.7,
+        "OPR": 32,
+        "fanDiameter_m": 1.47
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "AE 3007A1",
+      "catalogueInputs": {
+        "year": 1996,
+        "thrust_kN": 33.7175076,
+        "BPR": 5,
+        "OPR": 23,
+        "fanDiameter_m": 0.98,
+        "airflow_kgs": 127
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 6,
+          "uid": "6AL005",
+          "identification": "AE3007A1",
+          "dataStatus": "R",
+          "values": {
+            "BPR": 4.77,
+            "OPR": 17.97,
+            "thrust_kN": 34.91
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.23,
+            "OPR": 5.03,
+            "thrust_kN": -1.192492
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 7,
+          "uid": "6AL006",
+          "identification": "AE3007A1",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 4.77,
+            "OPR": 17.97,
+            "thrust_kN": 34.91
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.23,
+            "OPR": 5.03,
+            "thrust_kN": -1.192492
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        },
+        {
+          "source": "easa-emissions-2026-03",
+          "row": 31,
+          "uid": "01P06AL028",
+          "identification": "AE3007A1",
+          "dataStatus": "C",
+          "values": {
+            "BPR": 4.77,
+            "OPR": 17.97,
+            "thrust_kN": 34.91
+          },
+          "deltaCatalogueMinusSource": {
+            "BPR": 0.23,
+            "OPR": 5.03,
+            "thrust_kN": -1.192492
+          },
+          "interpretation": "Same normalized model name, but combustor/configuration and rating basis must be reconciled; differences are not automatically app errors."
+        }
+      ],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "TFE731-2",
+      "catalogueInputs": {
+        "year": 1972,
+        "thrust_kN": 15.56877,
+        "BPR": 2.67,
+        "OPR": 14,
+        "fanDiameter_m": 0.72,
+        "airflow_kgs": 51
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "HTF7000 (AS907)",
+      "catalogueInputs": {
+        "year": 2002,
+        "thrust_kN": 31.26209016,
+        "BPR": 4.4,
+        "OPR": 28,
+        "fanDiameter_m": 0.87
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "FJ44-1A",
+      "catalogueInputs": {
+        "year": 1992,
+        "thrust_kN": 8.451618,
+        "BPR": 3.28,
+        "OPR": 12.8,
+        "fanDiameter_m": 0.53,
+        "airflow_kgs": 28.6
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "BPR",
+        "OPR",
+        "fanDiameter_m",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Avon RA.29 Mk 524",
+      "catalogueInputs": {
+        "year": 1958,
+        "thrust_kN": 46.706309999999995,
+        "OPR": 10,
+        "airflow_kgs": 70
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "JT3C-6 (dry)",
+      "catalogueInputs": {
+        "year": 1958,
+        "thrust_kN": 49.820063999999995,
+        "OPR": 12.5,
+        "airflow_kgs": 82
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "JT4A-11",
+      "catalogueInputs": {
+        "year": 1959,
+        "thrust_kN": 77.84385,
+        "OPR": 12,
+        "airflow_kgs": 115
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CJ805-3B",
+      "catalogueInputs": {
+        "year": 1960,
+        "thrust_kN": 51.821763,
+        "OPR": 13,
+        "airflow_kgs": 75.6
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CJ610-6",
+      "catalogueInputs": {
+        "year": 1965,
+        "thrust_kN": 13.122249,
+        "OPR": 6.8,
+        "airflow_kgs": 20
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Olympus 593 Mk 610 (dry)",
+      "catalogueInputs": {
+        "year": 1976,
+        "thrust_kN": 139.45169700000002,
+        "OPR": 15.5,
+        "airflow_kgs": 186
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "OPR",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Olympus 593 Mk 610 (reheat)",
+      "catalogueInputs": {
+        "year": 1976,
+        "thrust_kN": 139.45169700000002,
+        "reheat_kN": 169.254771,
+        "OPR": 15.5,
+        "airflow_kgs": 186
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "thrust_kN",
+        "reheat_kN",
+        "OPR",
+        "airflow_kgs"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Dart Mk 532-7",
+      "catalogueInputs": {
+        "year": 1965,
+        "power_kW": 1565.97,
+        "OPR": 5.75,
+        "airflow_kgs": 11.4,
+        "propDiameter_m": 3.66
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "airflow_kgs",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "501-D13",
+      "catalogueInputs": {
+        "year": 1957,
+        "power_kW": 2796.375,
+        "OPR": 9.5,
+        "airflow_kgs": 14.7,
+        "propDiameter_m": 4.11
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "airflow_kgs",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "TPE331-10",
+      "catalogueInputs": {
+        "year": 1978,
+        "power_kW": 745.7,
+        "OPR": 10.8,
+        "propDiameter_m": 2.69
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PT6A-114A",
+      "catalogueInputs": {
+        "year": 1990,
+        "power_kW": 503.3475,
+        "OPR": 8,
+        "propDiameter_m": 2.69
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PT6A-67D",
+      "catalogueInputs": {
+        "year": 1991,
+        "power_kW": 953.7503,
+        "OPR": 12,
+        "propDiameter_m": 2.78
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW118B",
+      "catalogueInputs": {
+        "year": 1985,
+        "power_kW": 1342.26,
+        "OPR": 12,
+        "propDiameter_m": 3.2
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW127F",
+      "catalogueInputs": {
+        "year": 1996,
+        "power_kW": 2050.675,
+        "OPR": 14.5,
+        "propDiameter_m": 3.93
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "PW150A",
+      "catalogueInputs": {
+        "year": 1999,
+        "power_kW": 3781.4447,
+        "OPR": 18,
+        "propDiameter_m": 4.11
+      },
+      "verifiedFields": {
+        "power_kW": {
+          "url": "https://prd-sc102-cdn.rtx.com/-/media/pw/newsroom/collateral/documents/regional-aviation-engines-and-services/pw100-150-fast-facts.pdf?hash=C99719BA83BAFF688C4F3A0BA66CD826&rev=3d661bb2dde443cbb5d27393b7fe85a6",
+          "locator": "2021 fast facts, PW150A row, Mechanical Power: 5071 SHP; conversion 0.7457 kW/hp",
+          "basis": "Nominal figure independently corroborated; does not validate internal cycle parameters."
+        }
+      },
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "CT7-9B",
+      "catalogueInputs": {
+        "year": 1989,
+        "power_kW": 1304.9750000000001,
+        "OPR": 17,
+        "propDiameter_m": 3.35
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "AE 2100A",
+      "catalogueInputs": {
+        "year": 1994,
+        "power_kW": 3096.1464,
+        "OPR": 16.6,
+        "propDiameter_m": 3.81
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "250-B17F",
+      "catalogueInputs": {
+        "year": 1980,
+        "power_kW": 335.565,
+        "OPR": 7.2,
+        "propDiameter_m": 2
+      },
+      "verifiedFields": {},
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "power_kW",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    },
+    {
+      "name": "Catalyst",
+      "catalogueInputs": {
+        "year": 2023,
+        "power_kW": 969.4100000000001,
+        "OPR": 16,
+        "propDiameter_m": 2.67
+      },
+      "verifiedFields": {
+        "power_kW": {
+          "url": "https://www.geaerospace.com/sites/default/files/investor-day-2024-transcript.pdf",
+          "locator": "2024 investor day, Catalyst statement: about 1300 horsepower; model conversion 0.7457 kW/hp",
+          "basis": "Nominal figure independently corroborated; does not validate internal cycle parameters."
+        }
+      },
+      "primarySourceComparisons": [],
+      "unverifiedFields": [
+        "year",
+        "OPR",
+        "propDiameter_m"
+      ],
+      "nextAction": "Verify each remaining field against the exact variant, rating condition and units; replace or explicitly document assumptions. Resolve original redistribution provenance before publishing history."
+    }
+  ]
+}

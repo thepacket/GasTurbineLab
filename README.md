@@ -29,7 +29,7 @@ The documented design/off-design reference cases agree with NASA's pyCycle to th
 
 **Design studies.** Mission analysis against an aircraft polar with ratings, Nelder–Mead optimisation with constraints, Monte Carlo uncertainty, weight and size estimates, installed performance, emissions (P3–T3 and ICAO LTO with CAEP/8 limits) and noise (jet and fan).
 
-**Catalogue.** 59 named engine models calibrated to nominal take-off ratings. Internal parameters and generic maps are estimates; per-entry primary-source citations are still being completed.
+**Catalogue.** 59 named engine models calibrated to nominal take-off ratings. Internal parameters and generic maps are estimates; the [source ledger](reference/catalogue-provenance.json) distinguishes checked fields from unresolved values and rating-condition differences.
 
 **Interface.** Desktop, tablet and phone layouts; SI or US units; English or French; dark or light theme; guided teaching scenarios.
 

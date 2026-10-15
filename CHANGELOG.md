@@ -103,7 +103,13 @@ Following an external review of the transient/control implementation:
 - Preserve legacy custom-map IDs containing spaces/Unicode; give newly imported maps filename-independent IDs so ordinary filenames cannot break saved assignments.
 - Add browser coverage for report/CSV/Gallery agreement, custom-map portability into a clean browser, worker recreation, mission/uncertainty stale banners, and cached-app updates. UI structure unchanged.
 
-## Documentation and MIT preparation — 2026-10-15 (local)
+## Documentation and MIT preparation — 2026-10-15 (`148d965`)
 - Add MIT licensing for original project work, preserve pyCycle Apache-2.0 notices, and include license texts in static builds.
 - Update setup, model scope, mission integration, bounded uncertainty, persistence and deployment documentation.
 - Add contribution/security guidance and a public-release audit covering provenance, generated artifacts, Git history, dependencies and GitHub settings. Repository visibility is unchanged.
+
+## Pre-publication follow-up — 2026-10-15
+- Remove unused image/scaffold assets and generated OpenMDAO reports from the current tree; preserve Git history.
+- Pin and verify pyCycle numerical source data; verify the attributed EASA workbook extracts and record reproduction terms.
+- Inventory provenance for all catalogue presets, retain explicit unresolved fields, and check the inventory for drift in CI.
+- Add checksum-pinned Gitleaks history/working-tree scans and explicit read-only CI permissions. GitHub vulnerability alerts enabled; account-limited security features remain documented.

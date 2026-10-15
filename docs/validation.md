@@ -73,7 +73,7 @@ An off-design point is reported as converged only when the Newton residual norm 
 
 ## What is not validated
 
-Transients, control, heat soak, the secondary air system, missions, optimisation and uncertainty use the validated cycle but have no external reference; their models are documented in [methods.md](methods.md). The sub-idle regime (start-up) uses the sub-idle map extension, dynamic-head scaling of the fixed pressure losses below 50 % corrected flow and an explicit starter-only regime where no through-flow solution exists; a high-bypass turbofan start-up does not get past that regime with the generic maps. Weight, emissions, noise, temperature-only life and installation drag are heuristic estimates; the independent magnitude checks below do not establish engine-specific calibration. The commercial-engine catalogue reproduces published take-off ratings by construction; its internal temperatures and efficiencies are assumptions by generation.
+Transients, control, heat soak, the secondary air system, missions, optimisation and uncertainty use the validated cycle but have no external reference; their models are documented in [methods.md](methods.md). The sub-idle regime (start-up) uses the sub-idle map extension, dynamic-head scaling of the fixed pressure losses below 50 % corrected flow and an explicit starter-only regime where no through-flow solution exists; a high-bypass turbofan start-up does not get past that regime with the generic maps. Weight, emissions, noise, temperature-only life and installation drag are heuristic estimates; the independent magnitude checks below do not establish engine-specific calibration. The commercial-engine catalogue reproduces nominal preset ratings by construction; its internal temperatures and efficiencies are assumptions by generation.
 
 ## Engineering readiness pass (2026-10-15, local changes)
 
@@ -217,3 +217,11 @@ Portable-map tests carry a legacy custom ID containing spaces and Unicode throug
 Mission and Monte Carlo stale-banner checks supplement the existing optimiser stale-bound and transient provenance coverage. No UI redesign or new educational flow was introduced. Scientific calibration limits documented above remain unchanged: workflow correctness does not validate transient dynamics, aircraft performance or empirical estimates against engine-test data.
 
 Verification: 185 unit tests passed. The full browser suite passed 86 tests with four intentional duplicate PWA lifecycle skips; after the final legacy-ID and inherited-control corrections, all 12 affected map/release checks and all three operating-result export checks passed again. Each browser run rebuilt production assets with TypeScript checking. `git diff --check` passed.
+
+## Data-source reproducibility (2026-10-15)
+
+All 11 selected species and nine generic map tables exactly match the pinned upstream pyCycle source recorded in [pycycle-data-provenance.json](../reference/pycycle-data-provenance.json). Run `python3 reference/verify-pycycle-data.py /path/to/pyCycle` against that checkout to repeat the comparison without executing upstream code. This establishes equivalent source data; it does not recover the unknown original extraction date or expand cycle-validation coverage.
+
+The EASA workbook checksum and all 69 extracted cell values in the three-engine emissions reference are checked by `python3 reference/verify-emissions-reference.py /path/to/workbook.xlsx`. Reproduction terms and attribution are recorded in [third-party notices](../THIRD_PARTY_NOTICES.md).
+
+The [catalogue source ledger](../reference/catalogue-provenance.json) covers all 59 entries and distinguishes verified numeric fields, independent comparisons, and unresolved legacy inputs. Different emissions certification entries may report different BPR, OPR or thrust for the same model identifier. These require configuration/rating-basis review; they have not been silently substituted into the presets.
