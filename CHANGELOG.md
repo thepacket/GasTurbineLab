@@ -119,3 +119,8 @@ Following an external review of the transient/control implementation:
 - Add synchronized plot inspection with pointer, touch and keyboard support, shared x-axis zoom/reset, differentiated line styles and transient map-point highlighting.
 - Show absolute and relative comparison differences together, constrain table scrolling to the panel, improve light-theme contrast, focus states and control spacing, and visually distinguish stale results from warnings/errors.
 - Add compact progress and cancellation for mission, transient, optimisation, uncertainty and LTO analyses. Each analysis owns its worker; stopping one cannot terminate the live engine worker. Superseded sweeps stop instead of accumulating work.
+
+## CI browser reliability — 2026-10-15
+- Stop redundant WebGL drawing when the 3D model is static; scene changes and camera interaction still redraw, and rotation remains available.
+- Pause the real 3D scene during chart-specific browser tests so software rendering does not consume their interaction budget; assert actual hover inspection values.
+- Wait for transient completion before asserting final startup warnings. Add a rendering regression check and make CI fail on tests that only pass after retry.

@@ -2,7 +2,13 @@ import { test, expect, Page } from '@playwright/test';
 
 async function openView(page: Page, name: string) {
   const w = page.viewportSize()!.width;
-  if (w >= 1180 && name === 'Results') return;
+  if (w >= 1180 && name === 'Results') {
+    // Keep the real 3D scene mounted, but pause animation while testing charts.
+    // Software WebGL on CI otherwise competes with every browser interaction.
+    await page.getByRole('button', { name: 'Rotating', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Static', exact: true })).toBeVisible();
+    return;
+  }
   if (w < 760) {
     const direct = page.locator('nav.tabbar').getByRole('button', { name, exact: true });
     if (await direct.count()) await direct.click();
@@ -30,7 +36,8 @@ test('result plots render finite coordinates and hover values', async ({ page },
   const bad = await page.locator('.chart svg').evaluateAll(svgs => svgs.flatMap(svg => Array.from(svg.querySelectorAll('*')).flatMap(el => Array.from(el.attributes).filter(a => ['d', 'cx', 'cy', 'x', 'y', 'x1', 'x2', 'y1', 'y2'].includes(a.name) && /NaN|Infinity/.test(a.value)).map(a => a.value))));
   expect(bad).toEqual([]);
   await diagram.hover();
-  await expect(diagram.locator('text')).not.toHaveCount(0);
+  await expect(diagram.locator('.plot-inspection')).toBeVisible();
+  await expect(diagram.locator('.plot-inspection')).toContainText('Core');
   await diagram.screenshot({ path: `test-results/plot-ts-${info.project.name}.png` });
 });
 

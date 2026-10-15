@@ -157,6 +157,7 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
   const [spin, setSpin] = useState(true);
   const [orbit, setOrbit] = useState(false);
   const touch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
+  const needsRender = useRef(true);
   const nudge = (dir: 'left' | 'right' | 'up' | 'down' | 'in' | 'out') => {
     const st = sceneRef.current; if (!st) return;
     const c = st.controls, cam = st.camera;
@@ -167,6 +168,7 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
     if (dir === 'in') sph.radius *= 0.8; if (dir === 'out') sph.radius *= 1.25;
     cam.position.copy(c.target).add(new THREE.Vector3().setFromSpherical(sph));
     cam.lookAt(c.target);
+    needsRender.current = true;
   };
   const [hover, setHover] = useState<{ x: number; y: number; name: string; T: number; P: number } | null>(null);
   const sceneRef = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; engine?: THREE.Group; pickables: THREE.Object3D[]; rotors: THREE.Object3D[] } | null>(null);
@@ -192,15 +194,20 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
     const grid = new THREE.GridHelper(10, 20, 0x3a3d42, 0x26282c); grid.position.y = -1.0; scene.add(grid);
     const st = { renderer, scene, camera, controls, pickables: [] as THREE.Object3D[], rotors: [] as THREE.Object3D[] };
     sceneRef.current = st;
-    const resize = () => { const w = el.clientWidth, h = el.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+    const resize = () => { const w = el.clientWidth, h = el.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); needsRender.current = true; };
     const ro = new ResizeObserver(resize); ro.observe(el); resize();
     let raf = 0; const clock = new THREE.Clock();
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const dt = clock.getDelta();
       if (spinRef.current) for (const r of st.rotors) r.rotateX(dt * (r.userData.speed ?? 1.5));
-      controls.update();
-      renderer.render(scene, camera);
+      const cameraChanged = controls.update();
+      // A paused model should not continuously submit the same expensive frame.
+      // Keep OrbitControls damping responsive and redraw scene/size changes.
+      if (spinRef.current || cameraChanged || needsRender.current) {
+        renderer.render(scene, camera);
+        needsRender.current = false;
+      }
     };
     loop();
     return () => { cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); renderer.dispose(); };
@@ -209,6 +216,7 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
   // (re)build engine when result / cutaway changes
   useEffect(() => {
     const st = sceneRef.current; if (!st) return;
+    needsRender.current = true;
     const geo = buildGeometry(result);
     if (st.engine) { st.scene.remove(st.engine); st.engine.traverse((o: any) => { o.geometry?.dispose?.(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m: any) => m.dispose()); }); }
     const { group, pickables } = buildScene(geo, cutaway);
@@ -226,6 +234,7 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
 
   // selection highlight
   useEffect(() => {
+    needsRender.current = true;
     selRef.current = store.state.selected;
     const st = sceneRef.current; if (!st?.engine) return;
     st.engine.traverse((o: any) => {
@@ -268,7 +277,7 @@ export function Engine3D({ result, store }: { result: EngineResult; store: Store
         <span className="chip"><button className={cutaway ? 'on' : ''} onClick={() => setCutaway(!cutaway)}>{cutaway ? 'Cutaway' : 'Full casing'}</button></span>
         <span className="chip"><button className={spin ? 'on' : ''} onClick={() => setSpin(!spin)}>{spin ? 'Rotating' : 'Static'}</button></span>
         <span className="chip"><button className={orbit ? 'on' : ''} onClick={() => { const st = sceneRef.current; if (st) st.controls.autoRotate = !orbit; setOrbit(!orbit); }}>{orbit ? 'Orbiting' : 'Auto-orbit'}</button></span>
-        <span className="chip"><button onClick={() => { const st = sceneRef.current; if (st) { st.camera.userData.placed = false; st.camera.position.set(-3.4, 1.5, 4.8); st.controls.target.set(0, 0, 0); } }}>Reset view</button></span>
+        <span className="chip"><button onClick={() => { const st = sceneRef.current; if (st) { st.camera.userData.placed = false; st.camera.position.set(-3.4, 1.5, 4.8); st.controls.target.set(0, 0, 0); needsRender.current = true; } }}>Reset view</button></span>
         <span className="chip"><button onClick={() => { const c = ref.current; if (c) canvasToPng(c, 'gas-turbine-lab-3d.png'); }} aria-label="Export 3D view as PNG">PNG</button></span>
         {!touch && <span className="chip">drag to orbit · wheel / pinch to zoom · click a part</span>}
       </div>

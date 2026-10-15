@@ -87,9 +87,11 @@ Engine code must stay free of DOM and React imports so it runs unchanged in the 
 
 ## CI and dependencies
 
-GitHub Actions (`ci.yml`) runs type-check, unit tests, build, Chromium install and the Playwright suite on every push and pull request, and uploads screenshots. Dependabot opens weekly grouped npm PRs and monthly GitHub Actions PRs; merge them when CI is green.
+GitHub Actions (`ci.yml`) runs type-check, unit tests, build, Chromium install and the Playwright suite on every push and pull request, and uploads screenshots and failure traces. CI fails if any browser test needs a retry to pass. Dependabot opens weekly grouped npm PRs and monthly GitHub Actions PRs; merge them when CI is green.
 
 ## Deployment
+
+Deploy only a clean, pushed commit whose GitHub CI run has completed successfully. Local passes do not establish the remote CI result. Find the run for the exact commit with `gh run list --commit "$(git rev-parse HEAD)"`, inspect it with `gh run view RUN_ID`, and wait with `gh run watch RUN_ID --exit-status` if it is still running. Resolve failures and flaky retries before deployment.
 
 `fly deploy --build-arg GIT_SHA=$(git rev-parse --short HEAD)` builds the multi-stage `Dockerfile` (the hash appears in the header as the build version) (Node 22 build, nginx 1.27 runtime) and updates the single machine in region `yyz`. `deploy/nginx.conf` serves `index.html` for all routes, caches hashed assets for a year, and marks the service worker, manifest and HTML for revalidation. The service worker separately precaches the app for offline use; an old installed client may initially show its cached build. Verify the header version and the live bundle after deployment. Startup, visibility and reconnect checks request updates, with offline failures handled.
 
