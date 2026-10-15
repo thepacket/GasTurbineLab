@@ -8,7 +8,7 @@ import { MapCharts } from '../viz/MapChart';
 import { exportStationsCsv } from './csv';
 import { estimateWeight } from '../engine/weight';
 import { estimateNoise, LtoResult } from '../engine/certification';
-import { request } from '../engine/client';
+import { useAnalysisJob, AnalysisProgress } from './useAnalysisJob';
 import { useState } from 'react';
 import { Provenance } from './Provenance';
 import { useStale, StaleBanner } from './useStale';
@@ -191,11 +191,12 @@ function ValueRow({ k, v, units = 'SI' }: { k: string; v: number; units?: 'SI' |
 
 function Certification({ store, result }: { store: Store; result: EngineResult }) {
   const [lto, setLto] = useState<LtoResult | null>(null);
-  const [busy, setBusy] = useState(false);
+  const job = useAnalysisJob();
+  const busy = job.busy;
   const [err, setErr] = useState<string | null>(null);
   const stale = useStale(store.state.inputs);
   const noise = (() => { try { return estimateNoise(result); } catch { return null; } })();
-  const run = () => { setBusy(true); setErr(null); stale.snapshot(); request<LtoResult>({ type: 'lto', inputs: { ...store.state.inputs, chemistry: 'frozen' } }).then((r) => { setLto(r); setBusy(false); }).catch((e) => { setErr(e.message); setBusy(false); }); };
+  const run = () => { setErr(null); setLto(null); stale.snapshot(); job.run<LtoResult>({ type: 'lto', inputs: { ...store.state.inputs, chemistry: 'frozen' } }, undefined, setLto, setErr); };
   if (result.inputs.arch === 'turboprop') return null;
   return (
     <div className="section">
@@ -209,9 +210,9 @@ function Certification({ store, result }: { store: Store; result: EngineResult }
           {noise.notes.map((n, k) => <span key={k} style={{ gridColumn: '1 / -1', color: 'var(--text-muted)', fontSize: 12 }}>{n}</span>)}
         </div>
       )}
-      <div className="row"><button className="btn" onClick={run} disabled={busy}>{busy ? 'Running LTO cycle…' : 'Run ICAO LTO emissions cycle'}</button>{err && <span style={{ color: 'var(--bad)' }}>{err}</span>}</div>
+      <div className="row"><button className="btn" onClick={run} disabled={busy}>{busy ? 'Running LTO cycle…' : 'Run ICAO LTO emissions cycle'}</button>{busy && <AnalysisProgress cancel={job.cancel} />}{err && <span className="analysis-error" role="alert">{err}</span>}</div>
       {lto && (
-        <div style={{ opacity: stale.stale ? 0.5 : 1 }}>
+        <div>
           {!lto.applicable && <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Not applicable: this configuration is outside the supported scope of these Annex 16 limits. No compliance margin is reported.</div>}
           {!lto.complete && <div className="err" role="alert">Incomplete LTO cycle: totals and compliance margins are unavailable.</div>}
           {lto.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}

@@ -113,3 +113,9 @@ Following an external review of the transient/control implementation:
 - Pin and verify pyCycle numerical source data; verify the attributed EASA workbook extracts and record reproduction terms.
 - Inventory provenance for all catalogue presets, retain explicit unresolved fields, and check the inventory for drift in CI.
 - Add checksum-pinned Gitleaks history/working-tree scans and explicit read-only CI permissions. GitHub vulnerability alerts enabled; account-limited security features remain documented.
+
+## Interface refinement — 2026-10-15
+- Preserve panel structure and direct entry fields; no additional explanatory UI copy or numeric steppers.
+- Add synchronized plot inspection with pointer, touch and keyboard support, shared x-axis zoom/reset, differentiated line styles and transient map-point highlighting.
+- Show absolute and relative comparison differences together, constrain table scrolling to the panel, improve light-theme contrast, focus states and control spacing, and visually distinguish stale results from warnings/errors.
+- Add compact progress and cancellation for mission, transient, optimisation, uncertainty and LTO analyses. Each analysis owns its worker; stopping one cannot terminate the live engine worker. Superseded sweeps stop instead of accumulating work.

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { request, restart } from '../client';
+import { request, restart, isolatedRequest } from '../client';
 import { defaultInputs } from '../defaults';
 import { generateCompressorMap } from '../custommaps';
 
@@ -45,4 +45,38 @@ it('synchronises maps imported after worker creation before the next solve', asy
   expect(w.postMessage.mock.calls[2][0].type).toBe('lto');
   w.onmessage!({ data: { id: w.postMessage.mock.calls[2][0].id, ok: true, payload: 2 } });
   await expect(second).resolves.toBe(2);
+});
+
+it('cancels an isolated analysis without stopping the shared worker and ignores late progress', async () => {
+  vi.stubGlobal('Worker', FakeWorker);
+  const message = { type: 'lto' as const, inputs: defaultInputs('turbojet') };
+  const live = request(message);
+  const shared = FakeWorker.instances[0];
+  const controller = new AbortController();
+  const progress = vi.fn();
+  const analysis = isolatedRequest(message, controller.signal, progress);
+  const isolated = FakeWorker.instances[1];
+  const rejected = expect(analysis).rejects.toMatchObject({ name: 'AbortError' });
+  controller.abort();
+  await rejected;
+  expect(isolated.terminate).toHaveBeenCalledOnce();
+  expect(shared.terminate).not.toHaveBeenCalled();
+  isolated.onmessage!({ data: { id: 1, progress: 25 } });
+  expect(progress).not.toHaveBeenCalled();
+  shared.onmessage!({ data: { id: shared.postMessage.mock.calls[0][0].id, ok: true, payload: 'live' } });
+  await expect(live).resolves.toBe('live');
+});
+
+it('registers saved maps before an isolated analysis and terminates on completion', async () => {
+  vi.stubGlobal('Worker', FakeWorker);
+  vi.stubGlobal('localStorage', { getItem: () => JSON.stringify([{ id: 'custom:isolated', name: 'Isolated', kind: 'compressor', data: generateCompressorMap({ PRdes: 10, WcDes: 50 }) }]) });
+  const controller = new AbortController();
+  const analysis = isolatedRequest({ type: 'lto', inputs: defaultInputs('turbojet') }, controller.signal);
+  const w = FakeWorker.instances[0];
+  expect(w.postMessage.mock.calls.map(([m]) => m.type)).toEqual(['maps', 'lto']);
+  expect(w.postMessage.mock.calls[0][0].maps[0].id).toBe('custom:isolated');
+  w.onmessage!({ data: { id: 1, ok: true, payload: 'complete' } });
+  await expect(analysis).resolves.toBe('complete');
+  controller.abort();
+  expect(w.terminate).toHaveBeenCalledOnce();
 });

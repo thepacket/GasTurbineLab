@@ -85,3 +85,11 @@ Mission feasibility checks sampled thrust demand (2% tolerance), N1/N2/T4 rating
 Fuel is integrated with changing mass. An engine convergence failure stops integration and the warning identifies partial totals; other infeasible runs may evaluate the prescribed profile throughout, but those totals are not achievable flight fuel. The aircraft mass initializer is a rough pressure-scaled thrust or design-power estimate, not aircraft sizing. Fuel capacity, empty mass, reserves, stall and airbrakes are outside this model. Reset profile also restores the ratings for the current design. See the mission audit in `docs/validation.md` for reproducible sampling and mass checks.
 
 Saved-design cards now summarize the operating result being saved, including off-design T4; saving waits for a pending off-design calculation. Shared links and Gallery files preserve custom-map assignments even for older imports with spaces or accented filenames. The installed app checks for updates on each visit, when returning to the tab, and after reconnection; offline update failures do not prevent using the cached app.
+
+## Plot inspection and cancelling analyses
+
+Related line charts share an x-axis cursor and zoom range. Point or touch a chart to inspect a sample; with the chart focused, use Left/Right, Home or End. The compact +/−/reset buttons control the horizontal range; Escape clears inspection and resets the range. The transient compressor-map selection follows the same sample time and can also be inspected with the keyboard. Unsolved samples remain gaps.
+
+The comparison table displays the absolute A−B difference with the relative difference below it. The relative difference uses the magnitude of B as the denominator and is omitted when B is zero. Numeric entry fields remain directly editable without spinner buttons. On small screens, wide tables scroll inside the panel with their first column retained.
+
+While an analysis runs, the cross icon beside its progress indicator stops that run. Stopped partial results are cleared; rerun to obtain a completed result. Leaving an analysis view also stops its worker. The live engine calculation is independent. Progress is indeterminate for analyses without a reliable completion count; changing a budget or sample count during a run does not change the submitted run's progress scale.

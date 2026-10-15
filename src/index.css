@@ -176,3 +176,63 @@ svg.cross g[role="button"]:focus-visible > * { outline: 2px solid var(--accent);
 svg.cross g[role="button"]:focus { outline: none; }
 .brand .ver { font-family: var(--mono); font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
 @media (max-width: 759px) { .brand .ver { display: none; } }
+
+/* Inspection and density refinements: preserve the existing panels and text entry. */
+:root { --series-1: #5a9ce9; --series-2: #eb8054; --series-3: #3bb58b; --series-4: #dba626; }
+:root[data-theme="light"] {
+  --text-muted: #65645e;
+  --series-1: #2269b8; --series-2: #b8491d; --series-3: #137d58; --series-4: #906200;
+  --series-5: #b64070; --series-8: #c73737;
+  --good: #137d58; --warn: #906200; --bad: #c73737;
+}
+input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+button:disabled { cursor: default; opacity: .48; }
+button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.control .val { align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.control label { min-width: 0; }
+.explore-controls { gap: 10px 16px; }
+.explore-controls > label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; max-width: 100%; }
+.explore-controls select { max-width: 100%; min-width: 0; }
+.explore-controls input, .control .val input { min-height: 30px; }
+.charts { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.chart { min-width: 0; padding: 10px 10px 6px; }
+.chart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.chart-heading h4 { align-self: center; margin: 0; }
+.plot-tools { display: flex; gap: 3px; flex: none; }
+.plot-tools .iconbtn { width: 26px; height: 26px; border-radius: 5px; font-size: 17px; }
+.chart svg { touch-action: pan-y; }
+.chart svg:focus-visible { outline-offset: 1px; border-radius: 3px; }
+.legendrow { gap: 5px 14px; line-height: 1.5; }
+.legendrow > span { overflow-wrap: anywhere; }
+.legendrow i.line-swatch { width: 19px; height: 0; border-top-width: 2px; border-radius: 0; vertical-align: 3px; }
+.analysis-progress { display: inline-flex; align-items: center; gap: 8px; }
+.analysis-progress progress { width: 80px; height: 5px; accent-color: var(--accent); }
+.analysis-progress .iconbtn { width: 30px; height: 30px; }
+.analysis-progress svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.analysis-error { color: var(--bad); border-left: 3px solid var(--bad); padding-left: 8px; }
+.warn, .err { border-left-width: 3px; }
+.warn.stale-result { background: color-mix(in oklab, var(--accent) 10%, transparent); border-color: var(--accent); border-left-style: dashed; }
+.prov { line-height: 1.6; white-space: nowrap; }
+.table-scroll { overflow-x: auto; max-width: 100%; overscroll-behavior-x: contain; }
+.table-scroll table.stations th:first-child, .table-scroll table.stations td:first-child { position: sticky; left: 0; background: var(--surface-1); z-index: 1; }
+.table-scroll table.stations th:first-child { z-index: 2; }
+.compare-table th:nth-child(2) { border-bottom: 2px solid var(--series-1); }
+.compare-table th:nth-child(3) { border-bottom: 2px solid var(--series-2); }
+.compare-delta small { display: block; color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+@media (max-width: 759px) {
+  .charts { padding: 10px 8px; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+  .chart { padding: 10px 6px 6px; }
+  .plot-tools .iconbtn { width: 30px; height: 30px; }
+  .explore-controls { gap: 10px 12px; }
+  .control { column-gap: 6px; }
+  .control .val { gap: 3px; }
+  .control .val input { max-width: 74px; }
+  .section h3 { flex-wrap: wrap; }
+  .prov { font-size: 9px; padding: 1px 5px; }
+}
+.main.phone > .pane, .main.tablet > .pane { grid-template-columns: minmax(0, 1fr); }
+.pane > div { min-width: 0; }
+.explore-controls > label { min-width: 0; }
+
+.sampling-run { min-width: 20ch; font-variant-numeric: tabular-nums; }

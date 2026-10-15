@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { usePlotGroup } from './PlotGroup';
 import { EngineInputs, EngineResult } from '../engine/types';
 import { makeDesignPoint } from '../engine/offdesign';
 import { correctedFlow } from '../engine/maps';
@@ -66,6 +67,7 @@ function OneMap({ name, map, sc, status, op, des }: { name: string; map: any; sc
 
 /** Transient trajectory drawn on the first compressor map (HPC or the single compressor). */
 export function MapTrajectory({ design, samples }: { design: EngineInputs; samples: TransientSample[] }) {
+  const group = usePlotGroup();
   const dp = useMemo(() => { try { return makeDesignPoint(design); } catch { return null; } }, [design]);
   if (!dp || samples.length < 2) return null;
   const id = dp.comps.hpc ? 'hpc' : dp.comps.comp ? 'comp' : Object.keys(dp.comps)[0];
@@ -78,6 +80,8 @@ export function MapTrajectory({ design, samples }: { design: EngineInputs; sampl
   // samples without a gas-path solution (starter-only regime) carry no map point
   const traj = samples.map(s => s.gasPath !== false && s.converged && Number.isFinite(s.Wc?.[id]) && Number.isFinite(s.PR?.[id]) ? { Wc: s.Wc[id], PR: s.PR[id] } : { Wc: NaN, PR: NaN });
   const valid = traj.filter(p => Number.isFinite(p.Wc) && Number.isFinite(p.PR));
+  const selectedIndex = group?.cursor?.axis === 'time (s)' ? samples.findIndex(s => s.t === group.cursor!.x) : -1;
+  const selected = selectedIndex >= 0 && Number.isFinite(traj[selectedIndex].Wc) && Number.isFinite(traj[selectedIndex].PR) ? traj[selectedIndex] : null;
   if (!valid.length) return <div className="chart"><h4>{id.toUpperCase()} running line during the transient</h4><div className="sub">no converged gas-path map points to plot</div></div>;
   const [xmin, xmax, ymin, ymax] = mapBounds([...lines.flat(), ...stall, ...valid]);
   const sx = (v: number) => m.l + ((v - xmin) / (xmax - xmin)) * (W - m.l - m.r);
@@ -87,7 +91,23 @@ export function MapTrajectory({ design, samples }: { design: EngineInputs; sampl
     <div className="chart">
       <h4>{id.toUpperCase()} running line during the transient</h4>
       <div className="sub">operating point trajectory on the reference map · first valid ○ last valid ● · gaps omit unsolved samples</div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="transient trajectory on compressor map">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="transient trajectory on compressor map" tabIndex={0}
+        onKeyDown={event => {
+          if (event.key === 'Escape') { group?.setCursor(null); group?.setWindow(null); return; }
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const indices = traj.flatMap((p, i) => Number.isFinite(p.Wc) && Number.isFinite(p.PR) ? [i] : []);
+          const at = indices.indexOf(selectedIndex);
+          const index = event.key === 'Home' ? indices[0] : event.key === 'End' ? indices.at(-1)! : indices[Math.max(0, Math.min(indices.length - 1, at + (event.key === 'ArrowLeft' ? -1 : 1)))];
+          group?.setCursor({ axis: 'time (s)', x: samples[index].t });
+        }}
+        onPointerMove={event => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          const x = (event.clientX - bounds.left) / bounds.width * W, y = (event.clientY - bounds.top) / bounds.height * H;
+          let index = -1, distance = Infinity;
+          traj.forEach((p, i) => { const d = (sx(p.Wc) - x) ** 2 + (sy(p.PR) - y) ** 2; if (d < distance) { index = i; distance = d; } });
+          if (index >= 0) group?.setCursor({ axis: 'time (s)', x: samples[index].t });
+        }} onPointerLeave={e => { if (e.pointerType === 'mouse' && !document.activeElement?.matches('.chart svg')) group?.setCursor(null); }} onBlur={() => group?.setCursor(null)}>
         {Array.from({ length: 6 }, (_, i) => xmin + (xmax - xmin) * i / 5).map(v => <text key={v} x={sx(v)} y={H - m.b + 13} textAnchor="middle">{fmt(v, 1)}</text>)}
         {Array.from({ length: 6 }, (_, i) => ymin + (ymax - ymin) * i / 5).map(v => <text key={v} x={m.l - 5} y={sy(v) + 3.5} textAnchor="end">{fmt(v, 1)}</text>)}
         <g className="axis"><line x1={m.l} x2={W - m.r} y1={H - m.b} y2={H - m.b} /><line x1={m.l} x2={m.l} y1={m.t} y2={H - m.b} /></g>
@@ -98,6 +118,7 @@ export function MapTrajectory({ design, samples }: { design: EngineInputs; sampl
         <path d={path(traj)} fill="none" stroke="var(--series-2)" strokeWidth={2.5} strokeLinejoin="round" />
         <circle cx={sx(valid[0].Wc)} cy={sy(valid[0].PR)} r={5} fill="var(--surface-2)" stroke="var(--series-2)" strokeWidth={2} />
         <circle cx={sx(valid[valid.length - 1].Wc)} cy={sy(valid[valid.length - 1].PR)} r={5} fill="var(--series-2)" stroke="var(--surface-2)" strokeWidth={2} />
+        {selected && <circle className="map-selection" data-time={samples[selectedIndex].t} cx={sx(selected.Wc)} cy={sy(selected.PR)} r={7} fill="var(--surface-2)" stroke="var(--text-primary)" strokeWidth={2.5} pointerEvents="none" />}
       </svg>
       <div className="legendrow"><span><i style={{ background: 'var(--series-1)' }} />speed lines</span><span><i style={{ background: 'var(--bad)' }} />stall line</span><span><i style={{ background: 'var(--series-2)' }} />trajectory</span></div>
     </div>

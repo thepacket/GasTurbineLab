@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Store } from '../state/store';
 import { useStale, StaleBanner } from './useStale';
 import { Provenance } from './Provenance';
-import { request } from '../engine/client';
+import { useAnalysisJob, AnalysisProgress } from './useAnalysisJob';
 import { UNCERTAIN, MonteCarloResult } from '../engine/montecarlo';
 import { extent, niceAxis, axisLabels } from '../viz/plotData';
 import { fmt } from './format';
@@ -42,17 +42,18 @@ export function UncertaintyView({ store }: { store: Store }) {
   const [on, setOn] = useState<string[]>(() => avail.map((u) => u.path));
   const [samples, setSamples] = useState(400);
   const [res, setRes] = useState<MonteCarloResult | null>(null);
-  const [busy, setBusy] = useState<number | null>(null);
+  const job = useAnalysisJob();
+  const busy = job.busy;
+  const [completed, setCompleted] = useState(0);
+  const [runSamples, setRunSamples] = useState(samples);
   const stale = useStale({ inputs, on, sigmas, samples });
   const [error, setError] = useState<string | null>(null);
   const run = () => {
-    setBusy(0); setError(null); setRes(null); stale.snapshot();
-    request<MonteCarloResult>({ type: 'montecarlo', inputs, mc: { inputs: avail.filter((u) => on.includes(u.path)).map((u) => ({ ...u, sigma: sigmas[u.path] ?? u.sigma })), samples, seed: 12345 } }, (k: number) => setBusy(k))
-      .then((r) => { setRes(r); setBusy(null); })
-      .catch((e) => { setError(e.message); setBusy(null); });
+    setCompleted(0); setRunSamples(samples); setError(null); setRes(null); stale.snapshot();
+    job.run<MonteCarloResult>({ type: 'montecarlo', inputs, mc: { inputs: avail.filter((u) => on.includes(u.path)).map((u) => ({ ...u, sigma: sigmas[u.path] ?? u.sigma })), samples, seed: 12345 } }, (k: number) => setCompleted(k), r => setRes(r), setError);
   };
   return (
-    <div>
+    <div aria-busy={busy}>
       <div className="prose">
         <h2>Uncertainty <Provenance level="model" style={{ marginLeft: 8 }} /></h2>
         <p>Monte Carlo propagation: each selected input is perturbed with an independent normal deviation of the given standard deviation, truncated to its physical bounds (draws outside the bounds are redrawn and counted), the design point is re-solved (frozen chemistry) and the distributions of thrust, TSFC, fuel flow, T3 and thermal efficiency are collected. Samples whose solve fails or returns non-finite values are excluded and counted separately. One-at-a-time +1σ sensitivities are listed below the histograms.</p>
@@ -69,8 +70,9 @@ export function UncertaintyView({ store }: { store: Store }) {
       </div>
       <div className="explore-controls">
         <label>samples <input className="num" type="number" aria-label="Samples" style={{ width: 70 }} value={samples} step={100} onChange={(e) => setSamples(+e.target.value)} /></label>
-        <button className="btn primary" onClick={run} disabled={busy !== null}>{busy !== null ? `Sampling… ${busy}/${samples}` : 'Run Monte Carlo'}</button>
-        {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
+        <button className="btn primary sampling-run" onClick={run} disabled={busy}>{busy ? `Sampling… ${completed}/${runSamples}` : 'Run Monte Carlo'}</button>
+        {busy && <AnalysisProgress value={completed} max={runSamples} cancel={() => { job.cancel(); setRes(null); }} />}
+        {error && <span className="analysis-error" role="alert">{error}</span>}
       </div>
       {res && stale.stale && <StaleBanner what="Monte Carlo run" />}
       {res && (
@@ -88,8 +90,8 @@ export function UncertaintyView({ store }: { store: Store }) {
           </div>
           <div className="section">
             <h3>One-at-a-time sensitivities <span className="hint">+1σ, clipped to the physical bound where it would exceed it</span></h3>
-            <table className="stations"><thead><tr><th>Input</th><th>Perturbation applied</th><th>Δ thrust</th><th>Δ TSFC</th></tr></thead>
-              <tbody>{res.sensitivity.map((s) => <tr key={s.label}><td>{s.label}</td><td className="num">{s.delta >= 0 ? '+' : ''}{fmt(s.delta, 4)}{s.bounded ? ' (bounded)' : ''}</td><td className="num">{fmt(s.dFn_pct, 2)} %</td><td className="num">{fmt(s.dTSFC_pct, 2)} %</td></tr>)}</tbody></table>
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="Sensitivities"><table className="stations"><thead><tr><th>Input</th><th>Perturbation applied</th><th>Δ thrust</th><th>Δ TSFC</th></tr></thead>
+              <tbody>{res.sensitivity.map((s) => <tr key={s.label}><td>{s.label}</td><td className="num">{s.delta >= 0 ? '+' : ''}{fmt(s.delta, 4)}{s.bounded ? ' (bounded)' : ''}</td><td className="num">{fmt(s.dFn_pct, 2)} %</td><td className="num">{fmt(s.dTSFC_pct, 2)} %</td></tr>)}</tbody></table></div>
           </div>
         </>
       )}

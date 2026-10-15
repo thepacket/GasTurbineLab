@@ -72,3 +72,67 @@ test('off-design family plots identify every family in speed and surge series', 
   const surge = page.locator('.chart').filter({ has: page.getByRole('heading', { name: 'Compressor surge margins', exact: true }) });
   await expect(surge.locator('.legendrow')).toContainText('Altitude 15,000.00 m');
 });
+
+test('station charts share keyboard inspection and zoom can be reset', async ({ page }) => {
+  await openView(page, 'Results');
+  const pressure = page.getByRole('img', { name: 'Total pressure through the engine', exact: true });
+  const temperature = page.getByRole('img', { name: 'Total temperature through the engine', exact: true });
+  await pressure.focus();
+  await pressure.press('Home');
+  await pressure.press('ArrowRight');
+  await expect(pressure.locator('.plot-inspection')).toHaveAttribute('data-x', '1');
+  await expect(temperature.locator('.plot-inspection')).toHaveAttribute('data-x', '1');
+  const path = pressure.locator('path[stroke]').first();
+  const original = await path.getAttribute('d');
+  await page.getByRole('button', { name: 'Zoom in Total pressure through the engine', exact: true }).click();
+  await expect(path).not.toHaveAttribute('d', original!);
+  await expect(page.getByRole('button', { name: 'Reset zoom Total temperature through the engine', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Reset zoom Total pressure through the engine', exact: true }).click();
+  await expect(path).toHaveAttribute('d', original!);
+});
+
+test('sampling can be cancelled and restarted without showing a late result', async ({ page }) => {
+  await openView(page, 'Uncertainty');
+  const samples = page.getByLabel('Samples', { exact: true });
+  await samples.fill('5000');
+  await page.getByRole('button', { name: 'Run Monte Carlo', exact: true }).click();
+  await expect(page.getByRole('progressbar', { name: 'Analysis progress' })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel analysis', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Run Monte Carlo', exact: true })).toBeEnabled();
+  await expect(page.getByRole('progressbar', { name: 'Analysis progress' })).toHaveCount(0);
+  await expect(page.getByRole('img', { name: 'Net thrust', exact: true })).toHaveCount(0);
+  await samples.fill('20');
+  await page.getByRole('button', { name: 'Run Monte Carlo', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Net thrust', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Run Monte Carlo', exact: true })).toBeEnabled();
+  await expect(page.locator('.analysis-error')).toHaveCount(0);
+});
+
+test('comparison keeps absolute and percentage differences readable in both themes', async ({ page }, info) => {
+  await openView(page, 'Compare');
+  await page.getByRole('button', { name: 'Pin current design as B', exact: true }).click();
+  const table = page.getByRole('region', { name: 'Design comparison' });
+  const delta = table.getByRole('row').filter({ hasText: 'Net thrust (kN)' }).locator('td').last();
+  await expect(delta.locator('small')).toContainText('0.0 %');
+  await expect(delta).toContainText('0.00');
+  await expect(table).toBeVisible();
+  expect(await table.evaluate(el => el.getBoundingClientRect().width <= el.closest('.pane')!.getBoundingClientRect().width)).toBe(true);
+  await table.screenshot({ path: `test-results/refined-compare-${info.project.name}.png` });
+  await page.getByRole('button', { name: 'Toggle colour theme' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(delta.locator('small')).toContainText('0.0 %');
+  await table.screenshot({ path: `test-results/refined-compare-light-${info.project.name}.png` });
+});
+
+
+test('transient map keyboard inspection selects the same time on related charts', async ({ page }) => {
+  await openView(page, 'Transient');
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeEnabled();
+  const map = page.getByRole('img', { name: 'transient trajectory on compressor map', exact: true });
+  await map.focus();
+  await map.press('Home');
+  await map.press('ArrowRight');
+  const selected = await map.locator('.map-selection').getAttribute('data-time');
+  expect(selected).not.toBeNull();
+  await expect(page.getByRole('img', { name: 'Spool speeds', exact: true }).locator('.plot-inspection')).toHaveAttribute('data-x', selected!);
+});

@@ -51,3 +51,30 @@ export function request<T>(msg: Req, onProgress?: (p: any) => void): Promise<T> 
 }
 /** Cancel all outstanding requests by restarting the worker (used when inputs change rapidly). */
 export function restart() { if (worker) { worker.terminate(); worker = null; } for (const p of pending.values()) p.reject(new Error('cancelled')); pending.clear(); }
+
+export type RequestMessage = Req;
+/** Isolated analyses can be stopped even while a synchronous solver occupies their worker. */
+export function isolatedRequest<T>(msg: Req, signal: AbortSignal, onProgress?: (p: any) => void): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) { reject(new DOMException('Cancelled', 'AbortError')); return; }
+    const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+    let settled = false;
+    const cleanup = () => { settled = true; signal.removeEventListener('abort', abort); w.terminate(); };
+    const fail = (error: Error) => { if (settled) return; cleanup(); reject(error); };
+    const abort = () => fail(new DOMException('Cancelled', 'AbortError'));
+    signal.addEventListener('abort', abort, { once: true });
+    w.onerror = event => fail(new Error(event.message || 'Engine worker failed. Please retry.'));
+    w.onmessageerror = () => fail(new Error('Engine worker response could not be decoded. Please retry.'));
+    w.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      if (settled || event.data.id !== 1) return;
+      if ('progress' in event.data) { onProgress?.(event.data.progress); return; }
+      cleanup();
+      if (event.data.ok) resolve(event.data.payload as T); else reject(new Error(event.data.error));
+    };
+    try {
+      const maps = loadCustomMaps().map(({ id, kind, data }) => ({ id, kind, data }));
+      if (maps.length) w.postMessage({ id: 0, type: 'maps', maps } satisfies WorkerRequest);
+      w.postMessage({ ...msg, id: 1 } as WorkerRequest);
+    } catch (e) { fail(e instanceof Error ? e : new Error(String(e))); }
+  });
+}

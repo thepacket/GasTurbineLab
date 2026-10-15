@@ -1,8 +1,9 @@
+import { PlotGroup } from '../viz/PlotGroup';
 import { useState } from 'react';
 import { Store } from '../state/store';
 import { useStale, StaleBanner } from './useStale';
 import { Provenance } from './Provenance';
-import { request } from '../engine/client';
+import { useAnalysisJob, AnalysisProgress } from './useAnalysisJob';
 import { MissionResult, MissionPoint, Segment, Aircraft, defaultMission, Ratings, scaledAircraftMass } from '../engine/mission';
 import { isa } from '../engine/atmosphere';
 import { LineChart } from '../viz/charts';
@@ -20,23 +21,22 @@ export function MissionView({ store }: { store: Store }) {
   const [ratings, setRatings] = useState<Ratings>({ NLPmax: 1.04, NHPmax: 1.02, T4max_K: inputs.burner.T4_K });
   const [pts, setPts] = useState<MissionPoint[]>([]);
   const [res, setRes] = useState<MissionResult | null>(null);
-  const [busy, setBusy] = useState(false);
+  const job = useAnalysisJob();
+  const busy = job.busy;
   const stale = useStale({ inputs, ac, segs, ratings, od: store.state.od });
   const [error, setError] = useState<string | null>(null);
   const u = U(store.state.units);
   const [runArch, setRunArch] = useState(inputs.arch);
   const run = () => {
     setRunArch(inputs.arch);
-    setBusy(true); setError(null); setRes(null); setPts([]); stale.snapshot();
-    request<MissionResult>({ type: 'mission', inputs: { ...inputs, chemistry: 'frozen' }, mi: { aircraft: ac, segments: segs, od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, pointsPerSegment: 8, ratings } }, (p: MissionPoint[]) => setPts(p))
-      .then((r) => { setRes(r); setPts(r.points); setBusy(false); })
-      .catch((e) => { setError(e.message); setBusy(false); });
+    setError(null); setRes(null); setPts([]); stale.snapshot();
+    job.run<MissionResult>({ type: 'mission', inputs: { ...inputs, chemistry: 'frozen' }, mi: { aircraft: ac, segments: segs, od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, pointsPerSegment: 8, ratings } }, (p: MissionPoint[]) => setPts(p), (r) => { setRes(r); setPts(r.points); }, setError);
   };
   const setSeg = (i: number, patch: Partial<Segment>) => setSegs(segs.map((s, k) => (k === i ? { ...s, ...patch } : s)));
   const num = (v: number, on: (x: number) => void, w = 70, step = 1, label = '') => <input className="num" type="number" aria-label={label} style={{ width: w }} value={v} step={step} onChange={(e) => on(+e.target.value)} />;
   const unit = (kind: Segment['kind']) => (kind === 'cruise' ? 'km' : kind === 'climb' || kind === 'descent' ? 'm/s' : 's');
   return (
-    <div>
+    <div aria-busy={busy}>
       <div className="explore-controls">
         <strong>Mission <Provenance level="model" /></strong>
         <strong>Aircraft</strong>
@@ -51,12 +51,13 @@ export function MissionView({ store }: { store: Store }) {
         <label>N2 max {num(ratings.NHPmax, (v) => setRatings({ ...ratings, NHPmax: v }), 60, 0.01, 'N2 limit')}</label>
         <label>T4 max {num(ratings.T4max_K, (v) => setRatings({ ...ratings, T4max_K: v }), 70, 10, 'T4 limit')} K</label>
         <button className="btn primary" onClick={run} disabled={busy}>{busy ? 'Flying…' : 'Fly mission'}</button>
+        {busy && <AnalysisProgress cancel={() => { job.cancel(); setPts([]); setRes(null); }} />}
         <button className="btn" onClick={() => { const d = defaultMission(inputs.arch); setAc(initialAircraft()); setSegs(d.segments); setRatings({ NLPmax: 1.04, NHPmax: 1.02, T4max_K: inputs.burner.T4_K }); }}>Reset profile</button>
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{inputs.arch === 'turboprop' ? 'Aircraft mass is a rough design-power loading estimate (0.17 kW/kg).' : 'Aircraft mass is a rough estimate using pressure-scaled thrust and a nominal thrust/weight ratio of 0.28.'}</span>
-        {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
+        {error && <span className="analysis-error" role="alert">{error}</span>}
       </div>
       <div className="section" style={{ padding: '8px 14px' }}>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="Mission table">
         <table className="stations">
           <thead><tr><th>Segment</th><th>Kind</th><th>Alt start (m)</th><th>Alt end (m)</th><th>Mach</th><th>Value</th><th>T4 fraction</th><th></th></tr></thead>
           <tbody>
@@ -91,19 +92,19 @@ export function MissionView({ store }: { store: Store }) {
         </div>
       )}
       {pts.length > 1 && (
-        <div className="charts">
+        <PlotGroup resetKey={pts}>
           <LineChart title="Altitude profile" series={[{ name: 'altitude', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.alt_m })) }]} xLabel="time (min)" yLabel="m" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
           <LineChart title="Thrust per engine" sub="required vs delivered; unconverged engine points shown as gaps" series={[{ name: 'required', color: 'var(--series-2)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.FnReq / 1000 })) }, { name: 'delivered', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.Fn / 1000 : NaN })) }]} xLabel="time (min)" yLabel="kN" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
           <LineChart title="Fuel flow (all engines)" series={[{ name: 'fuel flow', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.Wf : NaN })) }]} xLabel="time (min)" yLabel="kg/s" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />
           <LineChart title="Aircraft mass" series={[{ name: 'mass', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.mass_kg / 1000 })) }]} xLabel="time (min)" yLabel="t" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 1)} />
           <LineChart title="Spool speeds" series={[{ name: 'N2 (HP)', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.NHPpct : NaN })) }, ...(runArch === 'turbofan' ? [{ name: 'N1 (LP)', color: 'var(--series-2)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.NLPpct : NaN })) }] : [])]} xLabel="time (min)" yLabel="% design" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
           <LineChart title="TSFC" series={[{ name: 'TSFC', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.TSFC : NaN })) }]} xLabel="time (min)" yLabel="mg/(N·s)" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 1)} />
-        </div>
+        </PlotGroup>
       )}
       {pts.length > 1 && (
         <div className="section" style={{ padding: 0 }}>
           <h3 style={{ padding: '12px 14px 0' }}>Mission points</h3>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="Mission table">
             <table className="stations">
               <thead><tr><th>Segment</th><th>t (min)</th><th>dist (km)</th><th>alt ({u.altitude(0).u})</th><th>M</th><th>mass (t)</th><th>Fn req (kN)</th><th>Fn (kN)</th><th>Wf (kg/s)</th><th>T4 (K)</th><th>N2 %</th><th>limit</th></tr></thead>
               <tbody>{pts.map((p, k) => <tr key={k} style={{ color: p.converged ? undefined : 'var(--bad)' }}><td>{p.segment}</td><td className="num">{fmt(p.t_s / 60, 1)}</td><td className="num">{fmt(p.dist_km, 0)}</td><td className="num">{u.altitude(p.alt_m).v}</td><td className="num">{fmt(p.mach, 2)}</td><td className="num">{fmt(p.mass_kg / 1000, 1)}</td><td className="num">{fmt(p.FnReq / 1000, 1)}</td><td className="num">{fmt(p.Fn / 1000, 1)}</td><td className="num">{fmt(p.Wf, 3)}</td><td className="num">{fmt(p.T4, 0)}</td><td className="num">{fmt(p.NHPpct, 1)}</td><td>{p.limited ?? ''}</td></tr>)}</tbody>

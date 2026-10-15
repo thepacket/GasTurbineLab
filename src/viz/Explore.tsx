@@ -1,7 +1,8 @@
+import { PlotGroup } from './PlotGroup';
 import { useEffect, useMemo, useState } from 'react';
 import { EngineInputs } from '../engine/types';
 import { OffDesignInputs } from '../engine/offdesign';
-import { request } from '../engine/client';
+import { isolatedRequest } from '../engine/client';
 import { LineChart, Series } from './charts';
 import { fmt } from '../ui/format';
 import { exportSweepCsv } from '../ui/csv';
@@ -56,17 +57,18 @@ export function Explore({ inputs, od, initialMode }: { inputs: EngineInputs; od:
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     setBusy(true); setError(null);
     const inp = { ...inputs, chemistry: chem };
     const odBase: OffDesignInputs = { ...od, throttle: { ...od.throttle } };
     if (mode === 'offdesign' && (param.path === 'throttle.value' || param2?.path === 'throttle.value')) odBase.throttle = { mode: 'T4', value: inputs.burner.T4_K };
     if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi <= lo) { setError('Sweep bounds must be finite with the upper bound greater than the lower bound.'); setBusy(false); return; }
     const t = setTimeout(() => {
-      request<{ level: number | null; pts: SweepPoint[] }[]>({ type: 'sweep', inputs: inp, mode, od: odBase, param: param.path, values, families: param2 && famValues ? { param: param2.path, values: famValues } : undefined })
+      isolatedRequest<{ level: number | null; pts: SweepPoint[] }[]>({ type: 'sweep', inputs: inp, mode, od: odBase, param: param.path, values, families: param2 && famValues ? { param: param2.path, values: famValues } : undefined }, controller.signal)
         .then((d) => { if (!cancelled) { setData(d); setDataKey(key); setBusy(false); } })
         .catch((e) => { if (!cancelled) { setError(e.message); setBusy(false); } });
     }, 150);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => { cancelled = true; controller.abort(); clearTimeout(t); };
   }, [inputs, od, mode, param, param2, values, famValues, chem, key, lo, hi]);
 
   const colors = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)'];
@@ -97,7 +99,7 @@ export function Explore({ inputs, od, initialMode }: { inputs: EngineInputs; od:
         {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
         <button className="btn" disabled={!data} onClick={() => { const keys = ['Fn', 'TSFC', 'spec', 'eth', 'eo', 'Wf', 'OPR', 'T4', 'T5', 'W', 'BPR', 'shp', 'psfc']; const ser = (data ?? []).flatMap((d) => keys.map((k) => ({ name: `${k}${d.level !== null && param2 ? ` @ ${param2.label}=${fmt(d.level * (param2.scale ?? 1), 2)}` : ''}`, points: d.pts.map((p) => ({ x: p.x * sc, y: p.r && !p.r.bad ? p.r[k] : NaN })) }))); exportSweepCsv(xl, ser, ser.map((x) => x.name)); }}>Export CSV</button>
       </div>
-      <div className="charts" style={{ opacity: busy ? 0.6 : 1 }}>
+      <PlotGroup resetKey={data} style={{ opacity: busy ? 0.6 : 1 }}>
         {tp ? (
           <>
             <LineChart title="Shaft power" sub="delivered at the power-turbine shaft" series={mk((r) => r.shp / 1000, 'shaft power')} xLabel={xl} yLabel="kW" xFmt={xf} yFmt={(v) => fmt(v, 0)} />
@@ -123,7 +125,7 @@ export function Explore({ inputs, od, initialMode }: { inputs: EngineInputs; od:
             <LineChart title="Turbine inlet temperature" series={mk((r) => r.T4, 'T4')} xLabel={xl} yLabel="K" xFmt={xf} yFmt={(v) => fmt(v, 0)} />
           </>
         )}
-      </div>
+      </PlotGroup>
     </div>
   );
 }

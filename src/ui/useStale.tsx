@@ -9,5 +9,5 @@ export function useStale(key: unknown) {
   return { stale: taken !== null && taken !== current, snapshot: () => setTaken(current), has: taken !== null };
 }
 export function StaleBanner({ what }: { what: string }) {
-  return <div className="warn"><span>⚠</span><span>The design or operating point has changed since this {what} was computed. The results below belong to the previous inputs; run it again to refresh.</span></div>;
+  return <div className="warn stale-result" role="status"><span>⚠</span><span>The design or operating point has changed since this {what} was computed. The results below belong to the previous inputs; run it again to refresh.</span></div>;
 }

@@ -1,8 +1,9 @@
+import { PlotGroup } from '../viz/PlotGroup';
 import { useEffect, useState } from 'react';
 import { Store } from '../state/store';
 import { useStale, StaleBanner } from './useStale';
 import { Provenance } from './Provenance';
-import { request } from '../engine/client';
+import { useAnalysisJob, AnalysisProgress } from './useAnalysisJob';
 import { TransientResult, TransientSample, FuelSchedule, StartInputs, Controller, DEFAULT_CONTROLLER, ThermalInputs, DEFAULT_THERMAL } from '../engine/transient';
 import { LineChart, Series } from '../viz/charts';
 import { fmt } from './format';
@@ -19,16 +20,15 @@ export function TransientView({ store }: { store: Store }) {
   const [start, setStart] = useState<StartInputs>({ enabled: false, starterTorque_Nm: Math.round(inputs.inertia.HP * 60), starterCutout: 0.45, lightOffSpeed: 0.18, lightOffT3min_K: 290, lightOffFuelFrac: 0.06, frictionPower_W: Math.round(inputs.flight.W_kgs * 150) });
   const [samples, setSamples] = useState<TransientSample[]>([]);
   const [result, setResult] = useState<TransientResult | null>(null);
-  const [busy, setBusy] = useState(false);
+  const job = useAnalysisJob();
+  const busy = job.busy;
   const stale = useStale({ inputs, sch, duration, start, ctl, th, od: store.state.od });
   const [error, setError] = useState<string | null>(null);
   const [runContext, setRunContext] = useState({ inputs, ctl, th, start, duration });
   const run = () => {
     setRunContext({ inputs: { ...inputs, chemistry: 'frozen' }, ctl, th, start, duration });
-    setBusy(true); setError(null); setResult(null); setSamples([]); stale.snapshot();
-    request<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start, controller: ctl, thermal: th } }, (p: TransientSample[]) => setSamples(p))
-      .then((r) => { setResult(r); setSamples(r.samples); setBusy(false); })
-      .catch((e) => { setError(e.message); setBusy(false); });
+    setError(null); setResult(null); setSamples([]); stale.snapshot();
+    job.run<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start, controller: ctl, thermal: th } }, (p: TransientSample[]) => setSamples(p), (r) => { setResult(r); setSamples(r.samples); }, setError);
   };
   useEffect(() => { /* auto-run once on mount */ run(); /* eslint-disable-next-line */ }, []);
   const colors = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
@@ -42,7 +42,7 @@ export function TransientView({ store }: { store: Store }) {
   const starterOnly = samples.filter((x) => !x.gasPath);
   const unconverged = samples.filter((x) => x.gasPath && !x.converged).length;
   return (
-    <div>
+    <div aria-busy={busy}>
       <div className="explore-controls">
         <strong>Transient <Provenance level="model" /></strong>
         <label>Start T4 <input className="num" type="number" aria-label="Start T4" style={{ width: 80 }} value={sch.T4start} step={10} onChange={(e) => Set('T4start', +e.target.value)} /> K</label>
@@ -63,8 +63,9 @@ export function TransientView({ store }: { store: Store }) {
           </>
         )}
         <button className="btn primary" onClick={run} disabled={busy}>{busy ? 'Integrating…' : 'Run'}</button>
+        {busy && <AnalysisProgress value={samples.at(-1)?.t ?? 0} max={runContext.duration} cancel={() => { job.cancel(); setSamples([]); setResult(null); }} />}
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Spool inertias: {Object.entries(inputs.inertia).filter(([k, v]) => v > 0 && (inputs.speeds as any)[k] > 0).map(([k, v]) => `${k} ${v} kg·m²`).join(', ')} (Build → Inertia). Operating point from the off-design panel ({store.state.od.altitude_m} m, M {store.state.od.mach}). Frozen chemistry.</span>
-        {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
+        {error && <span className="analysis-error" role="alert">{error}</span>}
       </div>
       <div className="explore-controls" style={{ borderTop: 0 }}>
         <strong>FADEC</strong>
@@ -116,7 +117,7 @@ export function TransientView({ store }: { store: Store }) {
             {runContext.start.enabled && <div className="card"><div className="k">Light-off</div><div className="v">{(() => { const i = samples.findIndex((x) => x.lit); return i >= 0 ? fmt(samples[i].t, 1) + ' s' : 'none'; })()}</div></div>}
             <div className="card"><div className="k">Limiter active</div><div className="v">{fmt((100 * samples.filter((x) => x.limited).length) / samples.length, 0)}<small>% of time</small></div></div>
           </div>
-          <div className="charts">
+          <PlotGroup resetKey={samples}>
             <LineChart title="Spool speeds" series={spools.map((k, i) => s((x) => x.Npct[k], k + ' spool', i))} xLabel="time (s)" yLabel="% design" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
             {runContext.ctl.mode !== 'open' && samples.some(x => x.demand !== undefined) && <LineChart title={`Controller: ${runContext.ctl.mode} demand vs measured`} series={[s((x) => (runContext.ctl.mode === 'Fn' ? (x.demand ?? NaN) / 1000 : 100 * (x.demand ?? NaN)), 'demand', 1), s((x) => (runContext.ctl.mode === 'Fn' ? (x.measured ?? NaN) / 1000 : 100 * (x.measured ?? NaN)), 'measured', 0)]} xLabel="time (s)" yLabel={runContext.ctl.mode === 'Fn' ? 'kN' : '% design'} xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 1)} />}
             <LineChart title="Fuel flow" sub="command vs delivered (after limiter)" series={[s((x) => x.WfCmd, 'commanded', 1), s((x) => x.Wf, 'delivered', 0)]} xLabel="time (s)" yLabel="kg/s" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
@@ -131,7 +132,7 @@ export function TransientView({ store }: { store: Store }) {
               </>
             )}
             <MapTrajectory design={runContext.inputs} samples={samples} />
-          </div>
+          </PlotGroup>
         </>
       )}
     </div>

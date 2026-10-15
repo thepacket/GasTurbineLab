@@ -1,3 +1,4 @@
+import { PlotGroup } from '../viz/PlotGroup';
 import { useMemo } from 'react';
 import { Store } from '../state/store';
 import { EngineResult } from '../engine/types';
@@ -34,16 +35,16 @@ export function Compare({ store, a }: { store: Store; a: EngineResult }) {
         <>
           <div className="section">
             <h3>A · {store.state.note ? store.state.note.split(' — ')[0] : `${a.inputs.arch} (current)`} &nbsp;vs&nbsp; B · {store.state.compareLabel}</h3>
-            <table className="stations">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="Design comparison"><table className="stations compare-table">
               <thead><tr><th>Quantity</th><th>A</th><th>B</th><th>Δ A−B</th></tr></thead>
-              <tbody>{metrics(a, b).map((m) => <tr key={m.k}><td>{m.k}</td><td className="num">{m.a}</td><td className="num">{m.b}</td><td className="num">{m.d}</td></tr>)}</tbody>
-            </table>
+              <tbody>{metrics(a, b).map((m) => <tr key={m.k}><td>{m.k}</td><td className="num">{m.a}</td><td className="num">{m.b}</td><td className="num compare-delta">{m.d}{m.relative && <small>{m.relative}</small>}</td></tr>)}</tbody>
+            </table></div>
           </div>
-          <div className="charts">
+          <PlotGroup resetKey={a}>
             <LineChart title="Temperature–entropy diagrams" sub="core stream, total conditions; Δs relative to each engine’s inlet" series={[ts(a, 'A', 'var(--series-1)'), ts(b, 'B', 'var(--series-2)')]} xLabel="Δs (kJ/kg·K)" yLabel="Tt (K)" labelPoints xFmt={(v) => fmt(v, 2)} yFmt={(v) => fmt(v, 0)} />
             <LineChart title="Total pressure along the core" series={[prof(a, 'Pt', 'A', 'var(--series-1)', stationIds), prof(b, 'Pt', 'B', 'var(--series-2)', stationIds)]} xLabel="station" xTicks={stationIds.map((_, i) => i)} yLabel="kPa" markers xFmt={(v) => stationIds[v] ?? ''} yFmt={(v) => kPa(v * 1000)} />
             <LineChart title="Total temperature along the core" series={[prof(a, 'Tt', 'A', 'var(--series-1)', stationIds), prof(b, 'Tt', 'B', 'var(--series-2)', stationIds)]} xLabel="station" xTicks={stationIds.map((_, i) => i)} yLabel="K" markers xFmt={(v) => stationIds[v] ?? ''} yFmt={(v) => fmt(v, 0)} />
-          </div>
+          </PlotGroup>
         </>
       )}
     </div>
@@ -53,7 +54,12 @@ const ts = (r: EngineResult, name: string, color: string) => { const core = r.st
 const prof = (r: EngineResult, key: 'Pt' | 'Tt', name: string, color: string, stationIds: string[]) => { const core = r.stations.filter((s) => s.stream !== 'bypass'); return { name, color, points: core.map((s) => ({ x: stationIds.indexOf(s.id), y: key === 'Pt' ? s.Pt / 1000 : s.Tt, label: s.id })) }; };
 
 function metrics(a: EngineResult, b: EngineResult) {
-  const row = (k: string, va: number, vb: number, f: (v: number) => string, rel = true) => ({ k, a: f(va), b: f(vb), d: Number.isFinite(va) && Number.isFinite(vb) ? (rel && vb !== 0 ? `${((va / vb - 1) * 100 >= 0 ? '+' : '')}${fmt((va / vb - 1) * 100, 1)} %` : f(va - vb)) : '–' });
+  const row = (k: string, va: number, vb: number, f: (v: number) => string, rel = true) => {
+    const valid = Number.isFinite(va) && Number.isFinite(vb);
+    const delta = va - vb;
+    return { k, a: f(va), b: f(vb), d: valid ? `${delta > 0 ? '+' : ''}${f(delta)}` : '–',
+      relative: valid && rel && vb !== 0 ? `${delta / Math.abs(vb) > 0 ? '+' : ''}${fmt(100 * delta / Math.abs(vb), 1)} %` : '' };
+  };
   const in_ = (r: EngineResult) => r.inputs;
   const out = [
     row('Architecture', 0, 0, () => '', false), // placeholder replaced below
@@ -68,10 +74,10 @@ function metrics(a: EngineResult, b: EngineResult) {
     row('Thermal efficiency', a.perf.thermalEff, b.perf.thermalEff, (v) => pct(v)),
     row('Propulsive efficiency', a.perf.propulsiveEff, b.perf.propulsiveEff, (v) => pct(v)),
     row('Overall efficiency', a.perf.overallEff, b.perf.overallEff, (v) => pct(v)),
-    row('Shaft power (turboprop)', a.perf.shaftPower_W, b.perf.shaftPower_W, (v) => (v ? kW(v) : '–')),
+    row('Shaft power (turboprop)', a.inputs.arch === 'turboprop' ? a.perf.shaftPower_W : NaN, b.inputs.arch === 'turboprop' ? b.perf.shaftPower_W : NaN, (v) => Number.isFinite(v) ? kW(v) : '–'),
     row('Altitude (m) · Mach', in_(a).flight.altitude_m, in_(b).flight.altitude_m, (v) => fmt(v, 0), false),
   ];
-  out[0] = { k: 'Architecture', a: in_(a).arch, b: in_(b).arch, d: '' };
-  out[out.length - 1] = { k: 'Flight condition', a: `${fmt(in_(a).flight.altitude_m, 0)} m · M ${fmt(in_(a).flight.mach, 2)}`, b: `${fmt(in_(b).flight.altitude_m, 0)} m · M ${fmt(in_(b).flight.mach, 2)}`, d: '' };
+  out[0] = { k: 'Architecture', a: in_(a).arch, b: in_(b).arch, d: '', relative: '' };
+  out[out.length - 1] = { k: 'Flight condition', a: `${fmt(in_(a).flight.altitude_m, 0)} m · M ${fmt(in_(a).flight.mach, 2)}`, b: `${fmt(in_(b).flight.altitude_m, 0)} m · M ${fmt(in_(b).flight.mach, 2)}`, d: '', relative: '' };
   return out;
 }
