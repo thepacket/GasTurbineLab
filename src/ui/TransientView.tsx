@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Store } from '../state/store';
+import { useStale, StaleBanner } from './useStale';
+import { Provenance } from './Provenance';
 import { request } from '../engine/client';
 import { TransientResult, TransientSample, FuelSchedule, StartInputs, Controller, DEFAULT_CONTROLLER, ThermalInputs, DEFAULT_THERMAL } from '../engine/transient';
 import { LineChart, Series } from '../viz/charts';
@@ -18,9 +20,10 @@ export function TransientView({ store }: { store: Store }) {
   const [samples, setSamples] = useState<TransientSample[]>([]);
   const [result, setResult] = useState<TransientResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const stale = useStale({ inputs, sch, duration, start, ctl, th, od: store.state.od });
   const [error, setError] = useState<string | null>(null);
   const run = () => {
-    setBusy(true); setError(null); setResult(null); setSamples([]);
+    setBusy(true); setError(null); setResult(null); setSamples([]); stale.snapshot();
     request<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start, controller: ctl, thermal: th } }, (p: TransientSample[]) => setSamples(p))
       .then((r) => { setResult(r); setSamples(r.samples); setBusy(false); })
       .catch((e) => { setError(e.message); setBusy(false); });
@@ -35,6 +38,7 @@ export function TransientView({ store }: { store: Store }) {
   return (
     <div>
       <div className="explore-controls">
+        <strong>Transient <Provenance level="model" /></strong>
         <label>Start T4 <input className="num" type="number" aria-label="Start T4" style={{ width: 80 }} value={sch.T4start} step={10} onChange={(e) => Set('T4start', +e.target.value)} /> K</label>
         <label>Final fuel <input className="num" type="number" aria-label="Final fuel fraction" style={{ width: 70 }} value={sch.WfEndFrac} step={0.05} onChange={(e) => Set('WfEndFrac', +e.target.value)} /> × design</label>
         <label>Ramp start <input className="num" type="number" aria-label="Ramp start" style={{ width: 60 }} value={sch.rampStart_s} step={0.1} onChange={(e) => Set('rampStart_s', +e.target.value)} /> s</label>
@@ -87,6 +91,7 @@ export function TransientView({ store }: { store: Store }) {
           </>
         )}
       </div>
+      {samples.length > 1 && stale.stale && <StaleBanner what="transient" />}
       {result?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {samples.length > 1 && (
         <>

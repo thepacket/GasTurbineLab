@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Store } from '../state/store';
+import { useStale, StaleBanner } from './useStale';
+import { Provenance } from './Provenance';
 import { request } from '../engine/client';
 import { VARIABLES, OptimizeResult, OptimizeTrace, Objective, Constraint, getPath } from '../engine/optimize';
 import { defaultMission } from '../engine/mission';
@@ -24,8 +26,9 @@ export function OptimizeView({ store }: { store: Store }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const design = 'error' in store.design ? null : store.design;
+  const stale = useStale({ inputs, objective, sel, cons, smCheck });
   const run = () => {
-    setBusy(true); setError(null); setRes(null); setTrace([]);
+    setBusy(true); setError(null); setRes(null); setTrace([]); stale.snapshot();
     const vars = avail.filter((v) => sel.includes(v.path)).map((v) => ({ ...v, min: bounds[v.path]?.[0] ?? v.min, max: bounds[v.path]?.[1] ?? v.max }));
     const constraints = cons.filter((c) => !(c.kind === 'FnMin' && c.value <= 0));
     if (smCheck.enabled) constraints.push({ kind: 'surgeMarginMin', value: smCheck.min });
@@ -39,7 +42,7 @@ export function OptimizeView({ store }: { store: Store }) {
   return (
     <div>
       <div className="prose">
-        <h2>Design optimisation</h2>
+        <h2>Design optimisation <Provenance level="model" style={{ marginLeft: 8 }} /></h2>
         <p>Nelder–Mead simplex over the selected design variables with bound clipping and quadratic penalties for constraints. Each evaluation is a full design-point solve (frozen chemistry); the mission objective flies the default profile for the current architecture at every evaluation. The surge-margin constraint solves one off-design check point per evaluation.</p>
       </div>
       <div className="section">
@@ -59,9 +62,10 @@ export function OptimizeView({ store }: { store: Store }) {
         <label className="toggle"><input type="checkbox" checked={smCheck.enabled} onChange={(e) => setSmCheck({ ...smCheck, enabled: e.target.checked })} /> surge margin ≥ {num(smCheck.min, (x) => setSmCheck({ ...smCheck, min: x }), 50, 1, 'Minimum surge margin')} % at {num(smCheck.altitude_m, (x) => setSmCheck({ ...smCheck, altitude_m: x }), 70, 500, 'Check altitude')} m, M {num(smCheck.mach, (x) => setSmCheck({ ...smCheck, mach: x }), 55, 0.05, 'Check Mach')}</label>
         <label>budget {num(maxEvals, setMaxEvals, 60, 10, 'Evaluation budget')} evals</label>
         <button className="btn primary" onClick={run} disabled={busy || sel.length === 0}>{busy ? `Optimising… ${trace.length} evals` : 'Optimise'}</button>
-        {res && <button className="btn" onClick={() => store.dispatch({ type: 'inputs', inputs: res.best, note: `Optimised: ${OBJ.find((o) => o.id === objective)!.label}` })}>Apply best design</button>}
+        {res && <button className="btn" disabled={stale.stale} title={stale.stale ? 'Inputs changed since this run; optimise again before applying' : undefined} onClick={() => store.dispatch({ type: 'inputs', inputs: res.best, note: `Optimised: ${OBJ.find((o) => o.id === objective)!.label}` })}>Apply best design</button>}
         {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
       </div>
+      {res && stale.stale && <StaleBanner what="optimisation" />}
       {res?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {(res || trace.length > 0) && (
         <div className="cards">

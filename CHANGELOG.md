@@ -41,3 +41,15 @@ All dates 2026-10-14 unless noted. Each entry is one pushed step.
 
 ## Documentation (2026-10-15)
 - README restructured; docs/methods.md, docs/validation.md, docs/user-guide.md, docs/development.md; this changelog.
+
+## Review fixes (2026-10-15)
+Following an external review of code, engineering and interface:
+- Mission completion is a hard feasibility constraint: `MissionResult` carries `feasible`, `maxShortfall` and `unconvergedPoints`; the optimiser penalises infeasible missions in proportion to the shortfall instead of a 5 % surcharge; the Mission view states feasibility.
+- Engineering reports escape every string; shared links are validated against the input schema (unknown keys dropped, non-finite numbers replaced, map ids pattern-checked); custom maps referenced by a design travel inside the link and are registered on load.
+- Custom maps saved in the browser are registered in every new calculation worker before any request runs.
+- The ICAO NOx limit uses the pressure ratio of the converged sea-level static rating point, not the cruise design OPR.
+- Monte Carlo draws are truncated to physical bounds (efficiencies, recovery and velocity coefficients ≤ 1, losses and flows ≥ 0) with redraws counted; non-finite or failed solves are excluded and counted.
+- CO₂ per hour was understated 1000×.
+- Every analysis (LTO, optimisation, uncertainty, mission, transient) keeps a snapshot of its inputs and shows a stale banner when the design changes; "Apply best design" is disabled when stale.
+- Outputs carry provenance badges: reference-checked, uncalibrated model, correlation estimate; the certification panel is named "Certification estimates"; a sticky status bar summarises the operating point and solver state.
+- Advanced control sections collapse by default; segmented toggles expose `aria-pressed`; cross-section parts, callouts and station rows are keyboard operable.

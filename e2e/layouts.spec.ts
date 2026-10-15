@@ -59,7 +59,7 @@ test('off-design mode solves in the worker', async ({ page }) => {
   await page.getByRole('button', { name: 'Off-design' }).click();
   await showResults(page);
   await expect(page.getByText('Off-design operating point')).toBeVisible();
-  await expect(page.getByText(/converged/)).toBeVisible();
+  await expect(page.getByText(/converged/).first()).toBeVisible();
 });
 
 test('PWA manifest and service worker are served', async ({ page, request }) => {

@@ -61,7 +61,9 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
 
         {/* gas path fills (both halves) */}
         {geo.parts.filter((p) => p.tip.length > 0 && p.kind !== 'gearbox').map((p) => (
-          <g key={p.id} className="part" style={{ cursor: 'pointer' }} onClick={() => pick(p.id)}
+          <g key={p.id} className="part" style={{ cursor: 'pointer' }} onClick={() => pick(p.id)} role="button" tabIndex={0} aria-label={`${p.name}: total temperature ${u.temperature(p.T).v} ${u.temperature(p.T).u}, total pressure ${u.pressure(p.P).v} ${u.pressure(p.P).u}`} aria-pressed={sel === p.id}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(p.id); } }}
+            onFocus={(e) => { const r = (e.currentTarget as SVGElement).getBoundingClientRect(), o = (e.currentTarget as SVGElement).ownerSVGElement!.getBoundingClientRect(); setHover({ x: r.left - o.left + r.width / 2, y: r.top - o.top, title: p.name, lines: [`Tt out ${u.temperature(p.T).v} ${u.temperature(p.T).u}`, `Pt out ${u.pressure(p.P).v} ${u.pressure(p.P).u}`] }); }} onBlur={() => setHover(null)}
             onMouseMove={(e) => onEnter(e, p.name, [`Tt out ${u.temperature(p.T).v} ${u.temperature(p.T).u}`, `Pt out ${u.pressure(p.P).v} ${u.pressure(p.P).u}`])}>
             {[1, -1].map((m) => <path key={m} d={pathOf(p.hub, p.tip, m)} fill={colorOf(p)} opacity={p.kind === 'inlet' || p.kind === 'nozzle' || p.kind === 'duct' || p.kind === 'afterburner' ? 0.9 : 0.75} stroke={sel === p.id ? 'var(--text-primary)' : 'none'} strokeWidth={2} />)}
           </g>
@@ -123,7 +125,7 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
             const id = 'st' + mk.id;
             const active = sel === id;
             return (
-              <g key={mk.id} style={{ cursor: 'pointer' }} onClick={() => pick(id)} onMouseMove={(e) => onEnter(e, `Station ${s.id} · ${s.name}`, [`Pt ${u.pressure(s.Pt).v} ${u.pressure(s.Pt).u}   Tt ${u.temperature(s.Tt).v} ${u.temperature(s.Tt).u}`, `W ${u.massflow(s.W).v} ${u.massflow(s.W).u}   M ${fmt(s.MN, 2)}`, `Ps ${u.pressure(s.Ps).v} ${u.pressure(s.Ps).u}   V ${u.velocity(s.V).v} ${u.velocity(s.V).u}`])}>
+              <g key={mk.id} style={{ cursor: 'pointer' }} onClick={() => pick(id)} role="button" tabIndex={0} aria-pressed={active} aria-label={`Station ${s.id} ${s.name}: Pt ${u.pressure(s.Pt).v} ${u.pressure(s.Pt).u}, Tt ${u.temperature(s.Tt).v} ${u.temperature(s.Tt).u}, flow ${u.massflow(s.W).v} ${u.massflow(s.W).u}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(id); } }} onMouseMove={(e) => onEnter(e, `Station ${s.id} · ${s.name}`, [`Pt ${u.pressure(s.Pt).v} ${u.pressure(s.Pt).u}   Tt ${u.temperature(s.Tt).v} ${u.temperature(s.Tt).u}`, `W ${u.massflow(s.W).v} ${u.massflow(s.W).u}   M ${fmt(s.MN, 2)}`, `Ps ${u.pressure(s.Ps).v} ${u.pressure(s.Ps).u}   V ${u.velocity(s.V).v} ${u.velocity(s.V).u}`])}>
                 <line x1={x} x2={x} y1={cy - pr(mk.rOut)} y2={cy + pr(mk.rOut)} stroke={active ? 'var(--text-primary)' : 'var(--text-muted)'} strokeWidth={active ? 1.5 : 0.8} strokeDasharray="3 3" />
                 <line x1={x} x2={x} y1={yEdge} y2={up ? yLab + 30 * k : yLab - 2} stroke={active ? 'var(--text-primary)' : 'var(--line-strong)'} strokeWidth={0.8} />
                 <g transform={`translate(${x},${yLab}) scale(${k})`}>

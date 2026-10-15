@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Store } from '../state/store';
+import { useStale, StaleBanner } from './useStale';
+import { Provenance } from './Provenance';
 import { request } from '../engine/client';
 import { UNCERTAIN, MonteCarloResult } from '../engine/montecarlo';
 import { fmt } from './format';
@@ -36,9 +38,10 @@ export function UncertaintyView({ store }: { store: Store }) {
   const [samples, setSamples] = useState(400);
   const [res, setRes] = useState<MonteCarloResult | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  const stale = useStale({ inputs, on, sigmas, samples });
   const [error, setError] = useState<string | null>(null);
   const run = () => {
-    setBusy(0); setError(null); setRes(null);
+    setBusy(0); setError(null); setRes(null); stale.snapshot();
     request<MonteCarloResult>({ type: 'montecarlo', inputs, mc: { inputs: avail.filter((u) => on.includes(u.path)).map((u) => ({ ...u, sigma: sigmas[u.path] })), samples, seed: 12345 } }, (k: number) => setBusy(k))
       .then((r) => { setRes(r); setBusy(null); })
       .catch((e) => { setError(e.message); setBusy(null); });
@@ -46,7 +49,7 @@ export function UncertaintyView({ store }: { store: Store }) {
   return (
     <div>
       <div className="prose">
-        <h2>Uncertainty</h2>
+        <h2>Uncertainty <Provenance level="model" style={{ marginLeft: 8 }} /></h2>
         <p>Monte Carlo propagation: each selected input is perturbed with an independent normal deviation of the given standard deviation, truncated to its physical bounds (draws outside the bounds are redrawn and counted), the design point is re-solved (frozen chemistry) and the distributions of thrust, TSFC, fuel flow, T3 and thermal efficiency are collected. Samples whose solve fails or returns non-finite values are excluded and counted separately. One-at-a-time +1σ sensitivities are listed below the histograms.</p>
       </div>
       <div className="section">
@@ -64,6 +67,7 @@ export function UncertaintyView({ store }: { store: Store }) {
         <button className="btn primary" onClick={run} disabled={busy !== null}>{busy !== null ? `Sampling… ${busy}/${samples}` : 'Run Monte Carlo'}</button>
         {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
       </div>
+      {res && stale.stale && <StaleBanner what="Monte Carlo run" />}
       {res && (
         <>
           <div className="cards">

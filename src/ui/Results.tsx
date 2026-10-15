@@ -10,6 +10,8 @@ import { estimateWeight } from '../engine/weight';
 import { estimateNoise, LtoResult } from '../engine/certification';
 import { request } from '../engine/client';
 import { useState } from 'react';
+import { Provenance } from './Provenance';
+import { useStale, StaleBanner } from './useStale';
 
 export function Results({ store, result }: { store: Store; result: EngineResult }) {
   const p = result.perf;
@@ -17,8 +19,15 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
   const sel = store.state.selected;
   const u = U(store.state.units);
   const C = (x: { v: string; u: string }) => <>{x.v}<small>{x.u}</small></>;
+  const st0 = result.stations[0];
   return (
     <div>
+      <div className="statusbar">
+        <span>{result.offDesign ? 'Off-design' : 'Design point'}</span>
+        <span>{fmt(result.inputs.flight.altitude_m, 0)} m · M {fmt(st0.MN, 2)} · {result.inputs.fuel ?? 'jetA'} · {result.inputs.chemistry ?? 'equilibrium'} chemistry</span>
+        {result.offDesign && <span style={{ color: result.offDesign.converged ? 'var(--good)' : 'var(--bad)' }}>{result.offDesign.converged ? 'converged' : 'not converged'}</span>}
+        <Provenance level="reference" />
+      </div>
       {result.offDesign && (
         <div className="section" style={{ paddingBottom: 8 }}>
           <h3>Off-design operating point</h3>
@@ -68,7 +77,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
 
       {!result.offDesign && (() => { try { const w = estimateWeight(result); return (
         <div className="section">
-          <h3>Weight & size <span className="hint">correlation estimate</span></h3>
+          <h3>Weight & size <span className="hint"><Provenance level="estimate" /></span></h3>
           <div className="kv">
             <span className="k">Dry mass</span><span className="v">{fmt(w.total_kg, 0)} kg</span>
             <span className="k">{arch === 'turboprop' ? 'Power / weight' : 'Thrust / weight'}</span><span className="v">{arch === 'turboprop' ? fmt(w.powerToWeight_kW_kg, 2) + ' kW/kg' : fmt(w.thrustToWeight, 1)}</span>
@@ -80,7 +89,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
 
       {(() => { const sas = result.components.find((c) => c.id === 'sas'); if (!sas) return null; const v = sas.values; const W25 = result.stations.find((s) => s.id === '25')?.W ?? 1; return (
         <div className="section">
-          <h3>Secondary air system <span className="hint">orifice network at gas-path pressures</span></h3>
+          <h3>Secondary air system <span className="hint"><Provenance level="model" /> orifice network at gas-path pressures</span></h3>
           {v.sealReversed ? <div className="warn"><span>⚠</span><span>Interstage seal reversed: hot gas ingestion into the turbine cavity.</span></div> : null}
           <div className="kv">
             <span className="k">HPT inlet cooling (does work)</span><span className="v">{fmt(v.coolInlet_kgs, 3)} kg/s · {fmt((100 * v.coolInlet_kgs) / W25, 2)} % W25</span>
@@ -95,7 +104,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
       <Certification store={store} result={result} />
 
       <div className="section">
-        <h3>Emissions & noise <span className="hint">P3–T3 correlations, Lighthill jet noise · estimates</span></h3>
+        <h3>Emissions & noise <span className="hint"><Provenance level="estimate" /> P3–T3 correlations, Lighthill jet noise</span></h3>
         <div className="kv">
           <span className="k">NOx emission index</span><span className="v">{fmt(p.EI_NOx_g_kg, 1)} g/kg fuel · {fmt(p.NOx_g_s, 2)} g/s</span>
           <span className="k">CO emission index</span><span className="v">{fmt(p.EI_CO_g_kg, 1)} g/kg fuel · {fmt(p.CO_g_s, 2)} g/s</span>
@@ -105,7 +114,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
       </div>
 
       <div className="section">
-        <h3>{t('Shaft power balance')}</h3>
+        <h3>{t('Shaft power balance')} <span className="hint"><Provenance level="reference" /></span></h3>
         {result.shafts.map((s) => {
           const max = Math.max(s.powerIn_W, s.powerOut_W, 1);
           return (
@@ -130,7 +139,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
             <thead><tr><th>St.</th><th>Pt {u.pressure(1).u}</th><th>Tt {u.temperature(1).u}</th><th>W {u.massflow(1).u}</th><th>Ps {u.pressure(1).u}</th><th>M</th><th>V {u.velocity(1).u}</th><th>A {u.area(1).u}</th></tr></thead>
             <tbody>
               {result.stations.map((s) => (
-                <tr key={s.id} className={sel === 'st' + s.id ? 'sel' : ''} onClick={() => store.dispatch({ type: 'select', id: sel === 'st' + s.id ? null : 'st' + s.id })} title={s.name}>
+                <tr key={s.id} className={sel === 'st' + s.id ? 'sel' : ''} tabIndex={0} role="button" aria-pressed={sel === 'st' + s.id} onClick={() => store.dispatch({ type: 'select', id: sel === 'st' + s.id ? null : 'st' + s.id })} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); store.dispatch({ type: 'select', id: sel === 'st' + s.id ? null : 'st' + s.id }); } }} title={s.name}>
                   <td><span style={{ color: 'var(--text-muted)' }}>{s.id}</span> {s.name}</td>
                   <td className="num">{u.pressure(s.Pt).v}</td><td className="num">{u.temperature(s.Tt).v}</td><td className="num">{u.massflow(s.W).v}</td>
                   <td className="num">{u.pressure(s.Ps).v}</td><td className="num">{fmt(s.MN, 2)}</td><td className="num">{u.velocity(s.V).v}</td><td className="num">{Number.isFinite(s.A) ? u.area(s.A).v : '∞'}</td>
@@ -182,12 +191,14 @@ function Certification({ store, result }: { store: Store; result: EngineResult }
   const [lto, setLto] = useState<LtoResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const stale = useStale(store.state.inputs);
   const noise = (() => { try { return estimateNoise(result); } catch { return null; } })();
-  const run = () => { setBusy(true); setErr(null); request<LtoResult>({ type: 'lto', inputs: { ...store.state.inputs, chemistry: 'frozen' } }).then((r) => { setLto(r); setBusy(false); }).catch((e) => { setErr(e.message); setBusy(false); }); };
+  const run = () => { setBusy(true); setErr(null); stale.snapshot(); request<LtoResult>({ type: 'lto', inputs: { ...store.state.inputs, chemistry: 'frozen' } }).then((r) => { setLto(r); setBusy(false); }).catch((e) => { setErr(e.message); setBusy(false); }); };
   if (result.inputs.arch === 'turboprop') return null;
   return (
     <div className="section">
-      <h3>Certification <span className="hint">ICAO LTO cycle · CAEP/8 NOx · Heidmann fan noise · estimates</span></h3>
+      <h3>Certification estimates <span className="hint"><Provenance level="estimate" /> ICAO LTO cycle · CAEP/8 NOx · Heidmann fan noise</span></h3>
+      {lto && stale.stale && <StaleBanner what="LTO cycle" />}
       {noise && (
         <div className="kv" style={{ marginBottom: 8 }}>
           <span className="k">Fan inlet broadband · tone</span><span className="v">{fmt(noise.fanInlet_dB, 0)} · {fmt(noise.fanTone_dB, 0)} dB at 1 m (tip Mach {fmt(noise.tipMach, 2)})</span>
@@ -198,7 +209,7 @@ function Certification({ store, result }: { store: Store; result: EngineResult }
       )}
       <div className="row"><button className="btn" onClick={run} disabled={busy}>{busy ? 'Running LTO cycle…' : 'Run ICAO LTO emissions cycle'}</button>{err && <span style={{ color: 'var(--bad)' }}>{err}</span>}</div>
       {lto && (
-        <>
+        <div style={{ opacity: stale.stale ? 0.5 : 1 }}>
           {!lto.applicable && <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Rated thrust below 26.7 kN: the Annex 16 limits do not apply, shown for reference.</div>}
           {lto.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
           <div className="kv" style={{ marginTop: 8 }}>
@@ -212,7 +223,7 @@ function Certification({ store, result }: { store: Store; result: EngineResult }
             <thead><tr><th>Mode</th><th>Thrust</th><th>Time</th><th>Fn kN</th><th>Wf kg/s</th><th>EI NOx</th><th>EI CO</th><th>EI HC</th><th>T3 K</th></tr></thead>
             <tbody>{lto.modes.map((m) => <tr key={m.name} style={{ color: m.converged ? undefined : 'var(--bad)' }}><td>{m.name}</td><td className="num">{fmt(m.thrustFrac * 100, 0)} %</td><td className="num">{fmt(m.time_s / 60, 1)} min</td><td className="num">{fmt(m.Fn / 1000, 1)}</td><td className="num">{fmt(m.Wf, 3)}</td><td className="num">{fmt(m.EI_NOx, 1)}</td><td className="num">{fmt(m.EI_CO, 1)}</td><td className="num">{fmt(m.EI_HC, 2)}</td><td className="num">{fmt(m.T3, 0)}</td></tr>)}</tbody>
           </table>
-        </>
+        </div>
       )}
     </div>
   );

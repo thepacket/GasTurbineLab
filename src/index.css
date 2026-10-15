@@ -161,3 +161,16 @@ table.stations tr:hover td { background: var(--surface-2); cursor: pointer; }
 .touchpad { position: absolute; right: 10px; bottom: 10px; display: grid; grid-template-columns: repeat(3, 44px); gap: 6px; }
 .touchpad button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--surface-1) 85%, transparent); color: var(--text-primary); font-size: 18px; }
 .touchpad button:active { background: var(--surface-3); }
+.prov { display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; border: 1px solid; vertical-align: middle; cursor: help; }
+.prov-reference { color: var(--good); border-color: var(--good); }
+.prov-model { color: var(--series-1); border-color: var(--series-1); }
+.prov-estimate { color: var(--warn); border-color: var(--warn); }
+.statusbar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); font-size: 12px; color: var(--text-secondary); position: sticky; top: 0; z-index: 3; }
+.statusbar span:first-child { color: var(--text-primary); font-weight: 600; }
+table.stations tr:focus-visible td { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sectiontoggle { border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.sectiontoggle .chev { color: var(--text-muted); font-size: 11px; width: 10px; }
+.sectiontoggle .adv { margin-left: 6px; font-size: 9.5px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--text-muted); text-transform: lowercase; letter-spacing: 0; font-weight: 500; }
+.section.collapsed { padding-bottom: 10px; }
+svg.cross g[role="button"]:focus-visible > * { outline: 2px solid var(--accent); }
+svg.cross g[role="button"]:focus { outline: none; }

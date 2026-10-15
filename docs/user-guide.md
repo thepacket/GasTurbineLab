@@ -16,7 +16,7 @@ Header buttons: language (EN/FR), report, PNG export of the cross-section, units
 
 **Operating point.** *Design point* means every slider defines the engine: pressure ratios and efficiencies are specified, turbine pressure ratios are solved for the shaft balance, and nozzle and mixer areas follow. *Off-design* freezes that geometry and maps and lets you set altitude, Mach, ΔT ISA, the throttle (T4, fuel flow or HP speed), power extraction, propeller load (turboprop), nozzle area and bleeds; speeds, flows and bypass ratio are solved. Off-design solves run in a worker; the results pane shows the solver status and unknowns.
 
-**Sections.** Flight condition; inlet; layout (spools, separate or mixed exhaust, fan gear ratio, mixer sizing); fan and bypass; compressors; combustor; turbines (efficiencies, mechanical efficiency, power extraction); afterburner (turbojet and mixed turbofan); propeller and gearbox; nozzles; variable geometry and bleeds; secondary air system (turbofan); installation; spool inertia; design shaft speeds; turbine cooling (fixed fractions or a target metal temperature); fuel and gas model (fuel type, humidity, chemistry, fuel enthalpy, heating value).
+**Sections.** Basic sections are open; advanced ones (variable geometry and bleeds, secondary air, installation, inertia, shaft speeds, cooling, fuel and gas model, afterburner) are collapsed by default and remember their state. Flight condition; inlet; layout (spools, separate or mixed exhaust, fan gear ratio, mixer sizing); fan and bypass; compressors; combustor; turbines (efficiencies, mechanical efficiency, power extraction); afterburner (turbojet and mixed turbofan); propeller and gearbox; nozzles; variable geometry and bleeds; secondary air system (turbofan); installation; spool inertia; design shaft speeds; turbine cooling (fixed fractions or a target metal temperature); fuel and gas model (fuel type, humidity, chemistry, fuel enthalpy, heating value).
 
 Number fields accept typed values; sliders snap to their step.
 
@@ -67,6 +67,10 @@ Seven guided scenarios load a design, open the relevant view and explain what to
 ## Validate
 
 Every station and performance figure against pyCycle for the design-point, off-design and mixed-flow reference cases, with deviations and status markers.
+
+## Provenance and stale results
+
+Every result area carries a badge: **reference-checked** (agrees with pyCycle on the validation cases: design point, off-design, mixer), **uncalibrated model** (physically based but without an external reference: transients, control, thermal, secondary air, mission, optimisation, uncertainty) or **correlation estimate** (weight, emissions, noise, creep life, installation drag, certification). Analyses that run on request keep a snapshot of their inputs; if you change the design afterwards, a banner marks the old result as stale and, for the optimiser, disables applying it until it is rerun. The status bar at the top of Results shows the operating mode, condition, fuel, chemistry and solver state.
 
 ## Units and conventions
 

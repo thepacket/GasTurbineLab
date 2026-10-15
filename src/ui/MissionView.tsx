@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Store } from '../state/store';
+import { useStale, StaleBanner } from './useStale';
+import { Provenance } from './Provenance';
 import { request } from '../engine/client';
 import { MissionResult, MissionPoint, Segment, Aircraft, defaultMission, Ratings, scaledAircraftMass } from '../engine/mission';
 import { isa } from '../engine/atmosphere';
@@ -18,10 +20,11 @@ export function MissionView({ store }: { store: Store }) {
   const [pts, setPts] = useState<MissionPoint[]>([]);
   const [res, setRes] = useState<MissionResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const stale = useStale({ inputs, ac, segs, ratings, od: store.state.od });
   const [error, setError] = useState<string | null>(null);
   const u = U(store.state.units);
   const run = () => {
-    setBusy(true); setError(null); setRes(null); setPts([]);
+    setBusy(true); setError(null); setRes(null); setPts([]); stale.snapshot();
     request<MissionResult>({ type: 'mission', inputs: { ...inputs, chemistry: 'frozen' }, mi: { aircraft: ac, segments: segs, od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, pointsPerSegment: 8, ratings } }, (p: MissionPoint[]) => setPts(p))
       .then((r) => { setRes(r); setPts(r.points); setBusy(false); })
       .catch((e) => { setError(e.message); setBusy(false); });
@@ -32,6 +35,7 @@ export function MissionView({ store }: { store: Store }) {
   return (
     <div>
       <div className="explore-controls">
+        <strong>Mission <Provenance level="model" /></strong>
         <strong>Aircraft</strong>
         <label>mass {num(ac.mass_kg, (v) => setAc({ ...ac, mass_kg: v }), 80, 500, 'Aircraft mass')} kg</label>
         <label>wing area {num(ac.wingArea_m2, (v) => setAc({ ...ac, wingArea_m2: v }), 60, 1, 'Wing area')} m²</label>
@@ -70,6 +74,7 @@ export function MissionView({ store }: { store: Store }) {
         </div>
         <button className="btn" style={{ marginTop: 8 }} onClick={() => setSegs([...segs, { kind: 'cruise', label: `Segment ${segs.length + 1}`, alt0_m: 10000, alt1_m: 10000, mach: 0.78, value: 500 }])}>Add segment</button>
       </div>
+      {res && stale.stale && <StaleBanner what="mission" />}
       {res?.warnings.slice(0, 8).map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {res && res.warnings.length > 8 && <div className="warn"><span>⚠</span><span>{res.warnings.length - 8} more warnings.</span></div>}
       {res && (

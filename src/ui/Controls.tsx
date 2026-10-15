@@ -4,6 +4,7 @@ import { PRESETS, REFERENCE_PRESETS } from '../engine/presets';
 import { ENGINES, calibrateEngine } from '../engine/engines';
 import { fmt } from './format';
 import { t } from './i18n';
+import { useState } from 'react';
 
 interface SliderProps { label: string; path: string; value: number; min: number; max: number; step: number; unit?: string; scale?: number; digits?: number; store: Store }
 function Slider({ label, path, value, min, max, step, unit, scale = 1, digits, store }: SliderProps) {
@@ -22,11 +23,18 @@ function Slider({ label, path, value, min, max, step, unit, scale = 1, digits, s
   );
 }
 
+const ADVANCED = new Set(['Variable geometry & bleeds', 'Secondary air system', 'Installation', 'Spool inertia', 'Design shaft speeds', 'Turbine cooling', 'Fuel & gas model', 'Afterburner']);
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  const key = 'gtl.section.' + title;
+  const [open, setOpen] = useState<boolean>(() => { try { const v = localStorage.getItem(key); return v !== null ? v === '1' : !ADVANCED.has(title); } catch { return !ADVANCED.has(title); } });
+  const toggle = () => { setOpen(!open); try { localStorage.setItem(key, open ? '0' : '1'); } catch { /* ignore */ } };
   return (
-    <div className="section">
-      <h3>{t(title)}{hint && <span className="hint">{hint}</span>}</h3>
-      {children}
+    <div className={`section${open ? '' : ' collapsed'}`}>
+      <h3>
+        <button className="sectiontoggle" onClick={toggle} aria-expanded={open} aria-controls={key}><span className="chev" aria-hidden>{open ? '▾' : '▸'}</span>{t(title)}{ADVANCED.has(title) && <span className="adv">advanced</span>}</button>
+        {hint && <span className="hint">{hint}</span>}
+      </h3>
+      {open && <div id={key}>{children}</div>}
     </div>
   );
 }
@@ -89,8 +97,8 @@ export function Controls({ store }: { store: Store }) {
 
       <Section title="Operating point" hint={store.odBusy ? 'solving…' : undefined}>
         <div className="segmented" style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-          <button className={store.state.mode === 'design' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'design' })}>{t('Design point')}</button>
-          <button className={store.state.mode === 'offdesign' ? 'on' : ''} onClick={() => store.dispatch({ type: 'mode', mode: 'offdesign' })}>{t('Off-design')}</button>
+          <button className={store.state.mode === 'design' ? 'on' : ''} aria-pressed={!!(store.state.mode === 'design')} onClick={() => store.dispatch({ type: 'mode', mode: 'design' })}>{t('Design point')}</button>
+          <button className={store.state.mode === 'offdesign' ? 'on' : ''} aria-pressed={!!(store.state.mode === 'offdesign')} onClick={() => store.dispatch({ type: 'mode', mode: 'offdesign' })}>{t('Off-design')}</button>
         </div>
         {store.state.mode === 'offdesign' ? (
           <div style={{ marginTop: 8 }}>
@@ -101,9 +109,9 @@ export function Controls({ store }: { store: Store }) {
             <div className="control">
               <label>Throttle by</label>
               <div className="segmented">
-                <button className={od.throttle.mode === 'T4' ? 'on' : ''} onClick={() => store.setOd('throttle', { mode: 'T4', value: i.burner.T4_K })}>T4</button>
-                <button className={od.throttle.mode === 'Wf' ? 'on' : ''} onClick={() => store.setOd('throttle', { mode: 'Wf', value: designWf })}>Fuel flow</button>
-                <button className={od.throttle.mode === 'NHP' ? 'on' : ''} onClick={() => store.setOd('throttle', { mode: 'NHP', value: 1 })}>N HP</button>
+                <button className={od.throttle.mode === 'T4' ? 'on' : ''} aria-pressed={!!(od.throttle.mode === 'T4')} onClick={() => store.setOd('throttle', { mode: 'T4', value: i.burner.T4_K })}>T4</button>
+                <button className={od.throttle.mode === 'Wf' ? 'on' : ''} aria-pressed={!!(od.throttle.mode === 'Wf')} onClick={() => store.setOd('throttle', { mode: 'Wf', value: designWf })}>Fuel flow</button>
+                <button className={od.throttle.mode === 'NHP' ? 'on' : ''} aria-pressed={!!(od.throttle.mode === 'NHP')} onClick={() => store.setOd('throttle', { mode: 'NHP', value: 1 })}>N HP</button>
               </div>
             </div>
             {od.throttle.mode === 'T4' && <OdSlider label="Turbine inlet temperature T4" path="throttle.value" value={od.throttle.value} min={900} max={2100} step={5} unit="K" store={store} />}
@@ -135,15 +143,15 @@ export function Controls({ store }: { store: Store }) {
             <div className="control">
               <label>Spools</label>
               <div className="segmented">
-                <button className={i.spools === 2 ? 'on' : ''} onClick={() => { if (i.spools === 3) { const core = i.ipc.PR * i.hpc.PR; const inp = { ...i, spools: 2 as const, lpc: { ...i.lpc, PR: Math.min(3, Math.sqrt(core) * 0.45 + 1) }, hpc: { ...i.hpc, PR: core / Math.min(3, Math.sqrt(core) * 0.45 + 1) } }; store.dispatch({ type: 'inputs', inputs: inp, note: store.state.note ?? undefined }); } }}>Two (fan + booster)</button>
-                <button className={i.spools === 3 ? 'on' : ''} onClick={() => { if (i.spools === 2) { const core = i.lpc.PR * i.hpc.PR; const ipc = Math.sqrt(core) * 0.9, hpc = core / ipc; store.dispatch({ type: 'inputs', inputs: { ...i, spools: 3 as const, ipc: { ...i.ipc, PR: ipc }, hpc: { ...i.hpc, PR: hpc } }, note: store.state.note ?? undefined }); } }}>Three (IP spool)</button>
+                <button className={i.spools === 2 ? 'on' : ''} aria-pressed={!!(i.spools === 2)} onClick={() => { if (i.spools === 3) { const core = i.ipc.PR * i.hpc.PR; const inp = { ...i, spools: 2 as const, lpc: { ...i.lpc, PR: Math.min(3, Math.sqrt(core) * 0.45 + 1) }, hpc: { ...i.hpc, PR: core / Math.min(3, Math.sqrt(core) * 0.45 + 1) } }; store.dispatch({ type: 'inputs', inputs: inp, note: store.state.note ?? undefined }); } }}>Two (fan + booster)</button>
+                <button className={i.spools === 3 ? 'on' : ''} aria-pressed={!!(i.spools === 3)} onClick={() => { if (i.spools === 2) { const core = i.lpc.PR * i.hpc.PR; const ipc = Math.sqrt(core) * 0.9, hpc = core / ipc; store.dispatch({ type: 'inputs', inputs: { ...i, spools: 3 as const, ipc: { ...i.ipc, PR: ipc }, hpc: { ...i.hpc, PR: hpc } }, note: store.state.note ?? undefined }); } }}>Three (IP spool)</button>
               </div>
             </div>
             <div className="control">
               <label>Exhaust</label>
               <div className="segmented">
-                <button className={!i.mixed ? 'on' : ''} onClick={() => store.set('mixed', false)}>Separate flow</button>
-                <button className={i.mixed ? 'on' : ''} onClick={() => store.set('mixed', true)}>Mixed flow</button>
+                <button className={!i.mixed ? 'on' : ''} aria-pressed={!!(!i.mixed)} onClick={() => store.set('mixed', false)}>Separate flow</button>
+                <button className={i.mixed ? 'on' : ''} aria-pressed={!!(i.mixed)} onClick={() => store.set('mixed', true)}>Mixed flow</button>
               </div>
             </div>
             {S({ label: 'Fan gear ratio (1 = direct drive)', path: 'fanGear.ratio', value: i.fanGear.ratio, min: 1, max: 4, step: 0.01 })}
@@ -152,8 +160,8 @@ export function Controls({ store }: { store: Store }) {
               <div className="control">
                 <label>Mixer sizing</label>
                 <div className="segmented">
-                  <button className={(i.mixer.designedStream ?? 'bypass') === 'bypass' ? 'on' : ''} onClick={() => store.set('mixer.designedStream', 'bypass')}>Core Mach given</button>
-                  <button className={i.mixer.designedStream === 'core' ? 'on' : ''} onClick={() => store.set('mixer.designedStream', 'core')}>Bypass Mach given</button>
+                  <button className={(i.mixer.designedStream ?? 'bypass') === 'bypass' ? 'on' : ''} aria-pressed={!!((i.mixer.designedStream ?? 'bypass') === 'bypass')} onClick={() => store.set('mixer.designedStream', 'bypass')}>Core Mach given</button>
+                  <button className={i.mixer.designedStream === 'core' ? 'on' : ''} aria-pressed={!!(i.mixer.designedStream === 'core')} onClick={() => store.set('mixer.designedStream', 'core')}>Bypass Mach given</button>
                 </div>
               </div>
             )}
@@ -226,8 +234,8 @@ export function Controls({ store }: { store: Store }) {
           <div className="control">
             <label>{arch === 'turbofan' ? (i.mixed ? 'Mixed nozzle type' : 'Core nozzle type') : 'Nozzle type'}</label>
             <div className="segmented">
-              <button className={i.coreNozzle.type === 'CV' ? 'on' : ''} onClick={() => store.set('coreNozzle.type', 'CV')}>Convergent</button>
-              <button className={i.coreNozzle.type === 'CD' ? 'on' : ''} onClick={() => store.set('coreNozzle.type', 'CD')}>Con-di</button>
+              <button className={i.coreNozzle.type === 'CV' ? 'on' : ''} aria-pressed={!!(i.coreNozzle.type === 'CV')} onClick={() => store.set('coreNozzle.type', 'CV')}>Convergent</button>
+              <button className={i.coreNozzle.type === 'CD' ? 'on' : ''} aria-pressed={!!(i.coreNozzle.type === 'CD')} onClick={() => store.set('coreNozzle.type', 'CD')}>Con-di</button>
             </div>
           </div>
         )}
@@ -237,8 +245,8 @@ export function Controls({ store }: { store: Store }) {
             <div className="control">
               <label>Bypass nozzle type</label>
               <div className="segmented">
-                <button className={i.bypNozzle.type === 'CV' ? 'on' : ''} onClick={() => store.set('bypNozzle.type', 'CV')}>Convergent</button>
-                <button className={i.bypNozzle.type === 'CD' ? 'on' : ''} onClick={() => store.set('bypNozzle.type', 'CD')}>Con-di</button>
+                <button className={i.bypNozzle.type === 'CV' ? 'on' : ''} aria-pressed={!!(i.bypNozzle.type === 'CV')} onClick={() => store.set('bypNozzle.type', 'CV')}>Convergent</button>
+                <button className={i.bypNozzle.type === 'CD' ? 'on' : ''} aria-pressed={!!(i.bypNozzle.type === 'CD')} onClick={() => store.set('bypNozzle.type', 'CD')}>Con-di</button>
               </div>
             </div>
             {S({ label: 'Bypass velocity coefficient Cv', path: 'bypNozzle.Cv', value: i.bypNozzle.Cv, min: 0.9, max: 1, step: 0.001 })}
@@ -302,8 +310,8 @@ export function Controls({ store }: { store: Store }) {
         <div className="control">
           <label>Cooling flow</label>
           <div className="segmented">
-            <button className={i.cooling.mode === 'fixed' ? 'on' : ''} onClick={() => store.set('cooling.mode', 'fixed')}>Fixed fractions</button>
-            <button className={i.cooling.mode === 'computed' ? 'on' : ''} onClick={() => store.set('cooling.mode', 'computed')}>From metal temperature</button>
+            <button className={i.cooling.mode === 'fixed' ? 'on' : ''} aria-pressed={!!(i.cooling.mode === 'fixed')} onClick={() => store.set('cooling.mode', 'fixed')}>Fixed fractions</button>
+            <button className={i.cooling.mode === 'computed' ? 'on' : ''} aria-pressed={!!(i.cooling.mode === 'computed')} onClick={() => store.set('cooling.mode', 'computed')}>From metal temperature</button>
           </div>
         </div>
         {i.cooling.mode === 'fixed' ? (
@@ -330,8 +338,8 @@ export function Controls({ store }: { store: Store }) {
         <div className="control">
           <label>Chemistry</label>
           <div className="segmented">
-            <button className={(i.chemistry ?? 'equilibrium') === 'equilibrium' ? 'on' : ''} onClick={() => store.set('chemistry', 'equilibrium')}>Equilibrium</button>
-            <button className={i.chemistry === 'frozen' ? 'on' : ''} onClick={() => store.set('chemistry', 'frozen')}>Frozen</button>
+            <button className={(i.chemistry ?? 'equilibrium') === 'equilibrium' ? 'on' : ''} aria-pressed={!!((i.chemistry ?? 'equilibrium') === 'equilibrium')} onClick={() => store.set('chemistry', 'equilibrium')}>Equilibrium</button>
+            <button className={i.chemistry === 'frozen' ? 'on' : ''} aria-pressed={!!(i.chemistry === 'frozen')} onClick={() => store.set('chemistry', 'frozen')}>Frozen</button>
           </div>
         </div>
         {S({ label: 'Fuel enthalpy as supplied', path: 'burner.fuel_h_Jkg', value: i.burner.fuel_h_Jkg, min: -2000e3, max: 500e3, step: 10e3, unit: 'kJ/kg', scale: 1e-3, digits: 0 })}
