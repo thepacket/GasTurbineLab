@@ -1,5 +1,6 @@
 /** Main-thread client for the engine worker. */
 import type { WorkerRequest, WorkerResponse } from './worker';
+import { loadCustomMaps } from './custommaps';
 
 let worker: Worker | null = null;
 let seq = 0;
@@ -8,6 +9,9 @@ const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) 
 function get(): Worker {
   if (!worker) {
     worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+    // a fresh worker has no custom maps: register the saved ones before any request runs (messages are ordered)
+    const maps = loadCustomMaps();
+    if (maps.length) worker.postMessage({ id: 0, type: 'maps', maps: maps.map((m) => ({ id: m.id, kind: m.kind, data: m.data })) } as WorkerRequest);
     worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       const p = pending.get(e.data.id); if (!p) return;
       if ('progress' in e.data) { p.onProgress?.(e.data.progress); return; }

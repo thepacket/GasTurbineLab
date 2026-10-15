@@ -30,3 +30,30 @@ describe('review fixes', () => {
     expect(sanitizeShared({ inputs: 'nope' }, defaultInputs)).toBeNull();
   });
 });
+
+import { runLto } from '../certification';
+import { solveEngine } from '../cycle';
+import { runMonteCarlo, UNCERTAIN } from '../montecarlo';
+import { solveOffDesign } from '../offdesign';
+
+describe('review fixes, second group', () => {
+  it('LTO uses the OPR of the converged sea-level rating point, not the cruise design OPR', () => {
+    const inp = defaultInputs('turbofan'); inp.chemistry = 'frozen'; // cruise design at 11 km
+    const dp = makeDesignPoint(inp);
+    const r = runLto(dp);
+    const sls = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, throttle: { mode: 'T4', value: inp.burner.T4_K } });
+    console.log('LTO reference: design OPR', dp.result.perf.OPR.toFixed(1), 'SLS rating OPR', sls.result.perf.OPR.toFixed(1), 'used', r.OPR.toFixed(1), 'NOx limit', r.limits.NOx.toFixed(1));
+    expect(Math.abs(r.OPR - sls.result.perf.OPR)).toBeLessThan(0.05);
+    expect(r.OPR).toBeLessThan(dp.result.perf.OPR);
+  });
+  it('Monte Carlo never samples efficiencies or recoveries above 1 and reports redraws', () => {
+    const inp = defaultInputs('turbofan'); inp.chemistry = 'frozen';
+    const r = runMonteCarlo(inp, { inputs: UNCERTAIN.filter((u) => ['inlet.ramRecovery', 'fan.eff'].includes(u.path)).map((u) => ({ ...u, sigma: 0.02 })), samples: 300, seed: 3 });
+    console.log('MC bounds: truncated', r.truncated, 'failures', r.failures, 'Fn p95', r.stats.Fn.p95.toFixed(0));
+    expect(r.truncated).toBeGreaterThan(0);
+    expect(r.failures).toBe(0);
+    // with recovery capped at 1 the thrust distribution cannot exceed the recovery=1 result by more than the fan-efficiency effect
+    const cap = solveEngine({ ...inp, inlet: { ...inp.inlet, ramRecovery: 1 }, fan: { ...inp.fan, eff: 1 } }).perf.Fn;
+    expect(Math.max(...r.Fn)).toBeLessThanOrEqual(cap * 1.0001);
+  });
+});

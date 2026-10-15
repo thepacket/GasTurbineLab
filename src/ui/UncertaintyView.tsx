@@ -47,7 +47,7 @@ export function UncertaintyView({ store }: { store: Store }) {
     <div>
       <div className="prose">
         <h2>Uncertainty</h2>
-        <p>Monte Carlo propagation: each selected input is perturbed with an independent normal deviation of the given standard deviation, the design point is re-solved (frozen chemistry) and the distributions of thrust, TSFC, fuel flow, T3 and thermal efficiency are collected. One-at-a-time +1σ sensitivities are listed below the histograms.</p>
+        <p>Monte Carlo propagation: each selected input is perturbed with an independent normal deviation of the given standard deviation, truncated to its physical bounds (draws outside the bounds are redrawn and counted), the design point is re-solved (frozen chemistry) and the distributions of thrust, TSFC, fuel flow, T3 and thermal efficiency are collected. Samples whose solve fails or returns non-finite values are excluded and counted separately. One-at-a-time +1σ sensitivities are listed below the histograms.</p>
       </div>
       <div className="section">
         <h3>Uncertain inputs (1σ)</h3>
@@ -55,7 +55,7 @@ export function UncertaintyView({ store }: { store: Store }) {
           <div className="control" key={u.path} style={{ gridTemplateColumns: 'auto 1fr auto' }}>
             <label className="toggle"><input type="checkbox" checked={on.includes(u.path)} onChange={(e) => setOn(e.target.checked ? [...on, u.path] : on.filter((x) => x !== u.path))} /> {u.label}</label>
             <span />
-            <span className="val">σ <input className="num" type="number" aria-label={`${u.label} sigma`} style={{ width: 70 }} step={0.001} value={sigmas[u.path]} onChange={(e) => setSigmas({ ...sigmas, [u.path]: +e.target.value })} /></span>
+            <span className="val">σ <input className="num" type="number" aria-label={`${u.label} sigma`} style={{ width: 70 }} step={0.001} value={sigmas[u.path]} onChange={(e) => setSigmas({ ...sigmas, [u.path]: +e.target.value })} /> <span className="unit">[{u.min ?? '−∞'}, {u.max ?? '∞'}]</span></span>
           </div>
         ))}
       </div>
@@ -68,7 +68,8 @@ export function UncertaintyView({ store }: { store: Store }) {
         <>
           <div className="cards">
             {(['Fn', 'TSFC', 'Wf', 'T3', 'eth'] as const).map((k) => { const s = res.stats[k]; const scale = k === 'Fn' ? 1e-3 : 1; const unit = { Fn: 'kN', TSFC: 'mg/(N·s)', Wf: 'kg/s', T3: 'K', eth: '%' }[k]; return <div className="card" key={k}><div className="k">{{ Fn: 'Net thrust', TSFC: 'TSFC', Wf: 'Fuel flow', T3: 'T3', eth: 'Thermal efficiency' }[k]}</div><div className="v">{fmt(s.mean * scale, 2)} ± {fmt(s.sd * scale, 2)}<small>{unit} (1σ · {fmt((100 * s.sd) / s.mean, 2)} %)</small></div></div>; })}
-            <div className="card"><div className="k">Failed samples</div><div className="v">{res.failures}</div></div>
+            <div className="card"><div className="k">Failed samples</div><div className="v">{res.failures}<small>solver failures or non-finite results, excluded</small></div></div>
+            <div className="card"><div className="k">Redrawn draws</div><div className="v">{res.truncated}<small>outside physical bounds (η, recovery, Cv ≤ 1; losses ≥ 0)</small></div></div>
           </div>
           <div className="charts">
             <Histogram title="Net thrust" values={res.Fn.map((v) => v / 1000)} unit="kN" />

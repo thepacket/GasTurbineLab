@@ -33,10 +33,15 @@ export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]
   const warnings: string[] = [];
   // rated thrust: sea-level static at the design T4 (the design itself if it is SLS)
   const inp = dp.inputs;
+  // rated thrust Foo and the reference pressure ratio come from the same converged sea-level static ISA rating point
+  // (Annex 16: π00 is the OPR at the take-off rating under ISA sea-level static conditions)
   let Foo = Foo_N ?? 0;
-  if (!Foo) {
-    if (inp.flight.altitude_m === 0 && inp.flight.mach === 0) Foo = dp.result.perf.Fn;
-    else { const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, throttle: { mode: 'T4', value: inp.burner.T4_K } }); Foo = s.converged ? s.result.perf.Fn : dp.result.perf.Fn; if (!s.converged) warnings.push('Sea-level static rating did not converge; using the design thrust as Foo.'); }
+  let oprRef = dp.result.perf.OPR;
+  if (inp.flight.altitude_m === 0 && inp.flight.mach === 0 && inp.flight.dT_isa === 0) { if (!Foo) Foo = dp.result.perf.Fn; }
+  else {
+    const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, throttle: { mode: 'T4', value: inp.burner.T4_K } });
+    if (s.converged) { if (!Foo) Foo = s.result.perf.Fn; oprRef = s.result.perf.OPR; }
+    else { if (!Foo) Foo = dp.result.perf.Fn; warnings.push('Sea-level static rating did not converge; using the design thrust and design OPR as the reference.'); }
   }
   const modes: LtoMode[] = [];
   let warm: Record<string, number> | undefined;
@@ -53,7 +58,7 @@ export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]
   const Dp = (key: 'EI_NOx' | 'EI_CO' | 'EI_HC') => modes.reduce((a, m) => a + m[key] * m.Wf * m.time_s, 0); // g
   const Foo_kN = Foo / 1000;
   const DpFoo = { NOx: Dp('EI_NOx') / Foo_kN, CO: Dp('EI_CO') / Foo_kN, HC: Dp('EI_HC') / Foo_kN };
-  const opr = dp.result.perf.OPR;
+  const opr = oprRef;
   const limits = { NOx: caep8NOxLimit(opr, Foo_kN), CO: 118, HC: 19.6 };
   const margins = { NOx: (1 - DpFoo.NOx / limits.NOx) * 100, CO: (1 - DpFoo.CO / limits.CO) * 100, HC: (1 - DpFoo.HC / limits.HC) * 100 };
   return { Foo_kN, OPR: opr, modes, DpFoo, limits, margins, fuel_kg: modes.reduce((a, m) => a + m.Wf * m.time_s, 0), applicable: Foo_kN > 26.7, warnings };
