@@ -1,111 +1,53 @@
 # Gas Turbine Lab
 
-A gas-turbine cycle laboratory that runs entirely in the browser (installable PWA, no server-side code). Assemble a **turbojet** (with afterburner), a **turbofan** (two or three spools, separate or mixed flow, direct-drive or geared fan) or a **free-turbine turboprop** (with reduction gearbox and propeller), solve the design point, then run the fixed engine **off-design** across throttle, altitude and Mach number on scaled component maps. Results are shown on an engine cross-section, on a procedurally generated 3D cutaway, in station tables, T–s diagrams, compressor maps and parametric sweeps, and can be compared, shared by link and exported to CSV.
+A gas-turbine engine laboratory that runs entirely in the browser. It is an installable progressive web app with no server-side code: the static bundle is served by nginx on Fly.io and every calculation, including the solvers, runs on the device.
 
-## Thermodynamic model
+**Live:** https://gas-turbine-lab.fly.dev/
 
-* **Gas properties**: NASA CEA 9-coefficient polynomials (the `janaf` set shipped with pyCycle). Composition is carried as element amounts per kg (pyCycle's `b0` convention). Above 1000 K the composition is solved by **Gibbs-free-energy minimisation** over N₂, O₂, Ar, CO₂, H₂O, CO, H₂, OH, NO, O and H (CEA's element-potential iteration); a frozen complete-combustion mode is available. Air composition and Jet-A (C₁₂H₂₃) definitions are identical to pyCycle's.
-* **Absolute enthalpies** (including formation enthalpy) so combustion is an enthalpy-conserving mix. Fuel enthalpy defaults to 0 kJ/kg, pyCycle's convention; it is adjustable.
-* **Components**: ISA-1976 atmosphere, inlet ram recovery, compressors with isentropic efficiency and exit bleeds, combustor with ΔP/P and combustion efficiency, turbines with per-stream cooling-flow expansion (pyCycle's bleed model), convergent or convergent–divergent nozzles with velocity coefficient, afterburner (turbojet and mixed turbofan), constant-area **mixer** (mass, impulse and energy conservation), **fan drive gearbox** and **propeller reduction gearbox** with explicit speeds, actuator-disc propeller with profile efficiency and tip-Mach warning.
-* **Shaft balances** are solved for each spool (LP, IP, HP, power turbine): turbine pressure ratio is found such that turbine power × mechanical efficiency equals compressor power plus power extraction (or the requested shaft power for the power turbine).
-* **Statics** at every station are computed for the sizing Mach numbers, which gives flow areas; the cross-section and 3D geometry scale with those areas.
+Build a **turbojet** (optionally afterburning), a **turbofan** (two or three spools, separate or mixed flow, direct-drive or geared fan) or a **free-turbine turboprop**, solve its design point, then run the fixed engine **off-design**, through **transients** with a control system, over a **mission**, through **optimisation** and **uncertainty** studies, and check **emissions and noise**. Results appear on an engine cross-section, a 3D cutaway, station tables, cycle diagrams, component maps and parametric sweeps. Everything can be compared, saved, shared as a link, exported to CSV or PNG, or written up as an engineering report.
 
-## Off-design operation
+The thermodynamics are validated against NASA's pyCycle to better than 0.05 % at design and off-design; see [docs/validation.md](docs/validation.md).
 
-The design point fixes nozzle throat and mixer areas and scales the NPSS-style component maps distributed with pyCycle (fan, LPC, HPC, HPT, LPT) so that each passes through its design flow, pressure ratio, efficiency and corrected speed. Off-design, the unknowns are inlet mass flow, bypass ratio, spool speeds, fuel/air ratio, compressor R-lines and turbine pressure ratios; the residuals are map-flow continuity at every compressor and turbine, shaft power balances, nozzle throat and mixer static-pressure matching, and the throttle target (T4, fuel flow or HP spool speed). A Newton solver with finite-difference Jacobian, backtracking and continuation from the design throttle solves 5 (turbojet) to 12 (three-spool turbofan) unknowns in a web worker. Results include corrected speeds, surge margins and the operating point drawn on each compressor map. Turboprops run with a constant-speed power turbine and a propeller load setting.
+## Documentation
 
-## Transients, missions, installation, emissions
+| Document | Contents |
+|---|---|
+| [docs/user-guide.md](docs/user-guide.md) | How to use each view, inputs and outputs, layouts, units, sharing |
+| [docs/methods.md](docs/methods.md) | The physics: gas model, components, design and off-design solvers, transients, control, thermal, secondary air, mission, optimisation, estimates |
+| [docs/validation.md](docs/validation.md) | pyCycle reference cases, tolerances, how to regenerate the references, known differences |
+| [docs/development.md](docs/development.md) | Code layout, running and testing, CI, deployment, how to add an architecture, a map, a preset or a scenario |
+| [CHANGELOG.md](CHANGELOG.md) | What was added, in order |
 
-* **Transient** (Transient tab): spool dynamics `I ω dω/dt = P_turbine − P_load` integrated with a Heun scheme while the gas path is solved quasi-steadily at each step with speeds held as states. A fuel ramp is applied, optionally limited by a ratio-unit (Wf/P3) acceleration schedule and deceleration floor. Outputs: spool speeds, fuel command vs delivered, thrust, surge margins, T4/T5 and the running-line trajectory on the compressor map. Inertias are inputs (Build → Spool inertia).
-* **Mission** (Mission tab): a segment profile (take-off, climb, cruise, descent, hold) flown with the fixed engine against a simple aircraft (mass, wing area, parabolic polar, engine count). Thrust required sets the throttle through a thrust-matching solve; N1, N2 and T4 ratings cap it and shortfalls are flagged. Fuel burn and mass are integrated; block fuel, time and distance are reported per segment.
-* **Variable geometry and bleeds**: customer bleed at HPC exit, handling bleed from the booster/compressor exit (to the bypass duct, or overboard), variable-area exhaust nozzle (A8 multiplier off-design) and a variable-stator flow gain on the fan and HPC maps.
-* **Installed performance**: additive inlet drag from the capture ratio, nacelle skin friction from the computed geometry, and afterbody drag; installed thrust and TSFC are reported and can drive the mission.
-* **Emissions and noise**: NOx and CO emission indices from P3–T3 correlations, CO₂ from fuel flow, and jet mixing noise from Lighthill V⁸ scaling (overall sound pressure level at 1 m). All are estimates and labelled as such.
-* **Custom maps** (Maps tab): assign any built-in or uploaded map to each compressor and turbine. Upload JSON (same structure as `src/data/maps.json`) or a CSV grid, or generate a parametric elliptical compressor map. Maps are kept in the browser's local storage.
-* **Learn** (Learn tab): seven guided scenarios (bypass ratio, T4, OPR, altitude, part power, acceleration and surge margin, block fuel) that load a design, open the right view and explain what to look for.
+## Capabilities at a glance
 
-## Fidelity and design tools (third round)
+**Cycle model.** NASA CEA polynomials with Gibbs-minimisation equilibrium chemistry (frozen mode available); Jet-A, SAF, hydrogen and methane; humid air; ISA-1976 atmosphere. Inlet, compressors with bleeds, combustor, turbines with cooling streams, afterburner, constant-area mixer, convergent and convergent–divergent nozzles, gearboxes, actuator-disc propeller. Shaft balances per spool. Statics and flow areas at every station.
 
-* **Start-up and sub-idle**: maps extend below their lowest speed line (flow ∝ speed, pressure rise ∝ speed², turbines unchoke below the tabulated pressure ratio). Transients can start from shutdown with a starter torque, friction, a light-off speed and T3 condition and a light-off fuel flow; hung starts are reported. Windmilling speed at forward speed is an empirical fraction.
-* **Stage stacking**: a mean-line stage-stacking generator (linear work characteristic, parabolic loss bucket per stage, front-stage variable stators rotating with speed) produces compressor maps that can be assigned to any compressor.
-* **Turbine cooling physics**: cooling effectiveness ε(m) = ε_max·m/(m + 3 %) relates flow fraction, gas, coolant and metal temperatures. Choose fixed fractions or let the model compute the flow for a target blade metal temperature; metal temperature and a creep-life estimate are reported.
-* **Fuels and humidity**: Jet-A, synthetic paraffinic kerosene, hydrogen and methane with their own composition, heating value and formation enthalpy through the equilibrium chemistry; ambient relative humidity adds water vapour to the air.
-* **Optimise** (Optimise tab): Nelder–Mead over chosen design variables with bounds, T3/T4/thrust/metal-temperature constraints, an optional off-design surge-margin check, and objectives of TSFC, specific thrust, thrust, thermal efficiency or mission block fuel.
-* **Uncertainty** (Uncertainty tab): Monte Carlo over component efficiencies, losses and coefficients with histograms, percentiles and one-at-a-time sensitivities.
-* **Weight and size**: WATE-style component weight correlations from the solved annulus areas, pressure ratios and temperatures, calibrated to published dry weights (within ±30 %), plus thrust/weight.
-* **Gallery** (Gallery tab): named saved designs with JSON export/import, share links and direct comparison.
-* **Report**: a self-contained HTML engineering report (inputs, performance, shafts, cross-section, stations, components, weight) opened for printing or saving as PDF; PNG export of the cross-section, charts and the 3D view.
-* **Mobile and language**: touch rotate/tilt/zoom buttons and auto-orbit in the 3D view; English/French interface toggle.
+**Off-design.** Component maps (pyCycle's generic NPSS-style maps, uploaded maps, parametric, stage-stacked or geometry-based maps) scaled through the design point; Newton solution for flows, speeds, bypass ratio, R-lines and turbine pressure ratios at fixed geometry; throttle by T4, fuel flow, spool speed or thrust; variable geometry, bleeds and a secondary air system; sub-idle map extensions.
 
-## Control, thermal, secondary air and certification (fourth round)
+**Dynamics.** Spool transients with inertias, fuel schedules and ratio-unit limiters, start-up with a starter and light-off, a FADEC with N1/N2/thrust loops and actuator schedules, heat soak and tip-clearance effects.
 
-* **FADEC** (Transient tab): closed-loop PI control of N1, N2 or thrust with a demand ramp, an acceleration schedule of Wf/P3 against corrected HP speed, a deceleration floor, a handling bleed valve that opens below a set N2, and a variable-stator gain. Demand and measured values are plotted together with the limiter activity.
-* **Maps from blade geometry** (Maps tab): per-stage mean radius, blade height, rotor inlet and exit metal angles, stator exit angle and solidity through mean-line velocity triangles, Carter's deviation rule and Lieblein diffusion-factor losses; turbines from nozzle throat area (choking flow) and a Smith-chart efficiency surface. A consistent-defaults generator starts the design at zero incidence.
-* **Heat soak and tip clearance** (Transient tab): casing and disc temperatures lag the compressor exit temperature with their own time constants; clearance follows casing, disc and centrifugal growth; the HPC and HPT efficiencies carry a clearance penalty relative to the design clearance, which reproduces the efficiency dip after a slam acceleration.
-* **Secondary air system** (Build → Secondary air system): an orifice network sized at the design point passes the cooling, customer and leakage flows; off-design, each flow follows the compressible orifice law on the gas-path pressures and the interstage seal is checked for reversal (hot-gas ingestion).
-* **Certification** (Results): the ICAO Annex 16 LTO cycle at 100/85/30/7 % rated thrust with Dp/Foo for NOx, CO and HC against the CAEP/8 NOx limit and the fixed CO/HC limits, plus a simplified Heidmann fan-noise estimate alongside jet noise.
-* **Validation breadth**: `reference/pycycle_offdesign.py` adds six pyCycle off-design points (turbojet and HBPR turbofan through pyCycle's multi-point model with the same maps) and a mixed-flow design point with pyCycle's mixer; the lab reproduces all of them to better than 0.05 %. The mixer gained pyCycle's designed-stream convention.
+**Design studies.** Mission analysis against an aircraft polar with ratings, Nelder–Mead optimisation with constraints, Monte Carlo uncertainty, weight and size estimates, installed performance, emissions (P3–T3 and ICAO LTO with CAEP/8 limits) and noise (jet and fan).
 
-## Views
+**Catalogue.** 59 commercial engines calibrated to published take-off ratings, with provenance notes.
 
-* **Build**: architecture, layout, presets, catalogue, operating point (design / off-design) and every component parameter; SI inputs with a SI / US display-unit toggle in the header.
-* **Section**: parametric SVG cross-section coloured by total temperature or pressure with station callouts; **3D**: Three.js cutaway with rotating blade rows and click-to-inspect parts.
-* **Results**: performance cards, shaft balances with speeds, T–s and station profiles, compressor maps, station table (CSV export), component details.
-* **Explore**: design-point sweeps (new design per point) or off-design sweeps (fixed engine) with optional parameter families, computed in a worker; CSV export.
-* **Compare**: the live design against a pinned snapshot or any catalogue engine, with overlaid diagrams.
-* **Transient**, **Mission**, **Optimise**, **Uncertainty**, **Maps**, **Gallery**, **Learn**: see above.
-* **Validate**: every station and performance figure against pyCycle.
-* **Share**: the link button encodes the complete design, operating point and comparison in the URL (`#d=`).
+**Interface.** Desktop, tablet and phone layouts; SI or US units; English or French; dark or light theme; guided teaching scenarios.
 
-## Commercial engine catalogue
-
-`src/engine/engines.ts` lists 59 airline, regional and business engines (CFM56 and LEAP, CF6, GE90, GEnx, GE9X, JT8D, JT9D, PW2000/PW4000, PW1000G, V2500, GP7200, Conway, Spey, Tay, RB211, Trent, BR715, AE 3007, TFE731, HTF7000, FJ44; the Avon, JT3C, JT4A, CJ805, CJ610 and Olympus 593 turbojets; and the Dart, 501-D13, TPE331, PT6A, PW100/PW150, CT7, AE 2100, 250 and Catalyst turboprops). Only publicly published nominal figures are used: take-off thrust or shaft power, bypass ratio, overall pressure ratio, fan or propeller diameter and airflow where the manufacturer quotes it. Turbine inlet temperature, the pressure-ratio split, cooling flows and component efficiencies are not public; they are assigned by generation and T4 (or airflow, when T4 would fall below a plausible floor) is calibrated so the model reproduces the published rating at sea-level static ISA conditions. The note shown under the preset menu states exactly which values are published and which are estimated. `npm test` checks that every catalogue entry reproduces its rating within 0.5 %.
-
-## Validation against pyCycle
-
-`reference/pycycle_reference.py` builds the same three architectures in NASA's [pyCycle](https://github.com/OpenMDAO/pyCycle) (CEA equilibrium thermodynamics) and writes `src/data/pycycle_reference.json`. The app's **Validate** tab compares every station and performance figure. With equilibrium chemistry the agreement is within 0.05 % on every station and 0.01 % on thrust and fuel flow for eight cases spanning sea-level static to Mach 2 at 15 km; the frozen model stays within 1 %. `npm test` enforces these tolerances.
-
-To regenerate the reference (needs Python ≤ 3.11 and numpy < 2 for pyCycle 4.4):
-
-```bash
-uv venv --python 3.11 reference/venv
-uv pip install --python reference/venv/bin/python "numpy<2" "scipy<1.14" om-pycycle
-reference/venv/bin/python reference/pycycle_reference.py > src/data/pycycle_reference.json
-```
-
-## Development
+## Quick start
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # vitest: pyCycle comparison, engine catalogue, off-design, transient, mission, catalogue envelope fuzz
-npm run test:e2e   # Playwright: desktop, tablet and phone layouts, off-design worker, PWA, share links
-npm run build      # static bundle + service worker in dist/
-node scripts/icons.mjs   # regenerate PWA icons from public/icons/icon.svg
+npm test           # unit and validation tests (vitest)
+npm run test:e2e   # layout and feature tests in a headless browser (Playwright)
+npm run build      # production bundle with service worker in dist/
 ```
 
-Layouts: desktop (three panes), tablet (controls + tabbed content), phone (bottom tab bar). Theme and display units follow toggles in the header. GitHub Actions runs type-check, unit tests, build and the Playwright suite on every push.
+Deployment: `fly deploy` builds the `Dockerfile` (Node build stage, nginx runtime) and runs one shared-CPU machine in Toronto that stops when idle.
 
-## Deployment (Fly.io)
+## Status and limits
 
-The `Dockerfile` builds the bundle and serves it with nginx; `fly.toml` runs one shared-CPU machine that stops when idle.
+The design-point thermodynamics, the fixed-geometry off-design solver and the mixer match pyCycle to the stated tolerances. Everything else is physically based but not validated against an external reference: transients, control, thermal, secondary air, mission, optimisation and uncertainty use the validated cycle but their own models and defaults. Weight, emissions, noise, creep life and installation drag are correlation estimates and are labelled as such in the interface. The generic maps are not the catalogue engines' real maps, so off-design trends for a named engine are representative rather than engine-specific.
 
-```bash
-fly deploy
-```
+## Licence and acknowledgements
 
-## Project layout
-
-```
-src/engine/      gas model (gas.ts, equilibrium.ts), components, generic core (core.ts),
-                 design wrapper (cycle.ts), maps and off-design solver (maps.ts, offdesign.ts),
-                 transient.ts, mission.ts, optimize.ts, montecarlo.ts, weight.ts, custommaps.ts,
-                 engine catalogue (engines.ts), worker (worker.ts)
-src/data/        janaf polynomial coefficients, component maps, pyCycle reference results
-e2e/             Playwright layout and PWA tests
-src/viz/         SVG cross-section, shared parametric geometry, charts, explorer
-src/three/       Three.js procedural cutaway model
-src/ui/          controls, results, validation, formatting
-reference/       pyCycle reference-case generator
-deploy/          nginx configuration
-```
+Thermodynamic coefficients and component maps are taken from NASA's open-source [pyCycle](https://github.com/OpenMDAO/pyCycle) (Apache-2.0). The catalogue uses only manufacturer-published nominal figures. No licence file has been added to this repository yet; it is private.
