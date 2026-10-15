@@ -1,7 +1,6 @@
 /** URL sharing: the whole design (inputs, operating point, mode) in the hash as base64url JSON. */
 import { EngineInputs } from '../engine/types';
 import { OffDesignInputs } from '../engine/offdesign';
-import { loadCustomMaps } from '../engine/custommaps';
 
 export interface Shared { inputs: EngineInputs; od?: OffDesignInputs; mode?: 'design' | 'offdesign'; note?: string | null; compare?: EngineInputs | null; maps?: { id: string; kind: 'compressor' | 'turbine'; data: unknown }[] }
 
@@ -95,15 +94,17 @@ export async function decodeShare(hash: string): Promise<Shared | null> {
     return JSON.parse(new TextDecoder().decode(bytes));
   } catch { return null; }
 }
-/** Custom maps referenced by the design (and the comparison design) travel inside the link. */
-export function packageMaps(data: Shared): Shared['maps'] {
+/** Custom maps referenced by the design (and the comparison design), taken from the available list, travel inside the link. */
+export function packageMaps(data: Shared, available: { id: string; kind: 'compressor' | 'turbine'; data: unknown }[]): Shared['maps'] {
   const ids = new Set<string>();
   for (const inp of [data.inputs, data.compare]) for (const id of Object.values(inp?.mapIds ?? {})) if (typeof id === 'string' && id.startsWith('custom:')) ids.add(id);
   if (!ids.size) return undefined;
-  const maps = loadCustomMaps().filter((m) => ids.has(m.id)).map((m) => ({ id: m.id, kind: m.kind, data: m.data as unknown }));
+  const maps = available.filter((m) => ids.has(m.id)).map((m) => ({ id: m.id, kind: m.kind, data: m.data }));
   return maps.length ? maps : undefined;
 }
 export async function shareUrl(data: Shared): Promise<string> {
-  const maps = data.maps ?? packageMaps(data);
+  // the map store is loaded lazily so this module stays free of the map tables
+  const { loadCustomMaps } = await import('../engine/custommaps');
+  const maps = data.maps ?? packageMaps(data, loadCustomMaps());
   return `${location.origin}${location.pathname}#d=${await encodeShare({ ...data, maps })}`;
 }

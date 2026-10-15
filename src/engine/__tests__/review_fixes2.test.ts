@@ -18,14 +18,13 @@ describe('review fixes, third group', () => {
     expect(d.od!.throttle).toEqual({ mode: 'Fn', value: 30000 });
   });
   it('custom maps referenced by a design or its comparison are packaged centrally', async () => {
-    const { saveCustomMaps } = await import('../custommaps');
     const data = generateCompressorMap({ PRdes: 10, WcDes: 50 });
-    saveCustomMaps([{ id: 'custom:t1', name: 't1', kind: 'compressor', data }, { id: 'custom:t2', name: 't2', kind: 'compressor', data }]);
+    const available = [{ id: 'custom:t1', kind: 'compressor' as const, data }, { id: 'custom:t2', kind: 'compressor' as const, data }, { id: 'custom:unused', kind: 'compressor' as const, data }];
     const a = defaultInputs('turbofan'); a.mapIds = { hpc: 'custom:t1' };
     const b = defaultInputs('turbofan'); b.mapIds = { fan: 'custom:t2' };
-    const maps = packageMaps({ inputs: a, compare: b });
+    const maps = packageMaps({ inputs: a, compare: b }, available);
     expect(maps!.map((m) => m.id).sort()).toEqual(['custom:t1', 'custom:t2']);
-    expect(packageMaps({ inputs: defaultInputs('turbojet') })).toBeUndefined();
+    expect(packageMaps({ inputs: defaultInputs('turbojet') }, available)).toBeUndefined();
   });
   it('+1σ sensitivities are bounded and report the perturbation applied', () => {
     const inp = defaultInputs('turbofan'); inp.chemistry = 'frozen';
