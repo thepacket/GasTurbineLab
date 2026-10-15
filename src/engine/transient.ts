@@ -224,6 +224,7 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
   let startMeasured = ctl && !st ? measure(start.result, speeds) : NaN;
   let complete = true, stoppedAt: number | undefined, eulerSteps = 0, starterOnlySteps = 0;
   let lastP3 = st ? NaN : start.result.stations.find((s) => s.id === '3')!.Pt; // P3 of the last converged gas path, for the limiter
+  let lastTriedHP = -Infinity; // HP speed at the last gas-path attempt in the starter-only regime
   const stop = (t: number, why: string) => { warnings.push(`${why} The trajectory stops at t = ${t.toFixed(2)} s of ${ti.duration_s} s; the samples shown are all converged solutions.`); complete = false; stoppedAt = t; };
   const describe = (r: Rate) => { const v = r.r.offDesign?.mapViolations ?? []; return `residual ${r.norm.toExponential(1)}${v.length ? `, outside the supported range: ${v.join(', ')}` : ''}`; };
 
@@ -272,8 +273,11 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     let limited = false;
     let WfNow = lit ? Math.max(WfCmd, 2e-4 * WfDes) : 0;
     if (lit && Number.isFinite(lastP3)) ({ Wf: WfNow, limited } = limitFuel(WfNow, lastP3));
-    // evaluate at the current state with the (limited) fuel; no fuel while unlit
-    let r1 = stepRate(speeds, WfNow, lit);
+    // evaluate at the current state with the (limited) fuel; no fuel while unlit.  In the starter-only regime the gas
+    // path is retried once the HP speed has risen by 1 % of design since the last attempt (the solves are expensive).
+    const retry = lit || !st || xGood !== null || speeds.HP - lastTriedHP >= 0.01 * inp.speeds.HP;
+    let r1 = retry ? stepRate(speeds, WfNow, lit) : null;
+    if (retry && !lit) lastTriedHP = speeds.HP;
     if (!r1 || !r1.conv) {
       if (!lit && st) { r1 = starterOnlyRate(speeds); starterOnlySteps++; }
       else { stop(t, r1 ? `Gas path did not converge (${describe(r1)}).` : 'Gas path could not be evaluated.'); break; }

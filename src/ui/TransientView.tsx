@@ -33,7 +33,8 @@ export function TransientView({ store }: { store: Store }) {
   const s = (pick: (x: TransientSample) => number, name: string, c = 0): Series => ({ name, color: colors[c], points: samples.map((x) => ({ x: x.t, y: pick(x) })) });
   const spools = samples[0] ? Object.keys(samples[0].Npct) : [];
   const comps = samples[0] ? Object.keys(samples[0].SM) : [];
-  const minSM = comps.map((c) => ({ c, v: Math.min(...samples.filter((x) => x.gasPath).map((x) => x.SM[c])) }));
+  const solved = samples.filter((x) => x.gasPath);
+  const minSM = comps.map((c) => ({ c, v: solved.length ? Math.min(...solved.map((x) => x.SM[c])) : NaN }));
   const Set = (k: keyof FuelSchedule, v: number) => setSch({ ...sch, [k]: v });
   const manualLimiter = (ctl.limiter ?? 'schedule') === 'manual';
   const starterOnly = samples.filter((x) => !x.gasPath);
@@ -107,7 +108,7 @@ export function TransientView({ store }: { store: Store }) {
             {starterOnly.length > 0 && <div className="card"><div className="k">Starter-only regime</div><div className="v">{fmt(starterOnly[0].t, 1)} → {fmt(starterOnly[starterOnly.length - 1].t, 1)}<small>s, no gas-path solution</small></div></div>}
             {spools.map((k) => <div className="card" key={k}><div className="k">{k} spool</div><div className="v">{fmt(samples[0].Npct[k], 1)} → {fmt(samples[samples.length - 1].Npct[k], 1)}<small>%</small></div></div>)}
             <div className="card"><div className="k">Net thrust</div><div className="v">{fmt(samples[0].Fn / 1000, 1)} → {fmt(samples[samples.length - 1].Fn / 1000, 1)}<small>kN</small></div></div>
-            {minSM.map((m) => <div className="card" key={m.c}><div className="k">Min {m.c.toUpperCase()} surge margin</div><div className="v" style={{ color: m.v < 5 ? 'var(--bad)' : m.v < 10 ? 'var(--warn)' : undefined }}>{fmt(m.v, 1)}<small>%{m.v < 0 ? ' (beyond stall line)' : ''}</small></div></div>)}
+            {minSM.map((m) => <div className="card" key={m.c}><div className="k">Min {m.c.toUpperCase()} surge margin</div><div className="v" style={{ color: m.v < 5 ? 'var(--bad)' : m.v < 10 ? 'var(--warn)' : undefined }}>{Number.isFinite(m.v) ? fmt(m.v, 1) : '—'}<small>{Number.isFinite(m.v) ? `%${m.v < 0 ? ' (beyond stall line)' : ''}` : 'no gas-path solution'}</small></div></div>)}
             <div className="card"><div className="k">Peak T4</div><div className="v">{fmt(Math.max(...samples.map((x) => x.T4)), 0)}<small>K</small></div></div>
             {th.enabled && result?.minClearance_mm !== undefined && <div className="card" style={result.contact ? { borderColor: 'var(--bad)' } : undefined}><div className="k">Min tip clearance</div><div className="v" style={{ color: result.contact ? 'var(--bad)' : undefined }}>{fmt(result.minClearance_mm, 3)}<small>mm{result.contact ? ' — contact' : ''}</small></div></div>}
             {start.enabled && <div className="card"><div className="k">Light-off</div><div className="v">{(() => { const i = samples.findIndex((x) => x.lit); return i >= 0 ? fmt(samples[i].t, 1) + ' s' : 'none'; })()}</div></div>}

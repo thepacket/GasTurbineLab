@@ -74,7 +74,9 @@ export function MapTrajectory({ design, samples }: { design: EngineInputs; sampl
   const speeds: number[] = d.NcMap.filter((n: number) => n >= 0.5);
   const lines = speeds.map((nc: number) => d.RlineMap.map((rl: number) => { const r = cd.map.read(cd.sc, nc * cd.sc.sNc, rl); return { Wc: r.Wc, PR: r.PR }; }));
   const stall = speeds.map((nc: number) => { const r = cd.map.read(cd.sc, nc * cd.sc.sNc, d.RlineStall); return { Wc: r.Wc, PR: r.PR }; });
-  const traj = samples.filter((s) => Number.isFinite(s.Wc[id]) && Number.isFinite(s.PR[id])).map((s) => ({ Wc: s.Wc[id], PR: s.PR[id] }));
+  // samples without a gas-path solution (starter-only regime) carry no map point
+  const traj = samples.filter((s) => s.gasPath !== false && Number.isFinite(s.Wc?.[id]) && Number.isFinite(s.PR?.[id])).map((s) => ({ Wc: s.Wc[id], PR: s.PR[id] }));
+  if (traj.length < 2) return <div className="chart"><h4>{id.toUpperCase()} running line during the transient</h4><div className="sub">no gas-path solutions to plot (starter-only regime)</div></div>;
   const allW = [...lines.flat().map((p: any) => p.Wc), ...traj.map((p) => p.Wc)], allP = [...lines.flat().map((p: any) => p.PR), ...traj.map((p) => p.PR)];
   const xmin = 0, xmax = Math.max(...allW) * 1.05, ymin = 1, ymax = Math.max(...allP) * 1.05;
   const sx = (v: number) => m.l + ((v - xmin) / (xmax - xmin)) * (W - m.l - m.r);

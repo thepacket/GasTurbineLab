@@ -79,7 +79,7 @@ Engine code must stay free of DOM and React imports so it runs unchanged in the 
 
 `npm test` runs: pyCycle design-point comparison (equilibrium and frozen), pyCycle off-design and mixed-flow comparison, catalogue calibration, off-design round trips and throttling for every architecture, transient and mission behaviour, FADEC, start-up, thermal, secondary air, fuels and cooling, optimiser, Monte Carlo, weight, map generators, certification, and a 354-point envelope fuzz over the catalogue. Solver-heavy tests have a 120 s timeout because CI runners are several times slower than a laptop.
 
-`npm run test:e2e` runs 14 specs on desktop, tablet and phone: layouts, overflow, architecture switching, off-design in the worker, PWA manifest and service worker, share links, transient, mission, maps, learn, optimise, uncertainty, gallery and the language toggle.
+`npm run test:e2e` runs 15 specs on desktop, tablet and phone: layouts, overflow, architecture switching, off-design in the worker, PWA manifest and service worker, share links, transient, transient start-up from shutdown, mission, maps, learn, optimise, uncertainty, gallery and the language toggle.
 
 ## CI and dependencies
 

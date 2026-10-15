@@ -27,6 +27,17 @@ test('transient view integrates a fuel step in the worker', async ({ page }) => 
   await expect(page.getByText(/Min HPC surge margin/i)).toBeVisible();
 });
 
+test('transient start-up from shutdown renders its regime cards without crashing', async ({ page }) => {
+  await openView(page, 'Transient');
+  await expect(page.getByText('Spool speeds')).toBeVisible({ timeout: 60_000 });
+  await page.getByLabel('start from shutdown').check();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  // the default turbofan at cruise cannot establish a gas path: the starter-only regime card and the hung-start warning appear
+  await expect(page.getByText(/Starter-only regime|Light-off/).first()).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText(/Hung start|Light-off at/).first()).toBeVisible();
+  await expect(page.getByText('Spool speeds')).toBeVisible();
+});
+
 test('mission view flies the default profile', async ({ page }) => {
   await openView(page, 'Mission');
   await page.getByRole('button', { name: 'Fly mission' }).click();
