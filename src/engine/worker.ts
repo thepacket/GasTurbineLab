@@ -4,7 +4,7 @@ import { makeDesignPoint, solveOffDesign, OffDesignInputs, DesignPoint } from '.
 import { solveEngine } from './cycle';
 import { runTransient, TransientInputs, TransientSample } from './transient';
 import { runMission, MissionInputs, MissionPoint } from './mission';
-import { registerCustomMap } from './maps';
+import { replaceCustomMaps } from './maps';
 import { runOptimization, OptimizeInputs, OptimizeTrace } from './optimize';
 import { runMonteCarlo, MonteCarloInputs } from './montecarlo';
 import { runLto, LtoMode } from './certification';
@@ -37,7 +37,7 @@ function setPath(obj: any, path: string, value: unknown): any {
 export function handleRequest(msg: WorkerRequest, post: (r: WorkerResponse) => void) {
   try {
     if (msg.type === 'maps') {
-      for (const m of msg.maps) registerCustomMap(m.id, m.kind, m.data);
+      replaceCustomMaps(msg.maps);
       cache = null;
       post({ id: msg.id, ok: true, payload: msg.maps.length });
     } else if (msg.type === 'optimize') {

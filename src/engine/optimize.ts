@@ -13,7 +13,7 @@ export type Objective = 'tsfc' | 'specificThrust' | 'thrust' | 'missionFuel' | '
 export interface Constraint { kind: 'T3max' | 'T4max' | 'surgeMarginMin' | 'FnMin' | 'metalMax'; value: number }
 export interface OptimizeInputs { variables: DesignVariable[]; objective: Objective; constraints: Constraint[]; mission?: MissionInputs; checkOffDesign?: { altitude_m: number; mach: number; T4frac: number }; maxEvals: number }
 export interface OptimizeTrace { eval: number; objective: number; penalty: number; x: number[]; feasible: boolean }
-export interface OptimizeResult { best: EngineInputs; bestX: number[]; objective: number; trace: OptimizeTrace[]; evals: number; converged: boolean; baseline: number; warnings: string[] }
+export interface OptimizeResult { best: EngineInputs; bestX: number[]; objective: number; trace: OptimizeTrace[]; evals: number; converged: boolean; feasible: boolean; baseline: number; warnings: string[] }
 
 export const VARIABLES: DesignVariable[] = [
   { path: 'BPR', label: 'Bypass ratio', min: 2, max: 14 },
@@ -33,6 +33,12 @@ export function runOptimization(base: EngineInputs, oi: OptimizeInputs, progress
   const warnings: string[] = [];
   const vars = oi.variables;
   const n = vars.length;
+  if (!n || new Set(vars.map(v => v.path)).size !== n) throw new Error('Select at least one distinct design variable.');
+  for (const v of vars) if (!VARIABLES.some(x => x.path === v.path) || !Number.isFinite(getPath(base, v.path)) || !Number.isFinite(v.min) || !Number.isFinite(v.max) || v.min >= v.max) throw new Error(`Invalid bounds or variable: ${v.path}.`);
+  if (!Number.isInteger(oi.maxEvals) || oi.maxEvals < n + 2 || oi.maxEvals > 100000) throw new Error(`Evaluation budget must be an integer from ${n + 2} to 100000.`);
+  if (oi.objective === 'missionFuel' && !oi.mission) throw new Error('Mission fuel optimisation requires a mission.');
+  if (oi.constraints.some(c => !Number.isFinite(c.value))) throw new Error('Constraint values must be finite.');
+  if (oi.constraints.some(c => c.kind === 'surgeMarginMin') && !oi.checkOffDesign) throw new Error('A surge-margin constraint requires an off-design check point.');
   const trace: OptimizeTrace[] = [];
   let evals = 0;
   const apply = (x: number[]): EngineInputs => { let inp = { ...base, chemistry: 'frozen' as const }; vars.forEach((v, i) => { inp = setPath(inp, v.path, Math.min(v.max, Math.max(v.min, x[i]))); }); return inp; };
@@ -62,7 +68,7 @@ export function runOptimization(base: EngineInputs, oi: OptimizeInputs, progress
     for (const c of oi.constraints) {
       if (c.kind === 'T3max' && T3 > c.value) pen += Math.pow((T3 - c.value) / 50, 2);
       if (c.kind === 'T4max' && inp.burner.T4_K > c.value) pen += Math.pow((inp.burner.T4_K - c.value) / 50, 2);
-      if (c.kind === 'FnMin' && r.perf.Fn < c.value) pen += Math.pow((c.value - r.perf.Fn) / (0.02 * c.value), 2);
+      if (c.kind === 'FnMin' && r.perf.Fn < c.value) pen += Math.pow((c.value - r.perf.Fn) / Math.max(0.02 * Math.abs(c.value), 1), 2);
       if (c.kind === 'metalMax') { const h = r.components.find((x) => x.id === 'hpt' || x.id === 'turb'); if (h && h.values.metalTemp_K > c.value) pen += Math.pow((h.values.metalTemp_K - c.value) / 20, 2); }
     }
     const smC = oi.constraints.find((c) => c.kind === 'surgeMarginMin');
@@ -75,11 +81,22 @@ export function runOptimization(base: EngineInputs, oi: OptimizeInputs, progress
       } catch { pen += 10; }
     }
     if (r.warnings.some((w) => w.includes('cannot'))) pen += 10;
+    if (!Number.isFinite(f) || !Number.isFinite(pen)) return { f: 1e9, pen: 1e9, feasible: false };
     return { f, pen, feasible: pen < 1e-6 };
   };
   const scale = vars.map((v) => v.max - v.min);
   const x0 = vars.map((v) => Math.min(v.max, Math.max(v.min, getPath(base, v.path))));
-  const F = (x: number[]) => { const o = objective(apply(x)); const val = o.f + 1e3 * o.pen; trace.push({ eval: evals, objective: o.f, penalty: o.pen, x: x.slice(), feasible: o.feasible }); if (progress && trace.length % 10 === 0) progress(trace); return val; };
+  let selected: { x: number[]; f: number; pen: number; feasible: boolean } | undefined;
+  const F = (x: number[]) => {
+    if (evals >= oi.maxEvals) return Infinity;
+    // Project the simplex itself, not just the design passed to the solver.
+    vars.forEach((v, i) => { x[i] = Math.min(v.max, Math.max(v.min, x[i])); });
+    const o = objective(apply(x)); const val = o.f + 1e3 * o.pen;
+    if (!selected || (o.feasible && !selected.feasible) || (o.feasible === selected.feasible && val < selected.f + 1e3 * selected.pen)) selected = { x: x.slice(), ...o };
+    trace.push({ eval: evals, objective: o.f, penalty: o.pen, x: x.slice(), feasible: o.feasible });
+    if (progress && trace.length % 10 === 0) progress(trace);
+    return val;
+  };
   const base0 = objective({ ...base, chemistry: 'frozen' });
   const baseline = base0.f;
   // initial simplex
@@ -106,11 +123,10 @@ export function runOptimization(base: EngineInputs, oi: OptimizeInputs, progress
       else { for (let i = 1; i <= n; i++) { simplex[i] = simplex[i].map((v, k) => simplex[0][k] + sig * (v - simplex[0][k])); fx[i] = F(simplex[i]); } }
     }
   }
-  const bi = fx.indexOf(Math.min(...fx));
-  const bestX = simplex[bi].map((v, i) => Math.min(vars[i].max, Math.max(vars[i].min, v)));
+  const bestX = selected!.x;
   const best = apply(bestX);
-  const bo = objective(best);
+  const bo = selected!;
   if (!bo.feasible) warnings.push('Best point still violates a constraint; penalties remain. Relax the bounds or constraints.');
   if (!converged) warnings.push(`Stopped at the evaluation budget (${oi.maxEvals}); the simplex had not fully collapsed.`);
-  return { best: { ...best, chemistry: base.chemistry }, bestX, objective: bo.f, trace, evals, converged, baseline, warnings };
+  return { best, bestX, objective: bo.f, trace, evals, converged, feasible: bo.feasible, baseline, warnings };
 }

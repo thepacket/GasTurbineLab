@@ -5,17 +5,34 @@
  * point so that the scaled map passes through the design PR, eff, flow and speed.
  */
 import mapsJson from '../data/maps.json';
+import { validateCompressor, validateTurbine } from './mapValidation';
 
 export interface CompressorMapData { defaults: Record<string, number>; RlineStall: number; alphaMap: number[]; NcMap: number[]; RlineMap: number[]; WcMap: number[][][]; PRmap: number[][][]; effMap: number[][][] }
 export interface TurbineMapData { defaults: Record<string, number>; alphaMap: number[]; NpMap: number[]; PRmap: number[]; WpMap: number[][][]; effMap: number[][][] }
 const DATA = mapsJson as unknown as { compressors: Record<string, CompressorMapData>; turbines: Record<string, TurbineMapData> };
 export const COMPRESSOR_MAPS = Object.keys(DATA.compressors);
 export const TURBINE_MAPS = Object.keys(DATA.turbines);
-const CUSTOM: { compressors: Record<string, CompressorMapData>; turbines: Record<string, TurbineMapData> } = { compressors: {}, turbines: {} };
+const CUSTOM: { compressors: Record<string, CompressorMapData>; turbines: Record<string, TurbineMapData> } = { compressors: Object.create(null), turbines: Object.create(null) };
 export function registerCustomMap(id: string, kind: 'compressor' | 'turbine', data: CompressorMapData | TurbineMapData) {
-  if (kind === 'compressor') CUSTOM.compressors[id] = data as CompressorMapData; else CUSTOM.turbines[id] = data as TurbineMapData;
+  if (!id || ['__proto__', 'constructor', 'prototype'].includes(id)) throw new Error('Invalid custom map id.');
+  if (kind === 'compressor') CUSTOM.compressors[id] = structuredClone(validateCompressor(data as CompressorMapData));
+  else if (kind === 'turbine') CUSTOM.turbines[id] = structuredClone(validateTurbine(data as TurbineMapData));
+  else throw new Error('Invalid custom map kind.');
 }
 export function listCustomMaps(): string[] { return [...Object.keys(CUSTOM.compressors), ...Object.keys(CUSTOM.turbines)]; }
+/** Replace a saved-map snapshot atomically, including removals. */
+export function replaceCustomMaps(maps: { id: string; kind: 'compressor' | 'turbine'; data: CompressorMapData | TurbineMapData }[]) {
+  for (const m of maps) {
+    if (!m.id || ['__proto__', 'constructor', 'prototype'].includes(m.id)) throw new Error('Invalid custom map id.');
+    if (m.kind === 'compressor') validateCompressor(m.data as CompressorMapData);
+    else if (m.kind === 'turbine') validateTurbine(m.data as TurbineMapData);
+    else throw new Error('Invalid custom map kind.');
+  }
+  if (new Set(maps.map(m => m.id)).size !== maps.length) throw new Error('Custom map ids must be distinct.');
+  for (const key of Object.keys(CUSTOM.compressors)) delete CUSTOM.compressors[key];
+  for (const key of Object.keys(CUSTOM.turbines)) delete CUSTOM.turbines[key];
+  for (const m of maps) registerCustomMap(m.id, m.kind, m.data);
+}
 export function customMapKind(id: string): 'compressor' | 'turbine' | null { return CUSTOM.compressors[id] ? 'compressor' : CUSTOM.turbines[id] ? 'turbine' : null; }
 
 /** Bilinear interpolation on a 2-D table (first alpha slice), with linear extrapolation outside. */

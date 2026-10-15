@@ -6,7 +6,7 @@ import { request } from '../engine/client';
 import { UNCERTAIN, MonteCarloResult } from '../engine/montecarlo';
 import { fmt } from './format';
 
-function Histogram({ title, values, unit, digits = 1 }: { title: string; values: number[]; unit: string; digits?: number }) {
+function Histogram({ title, values, stats, scale = 1, unit, digits = 1 }: { title: string; values: number[]; stats: MonteCarloResult['stats'][string]; scale?: number; unit: string; digits?: number }) {
   if (values.length < 2) return null;
   const W = 420, H = 200, m = { l: 40, r: 12, t: 10, b: 30 };
   const lo = Math.min(...values), hi = Math.max(...values);
@@ -15,11 +15,10 @@ function Histogram({ title, values, unit, digits = 1 }: { title: string; values:
   const mx = Math.max(...bins);
   const sx = (i: number) => m.l + (i / nb) * (W - m.l - m.r), bw = (W - m.l - m.r) / nb;
   const sy = (c: number) => H - m.b - (c / mx) * (H - m.t - m.b);
-  const sorted = values.slice().sort((a, b) => a - b); const q = (f: number) => sorted[Math.floor(f * (sorted.length - 1))];
   return (
     <div className="chart">
       <h4>{title}</h4>
-      <div className="sub">p5 {fmt(q(0.05), digits)} · median {fmt(q(0.5), digits)} · p95 {fmt(q(0.95), digits)} {unit}</div>
+      <div className="sub">p5 {fmt(stats.p5 * scale, digits)} · median {fmt(stats.p50 * scale, digits)} · p95 {fmt(stats.p95 * scale, digits)} {unit}</div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title}>
         <g className="axis"><line x1={m.l} x2={W - m.r} y1={H - m.b} y2={H - m.b} /></g>
         {bins.map((c, i) => <rect key={i} x={sx(i) + 1} y={sy(c)} width={bw - 2} height={H - m.b - sy(c)} rx={2} fill="var(--series-1)" />)}
@@ -42,7 +41,7 @@ export function UncertaintyView({ store }: { store: Store }) {
   const [error, setError] = useState<string | null>(null);
   const run = () => {
     setBusy(0); setError(null); setRes(null); stale.snapshot();
-    request<MonteCarloResult>({ type: 'montecarlo', inputs, mc: { inputs: avail.filter((u) => on.includes(u.path)).map((u) => ({ ...u, sigma: sigmas[u.path] })), samples, seed: 12345 } }, (k: number) => setBusy(k))
+    request<MonteCarloResult>({ type: 'montecarlo', inputs, mc: { inputs: avail.filter((u) => on.includes(u.path)).map((u) => ({ ...u, sigma: sigmas[u.path] ?? u.sigma })), samples, seed: 12345 } }, (k: number) => setBusy(k))
       .then((r) => { setRes(r); setBusy(null); })
       .catch((e) => { setError(e.message); setBusy(null); });
   };
@@ -58,7 +57,7 @@ export function UncertaintyView({ store }: { store: Store }) {
           <div className="control" key={u.path} style={{ gridTemplateColumns: 'auto 1fr auto' }}>
             <label className="toggle"><input type="checkbox" checked={on.includes(u.path)} onChange={(e) => setOn(e.target.checked ? [...on, u.path] : on.filter((x) => x !== u.path))} /> {u.label}</label>
             <span />
-            <span className="val">σ <input className="num" type="number" aria-label={`${u.label} sigma`} style={{ width: 70 }} step={0.001} value={sigmas[u.path]} onChange={(e) => setSigmas({ ...sigmas, [u.path]: +e.target.value })} /> <span className="unit">[{u.min ?? '−∞'}, {u.max ?? '∞'}]</span></span>
+            <span className="val">σ <input className="num" type="number" aria-label={`${u.label} sigma`} style={{ width: 70 }} step={0.001} value={sigmas[u.path] ?? u.sigma} onChange={(e) => setSigmas({ ...sigmas, [u.path]: +e.target.value })} /> <span className="unit">[{u.min ?? '−∞'}, {u.max ?? '∞'}]</span></span>
           </div>
         ))}
       </div>
@@ -76,10 +75,10 @@ export function UncertaintyView({ store }: { store: Store }) {
             <div className="card"><div className="k">Redrawn draws</div><div className="v">{res.truncated}<small>outside physical bounds (η, recovery, Cv ≤ 1; losses ≥ 0)</small></div></div>
           </div>
           <div className="charts">
-            <Histogram title="Net thrust" values={res.Fn.map((v) => v / 1000)} unit="kN" />
-            <Histogram title="TSFC" values={res.TSFC} unit="mg/(N·s)" digits={2} />
-            <Histogram title="Fuel flow" values={res.Wf} unit="kg/s" digits={3} />
-            <Histogram title="Compressor exit temperature" values={res.T3} unit="K" digits={0} />
+            <Histogram title="Net thrust" values={res.Fn.map((v) => v / 1000)} stats={res.stats.Fn} scale={0.001} unit="kN" />
+            <Histogram title="TSFC" values={res.TSFC} stats={res.stats.TSFC} unit="mg/(N·s)" digits={2} />
+            <Histogram title="Fuel flow" values={res.Wf} stats={res.stats.Wf} unit="kg/s" digits={3} />
+            <Histogram title="Compressor exit temperature" values={res.T3} stats={res.stats.T3} unit="K" digits={0} />
           </div>
           <div className="section">
             <h3>One-at-a-time sensitivities <span className="hint">+1σ, clipped to the physical bound where it would exceed it</span></h3>

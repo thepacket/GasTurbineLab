@@ -1,33 +1,28 @@
 import { useState } from 'react';
-import { Store } from '../state/store';
-import { EngineInputs } from '../engine/types';
-import { OffDesignInputs } from '../engine/offdesign';
+import { Store, odFromDesign } from '../state/store';
+import { type SavedDesign, loadGallery, saveGallery, parseGallery, galleryForExport, restoreGalleryMaps } from '../state/gallery';
 import { shareUrl } from './share';
 import { fmt } from './format';
 import { solveEngine } from '../engine/cycle';
 
-export interface SavedDesign { id: string; name: string; savedAt: string; inputs: EngineInputs; od?: OffDesignInputs; note?: string | null; summary: { arch: string; Fn_kN: number; TSFC: number; T4: number } }
-const KEY = 'gtl.gallery.v1';
-export function loadGallery(): SavedDesign[] { try { return JSON.parse(localStorage.getItem(KEY) ?? '[]'); } catch { return []; } }
-export function saveGallery(list: SavedDesign[]) { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* quota */ } }
 
 /** Named saved designs in this browser, with sharing links and import/export as JSON. */
 export function Gallery({ store }: { store: Store }) {
   const [list, setList] = useState<SavedDesign[]>(loadGallery);
   const [name, setName] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
-  const persist = (l: SavedDesign[]) => { setList(l); saveGallery(l); };
+  const persist = (l: SavedDesign[]) => { try { const valid = parseGallery(l); saveGallery(valid); setList(valid); return true; } catch (e: any) { setMsg(`Save failed: ${e.message}`); return false; } };
   const save = () => {
     const inputs = store.state.inputs;
     let summary = { arch: inputs.arch, Fn_kN: NaN, TSFC: NaN, T4: inputs.burner.T4_K };
-    try { const r = solveEngine({ ...inputs, chemistry: 'frozen' }); summary = { ...summary, Fn_kN: r.perf.Fn / 1000, TSFC: r.perf.TSFC_mg_Ns }; } catch { /* keep NaN */ }
-    const d: SavedDesign = { id: Date.now().toString(36), name: name.trim() || `${inputs.arch} · ${new Date().toLocaleString()}`, savedAt: new Date().toISOString(), inputs: JSON.parse(JSON.stringify(inputs)), od: store.state.od, note: store.state.note, summary };
-    persist([d, ...list]); setName(''); setMsg(`Saved “${d.name}”.`);
+    try { const r = solveEngine(inputs); summary = { ...summary, Fn_kN: r.perf.Fn / 1000, TSFC: r.perf.TSFC_mg_Ns }; } catch { /* keep NaN */ }
+    const d: SavedDesign = galleryForExport([{ id: Date.now().toString(36), name: name.trim() || `${inputs.arch} · ${new Date().toLocaleString()}`, savedAt: new Date().toISOString(), inputs: JSON.parse(JSON.stringify(inputs)), od: store.state.od, mode: store.state.mode, note: store.state.note, summary }])[0];
+    if (persist([d, ...list])) { setName(''); setMsg(`Saved “${d.name}”.`); }
   };
-  const load = (d: SavedDesign) => { store.dispatch({ type: 'inputs', inputs: JSON.parse(JSON.stringify(d.inputs)), note: d.note ?? `Loaded: ${d.name}` }); if (d.od) store.dispatch({ type: 'load', state: { od: d.od } }); setMsg(`Loaded “${d.name}”.`); };
-  const link = async (d: SavedDesign) => { const url = await shareUrl({ inputs: d.inputs, od: d.od, mode: 'design', note: d.note }); try { await navigator.clipboard.writeText(url); setMsg('Link copied.'); } catch { prompt('Copy this link', url); } };
-  const exportAll = () => { const blob = new Blob([JSON.stringify(list, null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gas-turbine-lab-designs.json'; a.click(); };
-  const importFile = async (f: File) => { try { const arr = JSON.parse(await f.text()); if (!Array.isArray(arr)) throw new Error('not a design list'); persist([...arr, ...list]); setMsg(`Imported ${arr.length} designs.`); } catch (e: any) { setMsg(`Import failed: ${e.message}`); } };
+  const load = async (d: SavedDesign) => { try { await restoreGalleryMaps(d); store.dispatch({ type: 'load', state: { inputs: JSON.parse(JSON.stringify(d.inputs)), selected: null, od: d.od ?? odFromDesign(d.inputs), mode: d.mode ?? 'design', note: d.note ?? `Loaded: ${d.name}` } }); setMsg(`Loaded “${d.name}”.`); } catch (e: any) { setMsg(`Load failed: ${e.message}`); } };
+  const link = async (d: SavedDesign) => { const url = await shareUrl({ inputs: d.inputs, od: d.od, mode: d.mode ?? 'design', maps: d.maps, note: d.note }); try { await navigator.clipboard.writeText(url); setMsg('Link copied.'); } catch { prompt('Copy this link', url); } };
+  const exportAll = () => { const blob = new Blob([JSON.stringify(galleryForExport(list), null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gas-turbine-lab-designs.json'; a.click(); };
+  const importFile = async (f: File) => { try { const arr = parseGallery(JSON.parse(await f.text())); if (persist([...arr, ...list])) setMsg(`Imported ${arr.length} designs.`); } catch (e: any) { setMsg(`Import failed: ${e.message}`); } };
   return (
     <div>
       <div className="prose"><h2>Saved designs</h2><p>Designs are stored in this browser. Export the list as JSON to move it elsewhere or share it; each entry can also be copied as a link.</p></div>

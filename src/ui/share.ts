@@ -73,6 +73,13 @@ export function sanitizeInputs(ri: any, defaultsFor: (arch: any) => EngineInputs
   };
   const inputs: EngineInputs = clean(defaultsFor(arch), ri ?? {});
   inputs.arch = arch;
+  const defaults = defaultsFor(arch);
+  inputs.chemistry = ['frozen', 'equilibrium'].includes(ri?.chemistry) ? ri.chemistry : defaults.chemistry;
+  inputs.fuel = ['jetA', 'saf', 'hydrogen', 'methane'].includes(ri?.fuel) ? ri.fuel : defaults.fuel;
+  inputs.spools = ri?.spools === 3 ? 3 : 2;
+  inputs.cooling.mode = ri?.cooling?.mode === 'computed' ? 'computed' : 'fixed';
+  inputs.coreNozzle.type = ['CV', 'CD'].includes(ri?.coreNozzle?.type) ? ri.coreNozzle.type : defaults.coreNozzle.type;
+  inputs.bypNozzle.type = ['CV', 'CD'].includes(ri?.bypNozzle?.type) ? ri.bypNozzle.type : defaults.bypNozzle.type;
   if (!ri || typeof ri !== 'object') return inputs;
   if (ri.mapIds && typeof ri.mapIds === 'object') {
     inputs.mapIds = {};
@@ -93,13 +100,29 @@ export async function decodeShare(hash: string): Promise<Shared | null> {
   const h = hash.replace(/^#/, '');
   if (!h.startsWith('d=')) return null;
   const payload = h.slice(2);
+  if (payload.length > 4 * 1024 * 1024 || !['z', 'j'].includes(payload[0])) return null;
   try {
     const kind = payload[0], body = payload.slice(1);
     let bytes = unb64url(body);
     if (kind === 'z') {
       const ds = new DecompressionStream('deflate-raw');
-      const w = ds.writable.getWriter(); w.write(bytes as unknown as BufferSource); w.close();
-      bytes = new Uint8Array(await new Response(ds.readable).arrayBuffer());
+      const w = ds.writable.getWriter();
+      const read = async () => {
+        const reader = ds.readable.getReader(); const chunks: Uint8Array[] = []; let size = 0;
+        try {
+          while (true) {
+            const { value, done } = await reader.read(); if (done) break;
+            size += value.length;
+            if (size > 4 * 1024 * 1024) throw new Error('Shared design is too large.');
+            chunks.push(value);
+          }
+        } catch (error) { await reader.cancel().catch(() => {}); throw error; }
+        const all = new Uint8Array(size); let offset = 0;
+        for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
+        return all;
+      };
+      const [decoded] = await Promise.all([read(), (async () => { await w.write(bytes as unknown as BufferSource); await w.close(); })()]);
+      bytes = decoded;
     }
     return JSON.parse(new TextDecoder().decode(bytes));
   } catch { return null; }

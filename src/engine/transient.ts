@@ -114,6 +114,9 @@ interface Rate { dN: Record<string, number>; r: EngineResult; conv: boolean; xr:
 
 /** Integrate the engine through the fuel schedule. Calls `progress` with partial samples. */
 export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s: TransientSample[]) => void): TransientResult {
+  if (!Number.isFinite(ti.duration_s) || ti.duration_s < 0 || !Number.isFinite(ti.dt_s) || ti.dt_s <= 0 || ti.duration_s / ti.dt_s > 100000) throw new Error('Transient duration and time step must be finite, with a positive time step and at most 100000 steps.');
+  if (ti.thermal?.enabled && (![ti.thermal.tauCasing_s, ti.thermal.tauDisc_s, ti.thermal.bladeHeight_mm, ti.thermal.rCasing_mm].every(v => Number.isFinite(v) && v > 0))) throw new Error('Thermal time constants and dimensions must be finite and positive.');
+  if (![ti.schedule.T4start, ti.schedule.WfEndFrac, ti.schedule.rampStart_s, ti.schedule.rampDuration_s, ti.schedule.ratioUnitLimit, ti.schedule.ratioUnitFloor].every(v => Number.isFinite(v) && v >= 0)) throw new Error('Fuel schedule values must be finite and non-negative.');
   const inp = dp.inputs;
   const warnings: string[] = [];
   const WfDes = dp.result.components.find((c) => c.id === 'burner')!.values.Wfuel_kgs;
@@ -123,7 +126,9 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
   const st = ti.start?.enabled ? ti.start : null;
   // steady start point (or a near-zero-speed state for a start-up)
   const start = solveOffDesign(dp, { ...ti.od, throttle: { mode: 'T4', value: ti.schedule.T4start } });
-  if (!start.converged && !st) warnings.push('Start operating point did not converge; integrating from the closest iterate.');
+  if (!start.converged && !st) {
+    return { samples: [], design: { Wf: WfDes, ratioUnit: ruDes }, warnings: ['Start operating point did not converge; the trajectory cannot be initialized.'], complete: false, stoppedAt_s: 0, eulerSteps: 0, starterOnlySteps: 0, contact: false };
+  }
   const sp = start.x;
   const windmill = st ? Math.max(0.04, 0.12 * ti.od.mach) : 0; // crude windmilling speed fraction at forward speed
   const speeds = st ? { LP: inp.speeds.LP * windmill * 1.3, IP: inp.speeds.IP * windmill, HP: inp.speeds.HP * windmill } : { LP: sp.N_LP ?? inp.speeds.LP, IP: sp.N_IP ?? inp.speeds.IP, HP: sp.N_HP };
@@ -212,10 +217,10 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
   const starterOnlyRate = (spd: typeof speeds): Rate => {
     const power: Record<string, number> = {};
     for (const k of names) power[k] = k === 'HP' ? starterPower(spd) : 0;
-    return { dN: ratesFromPower(spd, power), r: noFlowResult(dp, T2), conv: false, xr: x, norm: NaN, gasPath: false };
+    return { dN: ratesFromPower(spd, power), r: noFlowResult(dp, ti.od, T2), conv: false, xr: x, norm: NaN, gasPath: false };
   };
 
-  const n = Math.round(ti.duration_s / ti.dt_s);
+  const n = Math.ceil(ti.duration_s / ti.dt_s);
   let lastProgress = 0;
   // closed-loop state
   let integ = 0, lastMeasured = NaN, demand = NaN;
@@ -225,11 +230,17 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
   let complete = true, stoppedAt: number | undefined, eulerSteps = 0, starterOnlySteps = 0;
   let lastP3 = st ? NaN : start.result.stations.find((s) => s.id === '3')!.Pt; // P3 of the last converged gas path, for the limiter
   let lastTriedHP = -Infinity; // HP speed at the last gas-path attempt in the starter-only regime
-  const stop = (t: number, why: string) => { warnings.push(`${why} The trajectory stops at t = ${t.toFixed(2)} s of ${ti.duration_s} s; the samples shown are all converged solutions.`); complete = false; stoppedAt = t; };
+  const stop = (t: number, why: string) => { warnings.push(`${why} The trajectory stops at t = ${t.toFixed(2)} s of ${ti.duration_s} s; gas-path samples are converged solutions, and starter-only samples are marked separately.`); complete = false; stoppedAt = t; };
   const describe = (r: Rate) => { const v = r.r.offDesign?.mapViolations ?? []; return `residual ${r.norm.toExponential(1)}${v.length ? `, outside the supported range: ${v.join(', ')}` : ''}`; };
 
   for (let i = 0; i <= n; i++) {
-    const t = i * ti.dt_s;
+    const t = Math.min(i * ti.dt_s, ti.duration_s);
+    const h = Math.min(ti.dt_s, ti.duration_s - t);
+    // Switch the starter before evaluating either integration stage at this state.
+    if (st && starterOn && speeds.HP / inp.speeds.HP >= st.starterCutout) {
+      starterOn = false;
+      warnings.push(`Starter cut-out at t = ${t.toFixed(1)} s.`);
+    }
     // actuators: bleed valve and variable stators from the schedule
     if (sched) {
       const n2 = speeds.HP / inp.speeds.HP;
@@ -248,11 +259,15 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     const tRef = st ? t - tLit : t;
     const f = Math.min(1, Math.max(0, (tRef - ti.schedule.rampStart_s) / Math.max(ti.schedule.rampDuration_s, 1e-6)));
     let WfCmd = st ? (lit ? st.lightOffFuelFrac * WfDes + (WfEnd - st.lightOffFuelFrac * WfDes) * f : 0) : Wf0(start) + (WfEnd - Wf0(start)) * f;
+    const integBefore = integ;
+    let controlError = 0;
+    let ignited = false;
     if (ctl && lit) {
       const fr = Math.min(1, Math.max(0, (tRef - ti.schedule.rampStart_s) / Math.max(ctl.targetRamp_s, 1e-6)));
       demand = startMeasured + (ctl.target - startMeasured) * fr;
       const meas = Number.isFinite(lastMeasured) ? lastMeasured : startMeasured;
       const e = (demand - meas) / Math.max(Math.abs(demand), 1e-9);
+      controlError = e;
       integ += e * ti.dt_s;
       integ = Math.max(-0.5, Math.min(0.5, integ)); // anti-windup
       WfCmd = Math.max(0.02 * WfDes, WfBase + WfDes * (ctl.Kp * e + ctl.Ki * integ));
@@ -287,50 +302,63 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
       if (!lit && r1.gasPath && nHP >= st.lightOffSpeed) {
         const T3 = T3of(r1.r);
         if (T3 >= st.lightOffT3min_K) {
-          lit = true; tLit = t;
+          lit = true; tLit = t; ignited = true;
           warnings.push(`Light-off at t = ${t.toFixed(1)} s, N2 ${(100 * nHP).toFixed(0)} %, T3 ${T3.toFixed(0)} K.`);
           WfCmd = st.lightOffFuelFrac * WfDes;
-          WfNow = WfCmd;
-          const r1b = stepRate(speeds, WfCmd, true);
+          WfNow = limitFuel(WfCmd, r1.r.stations.find(s => s.id === '3')!.Pt).Wf;
+          const r1b = stepRate(speeds, WfNow, true);
           if (!r1b || !r1b.conv) { stop(t, r1b ? `Gas path did not converge at light-off (${describe(r1b)}).` : 'Gas path could not be evaluated at light-off.'); break; }
           r1 = r1b;
-          if (ctl) { startMeasured = measure(r1.r, speeds); WfBase = 0; }
         }
       }
-      if (starterOn && nHP >= st.starterCutout) { starterOn = false; warnings.push(`Starter cut-out at t = ${t.toFixed(1)} s.`); }
       if (!lit && !starterOn && (r1.dN.HP ?? 0) <= 0) {
         warnings.push(`Hung start: no light-off before the starter cut out (t = ${t.toFixed(1)} s)${r1.gasPath ? '' : '; no through-flow solution was found at the starter-driven speed'}.`);
+        complete = false; stoppedAt = t;
         samples.push({ ...sample(t, 0, 0, false, speeds, inp, r1.r, r1.conv), gasPath: r1.gasPath, lit, starter: starterOn });
         break;
       }
     }
-    // refine the limiter with P3 of this step's solution and re-solve once if the limit moved
+    // Couple the limiter to this step's pressure, including release of a limit
+    // imposed using the previous step's pressure. Do not label an unsettled limit as valid.
     if (lit && r1.gasPath) {
-      const P3 = r1.r.stations.find((s) => s.id === '3')!.Pt;
-      const lim = limitFuel(Math.max(WfCmd, 2e-4 * WfDes), P3);
-      if (lim.limited && Math.abs(lim.Wf / WfNow - 1) > 5e-3) {
+      let settled = false;
+      for (let iteration = 0; iteration < 10; iteration++) {
+        const P3 = r1.r.stations.find((s) => s.id === '3')!.Pt;
+        const lim = limitFuel(Math.max(WfCmd, 2e-4 * WfDes), P3);
+        if (Math.abs(lim.Wf / WfNow - 1) <= 5e-3) { settled = true; break; }
         const r2 = stepRate(speeds, lim.Wf, true);
         if (!r2 || !r2.conv) { stop(t, r2 ? `Gas path did not converge at the limited fuel flow (${describe(r2)}).` : 'Gas path could not be evaluated at the limited fuel flow.'); break; }
         r1 = r2; WfNow = lim.Wf;
       }
-      limited = lim.limited;
-      if (limited && ctl) integ -= 0.5 * (demand - (Number.isFinite(lastMeasured) ? lastMeasured : startMeasured)) / Math.max(Math.abs(demand), 1e-9) * ti.dt_s; // back off the integrator while limited
+      if (!complete) break;
+      if (!settled) { stop(t, 'Fuel limiter and compressor pressure did not settle within tolerance.'); break; }
+      limited = Math.abs(WfNow - WfCmd) > 5e-3 * Math.max(WfCmd, 1e-8 * WfDes);
+      // Conditional integration: prevent further wind-up into an active fuel limit,
+      // while allowing error of the opposite sign to unwind the integral.
+      if (ctl && limited && (WfCmd - WfNow) * controlError > 0) integ = integBefore;
+    }
+    // Bumpless transfer: at ignition the PI's zero-error output is the delivered fuel.
+    if (ignited && ctl) {
+      WfBase = WfNow;
+      startMeasured = measure(r1.r, speeds);
+      demand = startMeasured;
+      integ = 0;
     }
     Wf = WfNow;
     if (r1.gasPath) { x = r1.xr; xGood = { ...r1.xr }; lastP3 = r1.r.stations.find((s) => s.id === '3')!.Pt; }
     if (ctl && lit) lastMeasured = measure(r1.r, speeds);
     const smp: TransientSample = { ...sample(t, Wf, WfCmd, limited, speeds, inp, r1.r, r1.conv), gasPath: r1.gasPath, lit, starter: starterOn, demand: ctl && lit ? demand : undefined, measured: ctl && lit ? lastMeasured : undefined, bleedOpen: sched ? (geomOverride.handlingBleedFrac ?? 0) > (ti.od.geometry?.handlingBleedFrac ?? inp.geometry.handlingBleedFrac) : undefined, Tcasing: th ? Tcasing : undefined, Tdisc: th ? Tdisc : undefined, clearance_mm: th ? clr.delta_mm : undefined, effDeltaHPC: th ? clr.effDelta : undefined, rub: th ? clr.rub : undefined };
     samples.push(smp);
-    if (th) { const T3 = r1.gasPath ? T3of(r1.r) : T2; Tcasing += (ti.dt_s / th.tauCasing_s) * (T3 - Tcasing); Tdisc += (ti.dt_s / th.tauDisc_s) * (T3 - Tdisc); }
+    if (th) { const T3 = r1.gasPath ? T3of(r1.r) : T2; Tcasing += -Math.expm1(-h / th.tauCasing_s) * (T3 - Tcasing); Tdisc += -Math.expm1(-h / th.tauDisc_s) * (T3 - Tdisc); }
     // Heun (RK2) step on speeds; a failed predictor falls back to explicit Euler from the converged corrector
     if (i < n) {
       const k1 = r1.dN;
       const pred: typeof speeds = { ...speeds };
-      for (const k of names) (pred as any)[k] = (speeds as any)[k] + ti.dt_s * k1[k];
+      for (const k of names) (pred as any)[k] = (speeds as any)[k] + h * k1[k];
       let r2: Rate | null = r1.gasPath ? stepRate(pred, Wf, lit) : starterOnlyRate(pred);
       if (r2 && r1.gasPath && !r2.conv) r2 = null;
-      if (r2) for (const k of names) (speeds as any)[k] = (speeds as any)[k] + 0.5 * ti.dt_s * (k1[k] + (r2.dN[k] ?? k1[k]));
-      else { for (const k of names) (speeds as any)[k] = (speeds as any)[k] + ti.dt_s * k1[k]; eulerSteps++; smp.eulerStep = true; }
+      if (r2) for (const k of names) (speeds as any)[k] = (speeds as any)[k] + 0.5 * h * (k1[k] + (r2.dN[k] ?? k1[k]));
+      else { for (const k of names) (speeds as any)[k] = (speeds as any)[k] + h * k1[k]; eulerSteps++; smp.eulerStep = true; }
     }
     if (progress && t - lastProgress >= 0.5) { progress(samples); lastProgress = t; }
   }
@@ -346,14 +374,14 @@ function interpSchedule(tab: { Nc: number; ratioUnit: number }[], nc: number): n
   for (let i = 1; i < t.length; i++) if (nc <= t[i].Nc) return t[i - 1].ratioUnit + ((t[i].ratioUnit - t[i - 1].ratioUnit) * (nc - t[i - 1].Nc)) / (t[i].Nc - t[i - 1].Nc);
   return t[t.length - 1].ratioUnit;
 }
-function isaT2(_dp: DesignPoint, od: OffDesignInputs): number {
-  const amb = isa(od.altitude_m, od.dT_isa);
+function isaT2(dp: DesignPoint, od: OffDesignInputs): number {
+  const amb = isa(od.altitude_m, od.dT_isa, dp.inputs.flight.altIsGeopotential);
   return amb.T * (1 + 0.2 * od.mach * od.mach);
 }
 /** placeholder result for the starter-only regime: ambient total conditions, no flow, no thrust */
-function noFlowResult(dp: DesignPoint, T2: number): EngineResult {
+function noFlowResult(dp: DesignPoint, od: OffDesignInputs, T2: number): EngineResult {
   const base = dp.result;
-  const amb = isa(dp.inputs.flight.altitude_m, dp.inputs.flight.dT_isa);
+  const amb = isa(od.altitude_m, od.dT_isa, dp.inputs.flight.altIsGeopotential);
   const stations = base.stations.map((s) => ({ ...s, Pt: amb.P, Tt: T2, W: 0, V: 0, MN: 0 }));
   const components = base.components.map((c) => c.kind === 'compressor' ? { ...c, values: { ...c.values, PR: 1, surgeMargin_pct: NaN, Wc: NaN, Nc_pct: NaN } } : c.kind === 'burner' ? { ...c, values: { ...c.values, FAR: 0, Wfuel_kgs: 0, T4: T2 } } : c);
   return { ...base, stations, components, perf: { ...base.perf, Fn: 0, Fg: 0, Wfuel: 0 } as EngineResult['perf'], warnings: [], offDesign: { converged: false, iterations: 0, residualNorm: NaN, throttle: 'starter only', x: {} } };

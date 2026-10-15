@@ -73,12 +73,10 @@ function load(): AppState {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    // merge with defaults so new fields get sane values
-    const d = defaultInputs(parsed.inputs?.arch ?? 'turbofan');
-    const inputs = { ...d, ...parsed.inputs };
-    for (const k of ['ipc', 'ipt', 'mixer', 'fanGear', 'speeds', 'prop', 'afterburner', 'geometry', 'installation', 'inertia', 'humidity', 'cooling', 'sas'] as const) (inputs as any)[k] = { ...(d as any)[k], ...(parsed.inputs?.[k] ?? {}) };
-    const od = { ...fallback.od, ...(parsed.od ?? {}) };
-    return { ...fallback, ...parsed, inputs, od };
+    const safe = sanitizeShared(parsed, defaultInputs);
+    if (!safe) return fallback;
+    const views: View[] = ['build', 'section', 'model', 'results', 'explore', 'compare', 'transient', 'mission', 'optimize', 'uncertainty', 'maps', 'gallery', 'learn', 'validate'];
+    return { ...fallback, inputs: safe.inputs, od: safe.od ?? odFromDesign(safe.inputs), mode: safe.mode ?? 'design', note: safe.note ?? null, compare: safe.compare ?? null, compareLabel: typeof parsed.compareLabel === 'string' ? parsed.compareLabel.slice(0, 200) : null, view: views.includes(parsed.view) ? parsed.view : 'build', units: parsed.units === 'imperial' ? 'imperial' : 'SI' };
   } catch {
     return fallback;
   }
@@ -86,6 +84,7 @@ function load(): AppState {
 
 export function useEngineStore() {
   const [state, dispatch] = useReducer(reducer, undefined, load);
+  const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify({ inputs: state.inputs, view: state.view, note: state.note, mode: state.mode, od: state.od, compare: state.compare, compareLabel: state.compareLabel, units: state.units })); } catch { /* ignore */ }
   }, [state.inputs, state.view, state.note, state.mode, state.od, state.compare, state.compareLabel, state.units]);
@@ -95,7 +94,7 @@ export function useEngineStore() {
     if (!location.hash.startsWith('#d=')) return;
     decodeShare(location.hash).then((raw) => {
       const d = sanitizeShared(raw, defaultInputs);
-      if (!d) return;
+      if (!d) throw new Error('Invalid or unsupported shared design');
       const inputs = d.inputs;
       if (d.maps?.length) { // custom maps carried by the link: register and keep them
         const existing = loadCustomMaps();
@@ -104,32 +103,33 @@ export function useEngineStore() {
       }
       dispatch({ type: 'load', state: { inputs, od: d.od ?? odFromDesign(inputs), mode: d.mode ?? 'design', note: d.note ?? null, compare: d.compare ?? null } });
       history.replaceState(null, '', location.pathname);
-    });
+    }).catch((e) => { setLoadError(`Could not load shared design: ${e.message}`); });
   }, []);
 
   const design: EngineResult | { error: string } = useMemo(() => {
     try { return solveEngine(state.inputs); } catch (e: any) { return { error: e?.message ?? String(e) }; }
   }, [state.inputs]);
 
-  // off-design solution comes from the worker; keep the last good one while a new one is computed
+  // Only expose worker results whose source inputs still match the current operating state.
   const [odResult, setOdResult] = useState<EngineResult | { error: string } | null>(null);
-  const [odBusy, setOdBusy] = useState(false);
+  const [odSource, setOdSource] = useState<{ inputs: EngineInputs; od: OffDesignInputs } | null>(null);
   const reqId = useRef(0);
   useEffect(() => {
     if (state.mode !== 'offdesign' || 'error' in design) return;
     const id = ++reqId.current;
-    setOdBusy(true);
+    let active = true;
     const t = setTimeout(() => {
       request<{ result: EngineResult; converged: boolean }>({ type: 'offdesign', inputs: state.inputs, od: state.od })
-        .then((r) => { if (id === reqId.current) { setOdResult(r.converged ? r.result : { ...r.result, warnings: ['Off-design solver did not converge at this operating point; showing the closest iterate.', ...r.result.warnings] }); setOdBusy(false); } })
-        .catch((e) => { if (id === reqId.current) { setOdResult({ error: e.message }); setOdBusy(false); } });
+        .then((r) => { if (active && id === reqId.current) { setOdResult(r.converged ? r.result : { ...r.result, warnings: ['Off-design solver did not converge at this operating point; showing the closest iterate.', ...r.result.warnings] }); setOdSource({ inputs: state.inputs, od: state.od }); } })
+        .catch((e) => { if (active && id === reqId.current) { setOdResult({ error: e.message }); setOdSource({ inputs: state.inputs, od: state.od }); } });
     }, 120);
-    return () => clearTimeout(t);
+    return () => { active = false; clearTimeout(t); };
   }, [state.inputs, state.od, state.mode, design]);
 
-  const result = state.mode === 'offdesign' && odResult ? odResult : design;
+  const odPending = state.mode === 'offdesign' && !('error' in design) && (!odSource || odSource.inputs !== state.inputs || odSource.od !== state.od);
+  const result = 'error' in design ? design : state.mode === 'offdesign' ? (odPending || !odResult ? { error: 'Computing off-design result for the current inputs…' } : odResult) : design;
   const set = useCallback((path: string, value: unknown) => dispatch({ type: 'set', path, value }), []);
   const setOd = useCallback((path: string, value: unknown) => dispatch({ type: 'od', path, value }), []);
-  return { state, dispatch, set, setOd, result, design, odBusy };
+  return { state, dispatch, set, setOd, result, design, odBusy: odPending, odPending, loadError };
 }
 export type Store = ReturnType<typeof useEngineStore>;

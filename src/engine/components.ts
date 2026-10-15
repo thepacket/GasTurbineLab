@@ -104,11 +104,12 @@ export function burnerToT(inp: Flow, T4: number, dPqP: number, eff: number, hFue
     let step = -F / dF;
     step = Math.max(-0.01, Math.min(0.01, step));
     far += step;
-    if (far < 1e-5) far = 1e-5;
+    if (far < 0) far = 0;
     if (Math.abs(F) < 1e-6) break;
   }
   const s = state(far);
   const Tt = s.gas.TfromH(s.ht, Pt, T4);
+  if (!Number.isFinite(Tt) || !Number.isFinite(far) || Math.abs(Tt - T4) > Math.max(0.01, 1e-6 * T4)) throw new Error('Combustor cannot reach the requested temperature with non-negative fuel flow.');
   return { out: { gas: s.gas, Pt, Tt, ht: s.ht, W: s.Wout }, FAR: far, Wfuel: s.Wf };
 }
 

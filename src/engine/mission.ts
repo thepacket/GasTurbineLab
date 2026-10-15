@@ -28,23 +28,34 @@ export interface MissionResult {
   /** largest relative thrust shortfall over the mission, 0 when none */
   maxShortfall: number;
   unconvergedPoints: number;
+  ratingViolations: number;
+  operabilityViolations: number;
 }
 
 export function runMission(dp: DesignPoint, mi: MissionInputs, progress?: (p: MissionPoint[]) => void): MissionResult {
   const ac = mi.aircraft;
+  if (![ac.mass_kg, ac.wingArea_m2, ac.engines].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(ac.engines) || ![ac.CD0, ac.k].every(v => Number.isFinite(v) && v >= 0)) throw new Error('Invalid aircraft mass, wing area, engine count or drag polar.');
+  if (!mi.segments.length || !Number.isInteger(mi.pointsPerSegment) || mi.pointsPerSegment < 2 || mi.pointsPerSegment > 10000) throw new Error('A mission needs segments and 2–10000 points per segment.');
+  if (mi.ratings && !Object.values(mi.ratings).every(v => Number.isFinite(v) && v > 0)) throw new Error('Engine ratings must be finite and positive.');
+  for (const seg of mi.segments) {
+    if (![seg.alt0_m, seg.alt1_m, seg.mach, seg.value].every(Number.isFinite) || seg.mach <= 0 || seg.value <= 0 || (seg.T4frac !== undefined && (!Number.isFinite(seg.T4frac) || seg.T4frac <= 0))) throw new Error(`Invalid mission segment: ${seg.label}.`);
+    if ((seg.kind === 'climb' && seg.alt1_m <= seg.alt0_m) || (seg.kind === 'descent' && seg.alt1_m >= seg.alt0_m)) throw new Error(`Altitude direction conflicts with ${seg.kind}: ${seg.label}.`);
+    if ((seg.kind === 'climb' || seg.kind === 'descent') && seg.value >= seg.mach * Math.min(isa(seg.alt0_m, mi.od.dT_isa).a, isa(seg.alt1_m, mi.od.dT_isa).a)) throw new Error(`Vertical speed must be below airspeed: ${seg.label}.`);
+  }
   const warnings: string[] = [];
   const points: MissionPoint[] = [];
   const segOut: MissionResult['segments'] = [];
   let t = 0, dist = 0, mass = ac.mass_kg;
   let warm: Record<string, number> | undefined;
   const g = 9.80665;
+  let ratingViolations = 0, operabilityViolations = 0;
   for (const seg of mi.segments) {
     const n = Math.max(2, mi.pointsPerSegment);
     let segFuel = 0, segT = 0, segD = 0;
     for (let i = 0; i < n; i++) {
       const f = i / (n - 1);
       const alt = seg.alt0_m + (seg.alt1_m - seg.alt0_m) * f;
-      const amb = isa(alt, mi.od.dT_isa);
+      const amb = isa(alt, mi.od.dT_isa, dp.inputs.flight.altIsGeopotential);
       const V = seg.mach * amb.a;
       const q = 0.5 * amb.rho * V * V;
       // thrust required (per engine): drag + climb component (climb: T = D + W sin γ with sin γ = ROC/V)
@@ -82,11 +93,17 @@ export function runMission(dp: DesignPoint, mi: MissionInputs, progress?: (p: Mi
         if (!s2.converged) break;
         s = s2; limited = lim.label;
       }
+      const violation = s.converged ? over(s) : null;
+      if (violation) { ratingViolations++; warnings.push(`${seg.label}: point ${i + 1} exceeds ${violation.label}; no converged point within all ratings was found.`); }
+      if (s.converged && s.result.components.some(c => c.kind === 'compressor' && (!Number.isFinite(c.values.surgeMargin_pct) || c.values.surgeMargin_pct < 0))) {
+        operabilityViolations++; warnings.push(`${seg.label}: point ${i + 1} has a compressor at negative or undefined surge margin; steady mission operation is not feasible.`);
+      }
       if (s.converged) warm = s.x; else warnings.push(`${seg.label}: point ${i + 1} did not converge (Fn required ${(FnReq / 1000).toFixed(1)} kN).`);
       const Fn = ac.installed ? s.result.perf.installedFn : s.result.perf.Fn;
       if (!seg.T4frac && Fn < FnReq * 0.98 && s.converged) warnings.push(`${seg.label}: thrust required ${(FnReq / 1000).toFixed(1)} kN exceeds available ${(Fn / 1000).toFixed(1)} kN at ${alt.toFixed(0)} m${limited ? ` (${limited})` : ''}.`);
       const Wf = s.result.perf.Wfuel * ac.engines;
-      if (i > 0) { const dFuel = Wf * dt; mass -= dFuel; segFuel += dFuel; segT += dt; segD += dd; t += dt; dist += dd; }
+      if (!Number.isFinite(Wf) || Wf < 0 || !Number.isFinite(Fn)) throw new Error(`${seg.label}: gas path returned invalid fuel flow or thrust.`);
+      if (i > 0) { const dFuel = Wf * dt; if (dFuel >= mass) throw new Error(`${seg.label}: fuel consumption exhausts the aircraft mass; the mission cannot be integrated.`); mass -= dFuel; segFuel += dFuel; segT += dt; segD += dd; t += dt; dist += dd; }
       points.push({ t_s: t, dist_km: dist, alt_m: alt, mach: seg.mach, mass_kg: mass, FnReq, Fn, Wf, T4: s.result.stations.find((x) => x.id === '4')!.Tt, NHPpct: (100 * (s.x.N_HP ?? dp.inputs.speeds.HP)) / dp.inputs.speeds.HP, NLPpct: (100 * (s.x.N_LP ?? dp.inputs.speeds.LP)) / Math.max(dp.inputs.speeds.LP, 1), TSFC: s.result.perf.TSFC_mg_Ns, converged: s.converged, segment: seg.label, limited });
     }
     segOut.push({ label: seg.label, time_s: segT, fuel_kg: segFuel, dist_km: segD });
@@ -96,9 +113,9 @@ export function runMission(dp: DesignPoint, mi: MissionInputs, progress?: (p: Mi
   const shortfalls = points.map((p) => (p.FnReq > 0 ? Math.max(0, 1 - p.Fn / p.FnReq) : 0));
   const maxShortfall = Math.max(0, ...shortfalls);
   const unconvergedPoints = points.filter((p) => !p.converged).length;
-  const feasible = unconvergedPoints === 0 && maxShortfall <= 0.02;
-  if (!feasible) warnings.unshift(`Mission infeasible: ${unconvergedPoints} unconverged point(s), maximum thrust shortfall ${(100 * maxShortfall).toFixed(0)} %. Fuel and time totals are for the flown profile and do not represent a completed mission.`);
-  return { points, segments: segOut, totals: { time_s: t, fuel_kg: fuel, dist_km: dist, blockFuelFrac: fuel / ac.mass_kg }, warnings, feasible, maxShortfall, unconvergedPoints };
+  const feasible = unconvergedPoints === 0 && ratingViolations === 0 && operabilityViolations === 0 && maxShortfall <= 0.02;
+  if (!feasible) warnings.unshift(`Mission infeasible: ${unconvergedPoints} unconverged point(s), ${ratingViolations} rating violation(s), ${operabilityViolations} surge-margin violation(s), maximum thrust shortfall ${(100 * maxShortfall).toFixed(0)} %. Fuel and time totals are for the flown profile and do not represent a completed mission.`);
+  return { points, segments: segOut, totals: { time_s: t, fuel_kg: fuel, dist_km: dist, blockFuelFrac: fuel / ac.mass_kg }, warnings, feasible, maxShortfall, unconvergedPoints, ratingViolations, operabilityViolations };
 }
 
 /** Aircraft mass scaled so the engines give a thrust/weight ratio of ~0.28 at sea level (power loading ~ 0.17 kW/kg for turboprops). */

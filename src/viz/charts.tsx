@@ -42,7 +42,7 @@ export function LineChart({ title, sub, series, xLabel, yLabel, xFmt, yFmt, heig
         <text transform={`translate(12,${(m.t + H - m.b) / 2}) rotate(-90)`} textAnchor="middle">{yLabel}</text>
         {series.map((s) => (
           <g key={s.name}>
-            <path d={s.points.filter((p) => Number.isFinite(p.y)).map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join('')} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" />
+            <path d={s.points.map((p, i) => Number.isFinite(p.y) ? `${i > 0 && Number.isFinite(s.points[i - 1].y) ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}` : '').join('')} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" />
             {(markers || labelPoints) && s.points.map((p, i) => Number.isFinite(p.y) && (
               <g key={i}>
                 <circle cx={sx(p.x)} cy={sy(p.y)} r={4} fill={s.color} stroke="var(--surface-2)" strokeWidth={2} />

@@ -55,7 +55,7 @@ export default function App() {
   const view = store.state.view;
   const setView = (v: View) => store.dispatch({ type: 'view', view: v });
 
-  const errBox = !ok && <div className="err">Could not solve this cycle: {(res as any).error}</div>;
+  const errBox = <>{store.loadError && <div className="err" role="alert">{store.loadError}</div>}{!ok && <div className={store.odPending ? "warn" : "err"}>{store.odPending ? '' : 'Could not solve this cycle: '}{(res as any).error}</div>}</>;
   const [copied, setCopied] = useState(false);
   const [more, setMore] = useState(false);
   const [, setLangTick] = useState(0);

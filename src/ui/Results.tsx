@@ -212,7 +212,8 @@ function Certification({ store, result }: { store: Store; result: EngineResult }
       <div className="row"><button className="btn" onClick={run} disabled={busy}>{busy ? 'Running LTO cycle…' : 'Run ICAO LTO emissions cycle'}</button>{err && <span style={{ color: 'var(--bad)' }}>{err}</span>}</div>
       {lto && (
         <div style={{ opacity: stale.stale ? 0.5 : 1 }}>
-          {!lto.applicable && <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Rated thrust below 26.7 kN: the Annex 16 limits do not apply, shown for reference.</div>}
+          {!lto.applicable && <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>Not applicable: this configuration is outside the supported scope of these Annex 16 limits. No compliance margin is reported.</div>}
+          {!lto.complete && <div className="err" role="alert">Incomplete LTO cycle: totals and compliance margins are unavailable.</div>}
           {lto.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
           <div className="kv" style={{ marginTop: 8 }}>
             <span className="k">Rated thrust Foo · OPR</span><span className="v">{fmt(lto.Foo_kN, 1)} kN · {fmt(lto.OPR, 1)}</span>

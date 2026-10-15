@@ -98,7 +98,7 @@ export function TransientView({ store }: { store: Store }) {
         )}
       </div>
       {samples.length > 1 && stale.stale && <StaleBanner what="transient" />}
-      {result && !result.complete && <div className="err" role="alert"><strong>Trajectory incomplete.</strong> The integration stopped at {fmt(result.stoppedAt_s ?? 0, 2)} s of {duration} s because the gas path had no converged solution; only converged samples are shown and the end-point cards describe the last converged state, not the end of the manoeuvre.</div>}
+      {result && !result.complete && <div className="err" role="alert"><strong>Trajectory incomplete.</strong> The integration stopped at {fmt(result.stoppedAt_s ?? 0, 2)} s of {duration} s before completing the manoeuvre; see the warnings for the stopping reason. Samples may include the explicitly marked starter-only regime. The end-point cards describe the last available state.</div>}
       {unconverged > 0 && <div className="err" role="alert">{unconverged} plotted sample(s) are not converged gas-path solutions.</div>}
       {result?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {samples.length > 1 && (
@@ -124,7 +124,8 @@ export function TransientView({ store }: { store: Store }) {
             {th.enabled && samples[0]?.clearance_mm !== undefined && (
               <>
                 <LineChart title="Metal temperatures" series={[s((x) => x.Tcasing ?? NaN, 'casing', 1), s((x) => x.Tdisc ?? NaN, 'disc', 0)]} xLabel="time (s)" yLabel="K" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
-                <LineChart title="Tip clearance and efficiency penalty" sub="HP compressor; efficiency delta relative to the design clearance" series={[s((x) => x.clearance_mm ?? NaN, 'clearance (mm)', 0), s((x) => 100 * (x.effDeltaHPC ?? 0), 'Δη (%)', 1)]} xLabel="time (s)" yLabel="" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
+                <LineChart title="Tip clearance" sub="HP compressor" series={[s((x) => x.clearance_mm ?? NaN, 'clearance', 0)]} xLabel="time (s)" yLabel="mm" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
+                <LineChart title="Efficiency penalty" sub="HP compressor; delta relative to the design clearance" series={[s((x) => 100 * (x.effDeltaHPC ?? 0), 'Δη', 1)]} xLabel="time (s)" yLabel="percentage points" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
               </>
             )}
             <MapTrajectory design={inputs} samples={samples} />

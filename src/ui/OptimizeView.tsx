@@ -16,6 +16,8 @@ export function OptimizeView({ store }: { store: Store }) {
   const inputs = store.state.inputs;
   const avail = VARIABLES.filter((v) => { const val = getPath(inputs, v.path); if (typeof val !== 'number') return false; if (inputs.arch !== 'turbofan' && ['BPR', 'fan.PR', 'lpc.PR', 'hpc.PR', 'mixer.MNcore'].includes(v.path)) return false; if (inputs.arch === 'turbofan' && v.path === 'comp.PR') return false; if (v.path === 'lpc.PR' && inputs.spools === 3) return false; if (v.path === 'mixer.MNcore' && !inputs.mixed) return false; return true; });
   const [sel, setSel] = useState<string[]>(() => (inputs.arch === 'turbofan' ? ['BPR', 'fan.PR'] : ['comp.PR']));
+  const [submittedVars, setSubmittedVars] = useState<typeof VARIABLES>([]);
+  const selected = avail.filter((v) => sel.includes(v.path));
   const [bounds, setBounds] = useState<Record<string, [number, number]>>({});
   const [objective, setObjective] = useState<Objective>('tsfc');
   const [cons, setCons] = useState<Constraint[]>([{ kind: 'T3max', value: 950 }, { kind: 'FnMin', value: 0 }]);
@@ -29,7 +31,8 @@ export function OptimizeView({ store }: { store: Store }) {
   const stale = useStale({ inputs, objective, sel, bounds, cons, smCheck, maxEvals, od: store.state.od, arch: inputs.arch });
   const run = () => {
     setBusy(true); setError(null); setRes(null); setTrace([]); stale.snapshot();
-    const vars = avail.filter((v) => sel.includes(v.path)).map((v) => ({ ...v, min: bounds[v.path]?.[0] ?? v.min, max: bounds[v.path]?.[1] ?? v.max }));
+    const vars = selected.map((v) => ({ ...v, min: bounds[v.path]?.[0] ?? v.min, max: bounds[v.path]?.[1] ?? v.max }));
+    setSubmittedVars(vars);
     const constraints = cons.filter((c) => !(c.kind === 'FnMin' && c.value <= 0));
     if (smCheck.enabled) constraints.push({ kind: 'surgeMarginMin', value: smCheck.min });
     const m = defaultMission(inputs.arch);
@@ -61,8 +64,8 @@ export function OptimizeView({ store }: { store: Store }) {
         <label>Fn min {num((cons.find((c) => c.kind === 'FnMin')?.value ?? 0) / 1000, (x) => setCons(cons.map((c) => (c.kind === 'FnMin' ? { ...c, value: x * 1000 } : c))), 70, 1, 'Minimum thrust')} kN (0 = none)</label>
         <label className="toggle"><input type="checkbox" checked={smCheck.enabled} onChange={(e) => setSmCheck({ ...smCheck, enabled: e.target.checked })} /> surge margin ≥ {num(smCheck.min, (x) => setSmCheck({ ...smCheck, min: x }), 50, 1, 'Minimum surge margin')} % at {num(smCheck.altitude_m, (x) => setSmCheck({ ...smCheck, altitude_m: x }), 70, 500, 'Check altitude')} m, M {num(smCheck.mach, (x) => setSmCheck({ ...smCheck, mach: x }), 55, 0.05, 'Check Mach')}</label>
         <label>budget {num(maxEvals, setMaxEvals, 60, 10, 'Evaluation budget')} evals</label>
-        <button className="btn primary" onClick={run} disabled={busy || sel.length === 0}>{busy ? `Optimising… ${trace.length} evals` : 'Optimise'}</button>
-        {res && <button className="btn" disabled={stale.stale} title={stale.stale ? 'Inputs changed since this run; optimise again before applying' : undefined} onClick={() => store.dispatch({ type: 'inputs', inputs: res.best, note: `Optimised: ${OBJ.find((o) => o.id === objective)!.label}` })}>Apply best design</button>}
+        <button className="btn primary" onClick={run} disabled={busy || selected.length === 0}>{busy ? `Optimising… ${trace.length} evals` : 'Optimise'}</button>
+        {res && <button className="btn" disabled={stale.stale || !res.feasible} title={!res.feasible ? 'No feasible design found; constraints are not satisfied' : stale.stale ? 'Inputs changed since this run; optimise again before applying' : undefined} onClick={() => store.dispatch({ type: 'inputs', inputs: res.best, note: `Optimised: ${OBJ.find((o) => o.id === objective)!.label}` })}>Apply best design</button>}
         {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
       </div>
       {res && stale.stale && <StaleBanner what="optimisation" />}
@@ -70,14 +73,14 @@ export function OptimizeView({ store }: { store: Store }) {
       {(res || trace.length > 0) && (
         <div className="cards">
           <div className="card hero"><div className="k">Objective</div><div className="v">{fmt(res ? res.objective : best, 3)}<small>{res ? `from ${fmt(res.baseline, 3)} (${fmt((res.objective / res.baseline - 1) * 100, 1)} %)` : 'best so far'}</small></div></div>
-          {res && res.bestX.map((x, i) => <div className="card" key={i}><div className="k">{avail.find((v) => v.path === sel[i])?.label ?? sel[i]}</div><div className="v">{fmt(x, 3)}</div></div>)}
-          {res && <div className="card"><div className="k">Evaluations</div><div className="v">{res.evals}<small>{res.converged ? 'converged' : 'budget'}</small></div></div>}
+          {res && res.bestX.map((x, i) => <div className="card" key={i}><div className="k">{submittedVars[i]?.label}</div><div className="v">{fmt(x, 3)}</div></div>)}
+          {res && <div className="card"><div className="k">Evaluations</div><div className="v">{res.evals}<small>{res.converged ? 'converged' : 'budget'} · {res.feasible ? 'feasible' : 'infeasible'}</small></div></div>}
         </div>
       )}
       {trace.length > 1 && (
         <div className="charts">
           <LineChart title="Convergence" sub="objective per evaluation (infeasible points shown as gaps)" series={[{ name: 'objective', color: 'var(--series-1)', points: trace.map((t) => ({ x: t.eval, y: t.feasible ? t.objective : NaN })) }]} xLabel="evaluation" yLabel={objective === 'missionFuel' ? 'kg' : objective === 'tsfc' ? 'mg/(N·s)' : ''} xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />
-          {sel.map((p, i) => <LineChart key={p} title={avail.find((v) => v.path === p)?.label ?? p} series={[{ name: p, color: 'var(--series-2)', points: trace.map((t) => ({ x: t.eval, y: t.x[i] })) }]} xLabel="evaluation" yLabel="" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />)}
+          {submittedVars.map((v, i) => <LineChart key={v.path} title={v.label} series={[{ name: v.path, color: 'var(--series-2)', points: trace.map((t) => ({ x: t.eval, y: t.x[i] })) }]} xLabel="evaluation" yLabel="" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />)}
         </div>
       )}
       {design && <div className="prose"><p style={{ color: 'var(--text-muted)' }}>Current design: TSFC {fmt(design.perf.TSFC_mg_Ns, 2)} mg/(N·s), net thrust {fmt(design.perf.Fn / 1000, 1)} kN, T3 {fmt(design.stations.find((s) => s.id === '3')!.Tt, 0)} K.</p></div>}

@@ -9,6 +9,7 @@ import { evaluate, designProvider, Provider, SasAreas, orificeArea, coolingModel
 import { CompressorMap, TurbineMap, CompScalars, TurbScalars, correctedFlow, correctedSpeed, paramFlow, paramSpeed } from './maps';
 import { burnerAtFAR, TurbineStream } from './components';
 import { Flow } from './flow';
+import { validateEngineInputs, validateOperatingPoint } from './inputValidation';
 
 export type ThrottleMode = 'T4' | 'Wf' | 'NHP' | 'NLP' | 'Fn';
 export interface OffDesignInputs {
@@ -62,6 +63,7 @@ const INLET_STATION = (inp: EngineInputs): Record<string, string> => ({
 });
 
 export function makeDesignPoint(inp: EngineInputs): DesignPoint {
+  validateEngineInputs(inp);
   const result = evaluate(inp, designProvider(inp));
   const st = (id: string) => result.stations.find((s) => s.id === id)!;
   const comps: Record<string, CompDes> = {}, turbs: Record<string, TurbDes> = {}, nozzleAreas: Record<string, number> = {}, mapNames: Record<string, string> = {};
@@ -184,6 +186,7 @@ function withFlight(inp: EngineInputs, od: OffDesignInputs): EngineInputs {
   if (od.HPX_W !== undefined) i.HPX_W = od.HPX_W;
   if (od.propPower_W !== undefined) i.prop.shaftPower_W = od.propPower_W;
   if (od.installation !== undefined) i.installation = { ...i.installation, enabled: od.installation };
+  if (od.burnerLit === false) i.afterburner = { ...i.afterburner, enabled: false };
   return i;
 }
 /** Unknowns and residual names actually used, given the solve options. */
@@ -226,6 +229,7 @@ function residualVector(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs,
 
 /** Solve the off-design point. Uses Newton with backtracking and, if needed, continuation in the throttle from the design value. */
 export function solveOffDesign(dp: DesignPoint, od: OffDesignInputs, x0?: Record<string, number>, opt: SolveOptions = {}): OffDesignSolution {
+  validateOperatingPoint(od);
   const inp = withFlight(dp.inputs, od);
   const names = activeNames(inp, opt);
   let x = { ...(x0 ?? designUnknowns(dp)) };

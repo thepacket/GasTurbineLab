@@ -52,7 +52,7 @@ The frozen-chemistry deficit is the dissociation enthalpy that equilibrium absor
 * **Mixer.** pyCycle sizes the designed stream's area so that its static pressure matches the other stream, which is set by its own Mach number from the upstream element. The lab offers both conventions (`mixer.designedStream`).
 * **Nozzle thrust.** Both apply C_v to the ideal exit velocity in the gross-thrust momentum term and add the pressure term on the actual exit area.
 * **Speed of sound.** The lab uses the frozen speed of sound in static-state calculations; pyCycle uses the equilibrium value. This shows as the 0.1–0.3 % static-velocity difference at low-Mach stations and does not affect totals.
-* **Maps.** Both interpolate the same tables linearly. The lab clamps R-lines to the tabulated range with a penalty and extends maps below the lowest speed line for start-up; pyCycle extrapolates where `map_extrap` is set. Operating points inside the tables agree; sub-idle behaviour is not validated.
+* **Maps.** Both interpolate the same tables linearly. The lab uses bounded extrapolation outside the tabulated R-lines and checks physical flow mismatch separately from the boundary penalty (see below); pyCycle extrapolates where `map_extrap` is set. Operating points inside the tables agree; sub-idle behaviour is not validated.
 
 ## Regenerating the references
 
@@ -74,3 +74,36 @@ An off-design point is reported as converged only when the Newton residual norm 
 ## What is not validated
 
 Transients, control, heat soak, the secondary air system, missions, optimisation and uncertainty use the validated cycle but have no external reference; their models are documented in [methods.md](methods.md). The sub-idle regime (start-up) uses the sub-idle map extension, dynamic-head scaling of the fixed pressure losses below 50 % corrected flow and an explicit starter-only regime where no through-flow solution exists; a high-bypass turbofan start-up does not get past that regime with the generic maps. Weight, emissions, noise, creep life and installation drag are correlations calibrated to published data where available and labelled as estimates in the interface. The commercial-engine catalogue reproduces published take-off ratings by construction; its internal temperatures and efficiencies are assumptions by generation.
+
+## Engineering readiness pass (2026-10-15, local changes)
+
+The initial pass preserved the interface. Following authorization for UI fixes, correctness changes were made within the existing controls and visual style: result labels and states, invalid actions, error reporting and chart units. No navigation or operating-paradigm redesign was made.
+
+* Transients reject an unconverged initial operating point, transfer ignition fuel into PI control continuously, stop hung starts as incomplete, remove starter torque at cut-out, prevent integral wind-up into fuel limits, and end at the requested duration. Thermal lags use the exact first-order update for the held gas temperature. Unlit gas paths cannot burn afterburner fuel.
+* Missions reject invalid segment geometry and mass depletion. Feasibility now requires compliance with all speed/temperature ratings and non-negative finite compressor surge margins, in addition to convergence and the existing 2% thrust tolerance. The tolerance is a numerical acceptance rule, not an aircraft certification criterion. Mission fuel remains a coarse profile integration rather than a flight-dynamics or take-off-distance calculation.
+* Optimisation projects simplex coordinates into bounds, honours its evaluation budget, prefers a feasible evaluated candidate when available, and returns the same frozen-chemistry model used for the reported objective. Invalid or empty searches fail explicitly.
+* Uncertainty inputs enforce physical bounds and non-negative sigma. Failed rejection sampling is counted as failure rather than replaced by the mean; a run with no valid samples returns an error.
+* Maps require finite positive table values, efficiencies no greater than one, and strictly increasing axes. Generated overspeed efficiencies are finite; CSV reference speed is selected from its actual axis. Map snapshots include deletions and validate before replacing the registry. Corrupt saved maps do not discard valid neighbours.
+* Worker crashes reject pending requests and permit recreation. Map changes are synchronized before requests even when a worker already exists. Saved state and Gallery imports are sanitized, duplicate Gallery ids are replaced, and oversized or corrupt compressed share payloads fail safely. Gallery saves/exports carry referenced custom-map snapshots and operating mode; loading restores the maps before the analysis runs.
+* Design and off-design entry points validate numeric domains. A combustor target that cannot be reached with non-negative fuel now fails explicitly instead of returning a different temperature. Transient fuel limits are refined against the solved compressor pressure, including release of a previously active limit.
+* LTO totals and margins are withheld when any mode fails. Rated-thrust overrides use the corresponding reference pressure ratio. Hydrogen HC is zero. The CAEP/8 high-pressure-ratio branch is `32 + 1.6 OPR` for both thrust classes, following the [EASA emissions databank introduction](https://www.easa.europa.eu/en/downloads/45576/en). Unsupported configurations have no compliance margin.
+
+Automated checks cover the cycle references and catalogue, new boundary cases, worker failures, imports, stale optimisation results, keyboard activation and a simulated installed-service-worker upgrade. The upgrade fixture starts with an older worker, serves the current build, triggers the app's foreground update check, and checks for exactly one reload. It does not claim to reproduce every historical production cache state.
+
+Final local regression: 152 unit tests passed across 22 files; 64 browser tests passed, with the duplicate tablet/phone upgrade fixtures intentionally skipped (the upgrade runs on desktop). TypeScript and the production build also passed.
+
+The [NASA Heidmann report](https://ntrs.nasa.gov/citations/19750017876) includes spectral and directional source-noise modelling. This app's simplified overall-level correlation is not an implementation of the full method and has not been validated against measured spectra. Likewise, matching a few engine dry weights does not independently validate the weight correlation, and the creep-life rule has no stress/material calibration. These features are suitable for indicative comparisons within their stated limits, not certification or hardware-life decisions.
+
+### UI correctness follow-up
+
+Implemented after authorization for UI fixes:
+
+1. Disable “Apply best design” for infeasible results and distinguish constraint feasibility from numerical convergence.
+2. Bind optimisation cards and trajectories to the submitted variable order, even after controls change; exclude unavailable variables from submission and the run-button check.
+3. Show explicit incomplete and not-applicable LTO states without incorrectly attributing every unsupported case to low rated thrust.
+4. Plot clearance (mm) and efficiency delta (percentage points) separately using the existing chart component. Preserve gaps in invalid/infeasible chart series.
+5. Use returned Monte Carlo quantiles in histogram captions and default sigma values for newly available architecture inputs.
+6. Report invalid shared links and map-storage failures through existing error styles. Do not display a prior off-design result as the current solution while its replacement is pending; invalidate callbacks when the operating state changes.
+7. Correct the incomplete-transient message to account for hung starts, limit failures and starter-only samples.
+
+Field-level numeric validation hints are deferred as an interface improvement; invalid values already receive engine-level errors. The existing layout, navigation, styling and compact controls remain the basis of the interface.

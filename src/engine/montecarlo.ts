@@ -28,6 +28,16 @@ function gauss(r: () => number) { const u = Math.max(r(), 1e-12), v = r(); retur
 const stats = (a: number[]) => { const s = a.slice().sort((x, y) => x - y); const mean = s.reduce((p, q) => p + q, 0) / s.length; const sd = Math.sqrt(s.reduce((p, q) => p + (q - mean) ** 2, 0) / Math.max(s.length - 1, 1)); const q = (f: number) => s[Math.min(s.length - 1, Math.floor(f * s.length))]; return { mean, sd, p5: q(0.05), p50: q(0.5), p95: q(0.95) }; };
 
 export function runMonteCarlo(base: EngineInputs, mc: MonteCarloInputs, progress?: (done: number) => void): MonteCarloResult {
+  if (!Number.isInteger(mc.samples) || mc.samples < 1 || mc.samples > 100000 || !Number.isFinite(mc.seed)) throw new Error('Monte Carlo needs 1–100000 samples and a finite seed.');
+  const inputs = mc.inputs.map(u => {
+    const physical = UNCERTAIN.find(v => v.path === u.path);
+    if (!physical || !Number.isFinite(u.sigma) || u.sigma < 0) throw new Error(`Invalid uncertain input or standard deviation: ${u.path}.`);
+    const min = Math.max(physical.min ?? -Infinity, u.min ?? -Infinity), max = Math.min(physical.max ?? Infinity, u.max ?? Infinity);
+    const v = getPath(base, u.path);
+    if (Number.isNaN(min) || Number.isNaN(max) || min >= max || !Number.isFinite(v) || v < min || v > max) throw new Error(`Invalid bounds or baseline for ${u.path}.`);
+    return { ...u, min, max };
+  });
+  if (new Set(inputs.map(u => u.path)).size !== inputs.length) throw new Error('Uncertain inputs must be distinct.');
   const r = rng(mc.seed);
   const Fn: number[] = [], TSFC: number[] = [], T3: number[] = [], Wf: number[] = [], eth: number[] = [];
   let failures = 0, truncated = 0;
@@ -36,23 +46,24 @@ export function runMonteCarlo(base: EngineInputs, mc: MonteCarloInputs, progress
   const draw = (v: number, u: UncertainInput): number => {
     const lo = u.min ?? -Infinity, hi = u.max ?? Infinity;
     for (let k = 0; k < 50; k++) { const x = v + u.sigma * gauss(r); if (x >= lo && x <= hi) return x; truncated++; }
-    return Math.min(hi, Math.max(lo, v));
+    throw new Error('No draw inside the requested bounds.');
   };
   for (let k = 0; k < mc.samples; k++) {
     let inp = b;
-    for (const u of mc.inputs) { const v = getPath(b, u.path); if (typeof v !== 'number') continue; inp = setPath(inp, u.path, draw(v, u)); }
     try {
+      for (const u of inputs) inp = setPath(inp, u.path, draw(getPath(b, u.path), u));
       const res = solveEngine(inp);
       const vals = [res.perf.Fn, res.perf.TSFC_mg_Ns, res.stations.find((s) => s.id === '3')!.Tt, res.perf.Wfuel, res.perf.thermalEff * 100];
-      if (!vals.every(Number.isFinite) || res.warnings.some((w) => w.includes('cannot'))) { failures++; continue; }
+      if (!vals.every(Number.isFinite) || res.warnings.some((w) => w.includes('cannot'))) throw new Error('Invalid sample.');
       Fn.push(vals[0]); TSFC.push(vals[1]); T3.push(vals[2]); Wf.push(vals[3]); eth.push(vals[4]);
     } catch { failures++; }
     if (progress && k % 25 === 0) progress(k);
   }
+  if (!Fn.length) throw new Error('No valid Monte Carlo samples; check the design, uncertainties and bounds.');
   // one-at-a-time sensitivities (+1 sigma)
   const ref = solveEngine(b);
   // one-at-a-time: +1σ, clipped to the input's physical bound; the perturbation actually applied is reported
-  const sensitivity = mc.inputs.map((u) => {
+  const sensitivity = inputs.map((u) => {
     const v = getPath(b, u.path); if (typeof v !== 'number') return { label: u.label, dFn_pct: 0, dTSFC_pct: 0, delta: 0, bounded: false };
     const target = Math.min(u.max ?? Infinity, Math.max(u.min ?? -Infinity, v + u.sigma));
     const delta = target - v, bounded = Math.abs(delta - u.sigma) > 1e-12;

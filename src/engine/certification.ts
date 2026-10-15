@@ -11,7 +11,7 @@ import { DesignPoint, solveOffDesign } from './offdesign';
 import { EngineResult } from './types';
 
 export interface LtoMode { name: string; thrustFrac: number; time_s: number; Fn: number; Wf: number; EI_NOx: number; EI_CO: number; EI_HC: number; converged: boolean; T3: number; N1pct: number }
-export interface LtoResult { Foo_kN: number; OPR: number; modes: LtoMode[]; DpFoo: { NOx: number; CO: number; HC: number }; limits: { NOx: number; CO: number; HC: number }; margins: { NOx: number; CO: number; HC: number }; fuel_kg: number; applicable: boolean; warnings: string[] }
+export interface LtoResult { Foo_kN: number; OPR: number; modes: LtoMode[]; DpFoo: { NOx: number; CO: number; HC: number }; limits: { NOx: number; CO: number; HC: number }; margins: { NOx: number; CO: number; HC: number }; fuel_kg: number; applicable: boolean; complete: boolean; warnings: string[] }
 
 const LTO: { name: string; thrustFrac: number; time_s: number }[] = [
   { name: 'Take-off', thrustFrac: 1.0, time_s: 0.7 * 60 }, { name: 'Climb-out', thrustFrac: 0.85, time_s: 2.2 * 60 }, { name: 'Approach', thrustFrac: 0.30, time_s: 4.0 * 60 }, { name: 'Taxi / idle', thrustFrac: 0.07, time_s: 26.0 * 60 },
@@ -19,6 +19,10 @@ const LTO: { name: string; thrustFrac: number; time_s: number }[] = [
 
 /** CAEP/8 NOx limit, Dp/Foo in g/kN, as a function of overall pressure ratio and rated thrust (kN). */
 export function caep8NOxLimit(opr: number, Foo_kN: number): number {
+  if (!Number.isFinite(opr) || opr <= 0 || !Number.isFinite(Foo_kN) || Foo_kN <= 0) throw new Error('NOx limit requires positive finite OPR and rated thrust.');
+  // EASA emissions databank introduction, CAEP/8: the >=104.7 branch is common to both thrust classes.
+  // https://www.easa.europa.eu/en/downloads/45576/en
+  if (opr >= 104.7) return 32 + 1.6 * opr;
   if (Foo_kN > 89) {
     if (opr <= 30) return 7.88 + 1.4080 * opr;
     if (opr < 104.7) return -9.88 + 2.0 * opr;
@@ -26,23 +30,25 @@ export function caep8NOxLimit(opr: number, Foo_kN: number): number {
   }
   if (opr <= 30) return 40.052 + 1.5681 * opr - 0.3615 * Foo_kN - 0.0018 * opr * Foo_kN;
   if (opr < 104.7) return 41.9435 + 1.505 * opr - 0.5823 * Foo_kN + 0.005562 * opr * Foo_kN;
-  return 37.572 + 1.6 * opr;
+  return 32 + 1.6 * opr;
 }
 
 export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]) => void): LtoResult {
   const warnings: string[] = [];
   // rated thrust: sea-level static at the design T4 (the design itself if it is SLS)
   const inp = dp.inputs;
+  if (Foo_N !== undefined && (!Number.isFinite(Foo_N) || Foo_N <= 0)) throw new Error('Rated thrust must be finite and positive.');
   // rated thrust Foo and the reference pressure ratio come from the same converged sea-level static ISA rating point
   // (Annex 16: π00 is the OPR at the take-off rating under ISA sea-level static conditions)
   let Foo = Foo_N ?? 0;
   let oprRef = dp.result.perf.OPR;
-  if (inp.flight.altitude_m === 0 && inp.flight.mach === 0 && inp.flight.dT_isa === 0) { if (!Foo) Foo = dp.result.perf.Fn; }
+  if (Foo_N === undefined && inp.flight.altitude_m === 0 && inp.flight.mach === 0 && inp.flight.dT_isa === 0) { Foo = dp.result.perf.Fn; }
   else {
-    const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, throttle: { mode: 'T4', value: inp.burner.T4_K } });
+    const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, throttle: Foo_N === undefined ? { mode: 'T4', value: inp.burner.T4_K } : { mode: 'Fn', value: Foo_N } });
     if (s.converged) { if (!Foo) Foo = s.result.perf.Fn; oprRef = s.result.perf.OPR; }
-    else { if (!Foo) Foo = dp.result.perf.Fn; warnings.push('Sea-level static rating did not converge; using the design thrust and design OPR as the reference.'); }
+    else throw new Error('Sea-level static rating did not converge; LTO reference thrust and pressure ratio are unavailable.');
   }
+  if (!Number.isFinite(Foo) || Foo <= 0) throw new Error('No positive rated thrust for the LTO calculation.');
   const modes: LtoMode[] = [];
   let warm: Record<string, number> | undefined;
   for (const m of LTO) {
@@ -51,17 +57,22 @@ export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]
     const p = s.result.perf;
     const T3 = s.result.stations.find((q) => q.id === '3')!.Tt;
     // HC: like CO, from combustor inlet temperature (approximate)
-    const EI_HC = 0.05 + 6 * Math.exp(-(T3 - 450) / 90);
+    const EI_HC = inp.fuel === 'hydrogen' ? 0 : 0.05 + 6 * Math.exp(-(T3 - 450) / 90);
     modes.push({ name: m.name, thrustFrac: m.thrustFrac, time_s: m.time_s, Fn: p.Fn, Wf: p.Wfuel, EI_NOx: p.EI_NOx_g_kg, EI_CO: p.EI_CO_g_kg, EI_HC, converged: s.converged, T3, N1pct: (100 * (s.x.N_LP ?? inp.speeds.LP)) / Math.max(inp.speeds.LP, 1) });
     progress?.(modes.slice());
   }
-  const Dp = (key: 'EI_NOx' | 'EI_CO' | 'EI_HC') => modes.reduce((a, m) => a + m[key] * m.Wf * m.time_s, 0); // g
+  const complete = modes.every(m => m.converged && [m.Wf, m.EI_NOx, m.EI_CO, m.EI_HC].every(Number.isFinite));
+  if (!complete) warnings.push('LTO cycle is incomplete; integrated emissions, fuel and margins are unavailable.');
+  const Dp = (key: 'EI_NOx' | 'EI_CO' | 'EI_HC') => complete ? modes.reduce((a, m) => a + m[key] * m.Wf * m.time_s, 0) : NaN; // g
   const Foo_kN = Foo / 1000;
   const DpFoo = { NOx: Dp('EI_NOx') / Foo_kN, CO: Dp('EI_CO') / Foo_kN, HC: Dp('EI_HC') / Foo_kN };
   const opr = oprRef;
   const limits = { NOx: caep8NOxLimit(opr, Foo_kN), CO: 118, HC: 19.6 };
   const margins = { NOx: (1 - DpFoo.NOx / limits.NOx) * 100, CO: (1 - DpFoo.CO / limits.CO) * 100, HC: (1 - DpFoo.HC / limits.HC) * 100 };
-  return { Foo_kN, OPR: opr, modes, DpFoo, limits, margins, fuel_kg: modes.reduce((a, m) => a + m.Wf * m.time_s, 0), applicable: Foo_kN > 26.7, warnings };
+  const applicable = Foo_kN > 26.7 && inp.arch !== 'turboprop' && !inp.afterburner.enabled && (inp.fuel === undefined || inp.fuel === 'jetA' || inp.fuel === 'saf');
+  if (!applicable) warnings.push('This fuel, architecture, afterburner configuration or thrust rating is outside the supported CAEP/8 comparison.');
+  if (!applicable) for (const k of ['NOx', 'CO', 'HC'] as const) margins[k] = NaN;
+  return { Foo_kN, OPR: opr, modes, DpFoo, limits, margins, fuel_kg: complete ? modes.reduce((a, m) => a + m.Wf * m.time_s, 0) : NaN, applicable, complete, warnings };
 }
 
 export interface NoiseEstimate { fanInlet_dB: number; fanTone_dB: number; jet_dB: number; total_dB: number; tipMach: number; notes: string[] }
