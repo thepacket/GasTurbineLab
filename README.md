@@ -1,5 +1,7 @@
 # Gas Turbine Lab
 
+[![Gas Turbine Lab showing a turbofan cross-section, 3D cutaway, and compressor maps](docs/gas-turbine-lab.png)](https://gas-turbine-lab.fly.dev/)
+
 A gas-turbine engine laboratory that runs entirely in the browser. It is an installable progressive web app with no server-side code: the static bundle is served by nginx on Fly.io and every calculation, including the solvers, runs on the device.
 
 **Live:** [gas-turbine-lab.fly.dev](https://gas-turbine-lab.fly.dev/)
