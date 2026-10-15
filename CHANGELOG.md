@@ -75,3 +75,9 @@ Following an external review of the transient/control implementation:
 ## Review fixes, third pass (2026-10-15)
 - The comparison design B is validated by the same complete `sanitizeInputs` as design A (mixer settings, geopotential flag, chemistry, fuel, map assignments); a round-trip test checks B solves identically after sharing.
 - A test stubs the browser `Worker` and checks that a new worker receives the saved custom maps before its first request.
+
+## Transient/control physics audit — 2026-10-15 (unreleased)
+- Preserve off-design component modifiers during transient integration; compose compressor thermal corrections with them and remove the unsupported compressor-temperature correction to turbine efficiency.
+- Use current spool-speed feedback, integrate PI error over elapsed time including fractional final steps, and include minimum-fuel saturation in anti-windup.
+- Reject invalid inertia, controller, starter and thermal settings; stop on impossible component efficiencies. Report negative surge margins and unsupported turbofan startup through existing warnings.
+- Correct the efficiency plot's relative units without changing its layout. Document model scope, NASA comparisons, reproducible trajectories and time-step refinement; engine-specific calibration remains unvalidated.

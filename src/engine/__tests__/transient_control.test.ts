@@ -33,7 +33,7 @@ describe('transient control state transitions', () => {
       expect(r.samples[0].limited).toBe(false);
     } finally { spy.mockRestore(); }
   });
-  it.each(['N2', 'Fn'] as const)('transfers from ignition fuel to %s control without an undefined demand or fuel collapse', mode => {
+  it.each(['N2', 'Fn'] as const)('transfers bumplessly to %s control and then responds to its feedback', mode => {
     const ti = startup();
     ti.controller = { ...ti.controller!, mode, target: mode === 'Fn' ? 18000 : 0.8 };
     // Hold the ignition setpoint briefly so transfer can be checked independently of tracking.
@@ -45,7 +45,12 @@ describe('transient control state transitions', () => {
     const ignition = r.samples[i], next = r.samples[i + 1];
     expect(Number.isFinite(ignition.demand)).toBe(true);
     expect(ignition.demand).toBeCloseTo(ignition.measured!, 10);
-    expect(next.WfCmd).toBeCloseTo(ignition.Wf, 8);
+    if (mode === 'N2') {
+      // The starter continues accelerating: current-speed feedback must respond immediately.
+      const e = (next.demand! - next.Npct.HP / 100) / next.demand!;
+      const integral = Math.max(-0.5, Math.min(0.5, e * (next.t - ignition.t)));
+      expect(next.WfCmd).toBeCloseTo(Math.max(0, ignition.Wf + r.design.Wf * (ti.controller!.Kp * e + ti.controller!.Ki * integral)), 8);
+    } else expect(next.WfCmd).toBeCloseTo(ignition.Wf, 8);
     for (const s of r.samples.filter(s => s.lit)) {
       expect(Number.isFinite(s.demand)).toBe(true);
       expect(Number.isFinite(s.WfCmd)).toBe(true);
@@ -94,6 +99,7 @@ describe('transient control state transitions', () => {
   it.each([
     { target: 1, ratioUnitLimit: 0.2, ratioUnitFloor: 0 },
     { target: 0.8, ratioUnitLimit: 0, ratioUnitFloor: 2 },
+    { target: 0.1, ratioUnitLimit: 0, ratioUnitFloor: 0 }, // controller's minimum fuel
   ])('does not wind up against a sustained fuel limit ($target speed demand)', limits => {
     const ti = startup();
     ti.start = undefined;

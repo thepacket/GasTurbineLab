@@ -127,7 +127,7 @@ export function TransientView({ store }: { store: Store }) {
               <>
                 <LineChart title="Metal temperatures" series={[s((x) => x.Tcasing ?? NaN, 'casing', 1), s((x) => x.Tdisc ?? NaN, 'disc', 0)]} xLabel="time (s)" yLabel="K" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
                 <LineChart title="Tip clearance" sub="HP compressor" series={[s((x) => x.clearance_mm ?? NaN, 'clearance', 0)]} xLabel="time (s)" yLabel="mm" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
-                <LineChart title="Efficiency penalty" sub="HP compressor; delta relative to the design clearance" series={[s((x) => 100 * (x.effDeltaHPC ?? 0), 'Δη', 1)]} xLabel="time (s)" yLabel="percentage points" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
+                <LineChart title="Efficiency penalty" sub="HP compressor; delta relative to the design clearance" series={[s((x) => 100 * (x.effDeltaHPC ?? 0), 'Δη/η', 1)]} xLabel="time (s)" yLabel="% of reference efficiency" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
               </>
             )}
             <MapTrajectory design={runContext.inputs} samples={samples} />

@@ -1,0 +1,452 @@
+{
+  "description": "Generic-model plausibility audit. Default acceleration is NOT an idle-to-takeoff certification test. SLS cases use their SLS rating; other thrust fractions use the design-condition rating, including startup. NASA comparisons require matching operating conditions, map data, inertias and controller.",
+  "rows": [
+    {
+      "case": "turbojet:15%-thrust-initialization",
+      "converged": true,
+      "thrustFraction": 0.14999999999990515,
+      "norm": 1.7595534264473527e-12,
+      "mapViolations": []
+    },
+    {
+      "case": "turbojet:SLS-15%-to-rated",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "ratingThrust_N": 47556.584950116216,
+      "dt_s": 0.04,
+      "complete": true,
+      "initialThrustFraction": 0.1499999999989601,
+      "endThrustFraction": 0.9999999999702802,
+      "t95AfterCommand_s": 0.6599999999999999,
+      "minSurgeMargin_pct": {
+        "comp": 4.500671968079106
+      },
+      "peakT4_K": 1603.5905795899155,
+      "warnings": []
+    },
+    {
+      "case": "turbojet:SLS-15%-to-rated",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "ratingThrust_N": 47556.584950116216,
+      "dt_s": 0.02,
+      "complete": true,
+      "initialThrustFraction": 0.1499999999989601,
+      "endThrustFraction": 0.9999999999105179,
+      "t95AfterCommand_s": 0.6200000000000001,
+      "minSurgeMargin_pct": {
+        "comp": 4.064927546538666
+      },
+      "peakT4_K": 1605.3918993956795,
+      "warnings": []
+    },
+    {
+      "case": "turbojet:SLS-15%-to-rated",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "ratingThrust_N": 47556.584950116216,
+      "dt_s": 0.01,
+      "complete": true,
+      "initialThrustFraction": 0.1499999999989601,
+      "endThrustFraction": 0.9999999999246885,
+      "t95AfterCommand_s": 0.6100000000000001,
+      "minSurgeMargin_pct": {
+        "comp": 4.421841486121103
+      },
+      "peakT4_K": 1603.7506388809688,
+      "warnings": []
+    },
+    {
+      "case": "turbojet:default",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "thrustNormalization_N": 47556.584950116216,
+      "thrustNormalizationCondition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "complete": true,
+      "samples": 301,
+      "initialThrustFraction": 0.49139348415024725,
+      "endThrustFraction": 0.9999999999706165,
+      "t95AfterCommand_s": 0.45999999999999996,
+      "endN_pct": {
+        "HP": 100.00000000139057
+      },
+      "minSurgeMargin_pct": {
+        "comp": 16.362403115429025
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": 1603.3259948312373,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": []
+    },
+    {
+      "case": "turbojet:deceleration",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "thrustNormalization_N": 47556.584950116216,
+      "thrustNormalizationCondition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "complete": true,
+      "samples": 301,
+      "initialThrustFraction": 1,
+      "endThrustFraction": 0.5580758056437021,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "HP": 93.30929383528634
+      },
+      "minSurgeMargin_pct": {
+        "comp": 23.309038081191822
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": 1500.0000000046543,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": []
+    },
+    {
+      "case": "turbojet:N2",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "thrustNormalization_N": 47556.584950116216,
+      "thrustNormalizationCondition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "complete": true,
+      "samples": 301,
+      "initialThrustFraction": 0.49139348415024725,
+      "endThrustFraction": 0.8323103777635742,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "HP": 97.66152260798214
+      },
+      "minSurgeMargin_pct": {
+        "comp": 27.385689994199012
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": 1382.2318743037333,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": []
+    },
+    {
+      "case": "turbojet:thermal",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "thrustNormalization_N": 47556.584950116216,
+      "thrustNormalizationCondition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "complete": true,
+      "samples": 1001,
+      "initialThrustFraction": 0.49091582687495644,
+      "endThrustFraction": 0.9879440703447623,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "HP": 99.73491786318338
+      },
+      "minSurgeMargin_pct": {
+        "comp": 16.3347118814948
+      },
+      "minClearance_mm": 0.4219968313224891,
+      "maxClearance_mm": 0.7083022431778798,
+      "minEffDelta": -0.016625158675171496,
+      "peakT4_K": 1604.0801451481973,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": []
+    },
+    {
+      "case": "turbojet:startup",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "thrustNormalization_N": 47556.584950116216,
+      "thrustNormalizationCondition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "complete": true,
+      "samples": 301,
+      "initialThrustFraction": 0,
+      "endThrustFraction": 0.5576348138923686,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "HP": 93.29562710149034
+      },
+      "minSurgeMargin_pct": {
+        "comp": 3.056706969473444
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": 1410.568962935259,
+      "eulerSteps": 0,
+      "starterOnlySamples": 10,
+      "warnings": [
+        "Light-off at t = 2.4 s, N2 18 %, T3 301 K.",
+        "Starter cut-out at t = 5.9 s.",
+        "10 sample(s) in the starter-only regime: no through-flow solution exists at the starter-driven speed, so the spool was integrated with starter torque and friction only (no gas-path quantities)."
+      ]
+    },
+    {
+      "case": "turbofan:15%-thrust-initialization",
+      "converged": true,
+      "thrustFraction": 0.14999999999992153,
+      "norm": 2.814237708958151e-12,
+      "mapViolations": []
+    },
+    {
+      "case": "turbofan:SLS-15%-to-rated",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "ratingThrust_N": 100759.93604063685,
+      "dt_s": 0.04,
+      "complete": true,
+      "initialThrustFraction": 0.14999999999833494,
+      "endThrustFraction": 0.9999999999588152,
+      "t95AfterCommand_s": 1.7400000000000002,
+      "minSurgeMargin_pct": {
+        "fan": 39.12137244213378,
+        "lpc": 12.888031222880647,
+        "hpc": 1.259951730741804
+      },
+      "peakT4_K": 1699.870708130378,
+      "warnings": []
+    },
+    {
+      "case": "turbofan:SLS-15%-to-rated",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "ratingThrust_N": 100759.93604063685,
+      "dt_s": 0.02,
+      "complete": true,
+      "initialThrustFraction": 0.14999999999833494,
+      "endThrustFraction": 0.9999999999638459,
+      "t95AfterCommand_s": 1.7000000000000002,
+      "minSurgeMargin_pct": {
+        "fan": 38.929075332794795,
+        "lpc": 12.91384049678821,
+        "hpc": 1.5483862298174778
+      },
+      "peakT4_K": 1699.3932924770036,
+      "warnings": []
+    },
+    {
+      "case": "turbofan:SLS-15%-to-rated",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "ratingThrust_N": 100759.93604063685,
+      "dt_s": 0.01,
+      "complete": true,
+      "initialThrustFraction": 0.14999999999833494,
+      "endThrustFraction": 0.9999999999375855,
+      "t95AfterCommand_s": 1.67,
+      "minSurgeMargin_pct": {
+        "fan": 38.90618484432624,
+        "lpc": 12.93322832283257,
+        "hpc": 1.4157545042184916
+      },
+      "peakT4_K": 1701.013105767513,
+      "warnings": []
+    },
+    {
+      "case": "turbofan:default",
+      "condition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "thrustNormalization_N": 26573.35949665695,
+      "thrustNormalizationCondition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "complete": true,
+      "samples": 301,
+      "initialThrustFraction": 0.36359963709501275,
+      "endThrustFraction": 0.999999230351625,
+      "t95AfterCommand_s": 2.06,
+      "endN_pct": {
+        "LP": 99.99994184861814,
+        "HP": 99.99998756111003
+      },
+      "minSurgeMargin_pct": {
+        "fan": 36.3357989942001,
+        "lpc": 0.4543868097744319,
+        "hpc": 10.722725141432022
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": 1632.287793046242,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": []
+    },
+    {
+      "case": "turbofan:deceleration",
+      "condition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "thrustNormalization_N": 26573.35949665695,
+      "thrustNormalizationCondition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "complete": true,
+      "samples": 301,
+      "initialThrustFraction": 1,
+      "endThrustFraction": 0.5203161017793655,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "LP": 82.66769375683829,
+        "HP": 92.38540664365784
+      },
+      "minSurgeMargin_pct": {
+        "fan": 36.33576758642534,
+        "lpc": 7.656705727256674,
+        "hpc": 23.10709886799085
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": 1550.0000000017633,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": []
+    },
+    {
+      "case": "turbofan:N2",
+      "condition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "thrustNormalization_N": 26573.35949665695,
+      "thrustNormalizationCondition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "complete": true,
+      "samples": 301,
+      "initialThrustFraction": 0.36359963709501275,
+      "endThrustFraction": 0.8600740836421403,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "LP": 93.90870782708727,
+        "HP": 97.72148187303691
+      },
+      "minSurgeMargin_pct": {
+        "fan": 40.52185808250064,
+        "lpc": 3.764022341221307,
+        "hpc": 21.02701521300343
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": 1474.6846883958635,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": []
+    },
+    {
+      "case": "turbofan:thermal",
+      "condition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "thrustNormalization_N": 26573.35949665695,
+      "thrustNormalizationCondition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "complete": true,
+      "samples": 1001,
+      "initialThrustFraction": 0.3638107530543083,
+      "endThrustFraction": 0.9930426106387331,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "LP": 99.38938020950776,
+        "HP": 99.58483913473667
+      },
+      "minSurgeMargin_pct": {
+        "fan": 36.435915840657884,
+        "lpc": -0.33981396017120913,
+        "hpc": 10.82998607720329
+      },
+      "minClearance_mm": 0.5167095561412527,
+      "maxClearance_mm": 0.9245882417276836,
+      "minEffDelta": -0.027157181097302516,
+      "peakT4_K": 1632.8699939845517,
+      "eulerSteps": 0,
+      "starterOnlySamples": 0,
+      "warnings": [
+        "LPC: 2 sample(s) beyond the modeled stall line; minimum map surge margin -0.34 %. Surge dynamics are not modeled; these samples are outside the operable branch."
+      ]
+    },
+    {
+      "case": "turbofan:startup",
+      "condition": {
+        "altitude_m": 0,
+        "mach": 0
+      },
+      "thrustNormalization_N": 26573.35949665695,
+      "thrustNormalizationCondition": {
+        "altitude_m": 11000,
+        "mach": 0.8
+      },
+      "complete": false,
+      "stop_s": 10.700000000000001,
+      "samples": 108,
+      "initialThrustFraction": 0,
+      "endThrustFraction": 0,
+      "t95AfterCommand_s": null,
+      "endN_pct": {
+        "LP": 5.200000000000001,
+        "HP": 45.214973921626296
+      },
+      "minSurgeMargin_pct": {
+        "fan": null,
+        "lpc": null,
+        "hpc": null
+      },
+      "maxClearance_mm": null,
+      "minEffDelta": null,
+      "peakT4_K": null,
+      "eulerSteps": 0,
+      "starterOnlySamples": 108,
+      "warnings": [
+        "Starter cut-out at t = 10.7 s.",
+        "Hung start: no light-off before the starter cut out (t = 10.7 s); no through-flow solution was found at the starter-driven speed.",
+        "Turbofan startup is unsupported by this map set at the attempted spool speeds. Starter-only motion is not a validated engine start.",
+        "108 sample(s) in the starter-only regime: no through-flow solution exists at the starter-driven speed, so the spool was integrated with starter torque and friction only (no gas-path quantities)."
+      ]
+    }
+  ]
+}

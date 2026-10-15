@@ -41,7 +41,7 @@ export interface StartInputs {
   lightOffFuelFrac: number; // initial fuel flow after light-off, fraction of design
   frictionPower_W: number; // drag on the HP spool at design speed (scales with N²)
 }
-/** Full-authority digital engine control: closed-loop fuel on a spool speed or thrust, with schedules and actuators. */
+/** Simplified control experiment: PI fuel on speed or simulated thrust, with instantaneous geometry schedules. */
 export interface Controller {
   mode: 'open' | 'N1' | 'N2' | 'Fn'; // 'open' = fuel schedule only
   target: number; // N1 / N2 as fraction of design speed, Fn in N
@@ -72,11 +72,11 @@ export interface ThermalInputs {
   enabled: boolean;
   tauCasing_s: number; tauDisc_s: number; // thermal time constants
   alpha_1perK: number; // thermal expansion coefficient (nickel alloy ~1.3e-5)
-  coldClearance_mm: number; // HPC/HPT cold build clearance
-  bladeHeight_mm: number; // representative rear HPC / HPT blade height
+  coldClearance_mm: number; // compressor cold build clearance
+  bladeHeight_mm: number; // representative rear compressor blade height
   rCasing_mm: number; // casing radius
   centrifugalGrowth_mm: number; // blade + disc growth at design speed (∝ N²)
-  effPerClearance: number; // Δη per unit (δ/h): ~1.0–2.0
+  effPerClearance: number; // fractional efficiency change Δη/η per unit (δ/h); uncalibrated
 }
 export const DEFAULT_THERMAL: ThermalInputs = { enabled: false, tauCasing_s: 8, tauDisc_s: 90, alpha_1perK: 1.3e-5, coldClearance_mm: 1.2, bladeHeight_mm: 25, rCasing_mm: 350, centrifugalGrowth_mm: 0.9, effPerClearance: 1.5 };
 /** clearance below which the efficiency correlation is evaluated at the floor (numerical guard, not a physical result) */
@@ -110,13 +110,23 @@ export interface TransientResult {
   contact: boolean;
 }
 
-interface Rate { dN: Record<string, number>; r: EngineResult; conv: boolean; xr: Record<string, number>; norm: number; gasPath: boolean }
+interface Rate { invalidReason?: string; dN: Record<string, number>; r: EngineResult; conv: boolean; xr: Record<string, number>; norm: number; gasPath: boolean }
 
 /** Integrate the engine through the fuel schedule. Calls `progress` with partial samples. */
 export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s: TransientSample[]) => void): TransientResult {
   if (!Number.isFinite(ti.duration_s) || ti.duration_s < 0 || !Number.isFinite(ti.dt_s) || ti.dt_s <= 0 || ti.duration_s / ti.dt_s > 100000) throw new Error('Transient duration and time step must be finite, with a positive time step and at most 100000 steps.');
   if (ti.thermal?.enabled && (![ti.thermal.tauCasing_s, ti.thermal.tauDisc_s, ti.thermal.bladeHeight_mm, ti.thermal.rCasing_mm].every(v => Number.isFinite(v) && v > 0))) throw new Error('Thermal time constants and dimensions must be finite and positive.');
   if (![ti.schedule.T4start, ti.schedule.WfEndFrac, ti.schedule.rampStart_s, ti.schedule.rampDuration_s, ti.schedule.ratioUnitLimit, ti.schedule.ratioUnitFloor].every(v => Number.isFinite(v) && v >= 0)) throw new Error('Fuel schedule values must be finite and non-negative.');
+  const nonnegative = (values: number[]) => values.every(v => Number.isFinite(v) && v >= 0);
+  const activeSpools = dp.inputs.arch === 'turbofan' ? (dp.inputs.spools === 3 ? ['LP', 'IP', 'HP'] as const : ['LP', 'HP'] as const) : ['HP'] as const;
+  if (activeSpools.some(k => !Number.isFinite(dp.inputs.inertia[k]) || dp.inputs.inertia[k] <= 0)) throw new Error('Every dynamically integrated spool needs a finite positive inertia.');
+  const control = ti.controller;
+  if (control && (!['manual', 'schedule'].includes(control.limiter ?? 'schedule') || !['open', 'N1', 'N2', 'Fn'].includes(control.mode) || !nonnegative([control.targetRamp_s, control.Kp, control.Ki, control.decelFloor, control.bleedValve.openBelowN2, control.bleedValve.frac]) || !Number.isFinite(control.vsvGain) || control.bleedValve.frac >= 1 || (control.mode !== 'open' && (!Number.isFinite(control.target) || control.target <= 0)) || (control.mode === 'N1' && dp.inputs.arch !== 'turbofan'))) throw new Error('Invalid controller mode, target, gains or actuator settings.');
+  const scheduleLimits = control && (control.limiter ?? 'schedule') === 'schedule';
+  if (scheduleLimits && (!control.accelSchedule.length || control.accelSchedule.some(p => !Number.isFinite(p.Nc) || p.Nc <= 0 || !Number.isFinite(p.ratioUnit) || p.ratioUnit <= 0 || p.ratioUnit < control.decelFloor) || new Set(control.accelSchedule.map(p => p.Nc)).size !== control.accelSchedule.length)) throw new Error('Acceleration schedule needs distinct positive speeds and ceilings no lower than the deceleration floor.');
+  if (!scheduleLimits && ti.schedule.ratioUnitLimit > 0 && ti.schedule.ratioUnitFloor > ti.schedule.ratioUnitLimit) throw new Error('The manual fuel floor must not exceed the ceiling.');
+  if (ti.start?.enabled && (!nonnegative([ti.start.starterTorque_Nm, ti.start.frictionPower_W]) || ![ti.start.starterCutout, ti.start.lightOffSpeed, ti.start.lightOffT3min_K, ti.start.lightOffFuelFrac].every(v => Number.isFinite(v) && v > 0))) throw new Error('Invalid starter or ignition settings.');
+  if (ti.thermal?.enabled && !nonnegative([ti.thermal.alpha_1perK, ti.thermal.coldClearance_mm, ti.thermal.centrifugalGrowth_mm, ti.thermal.effPerClearance])) throw new Error('Thermal expansion, clearance, centrifugal growth and efficiency coefficient must be finite and non-negative.');
   const inp = dp.inputs;
   const warnings: string[] = [];
   const WfDes = dp.result.components.find((c) => c.id === 'burner')!.values.Wfuel_kgs;
@@ -161,13 +171,13 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     const growthCasing = th.alpha_1perK * (Tc - 288.15) * th.rCasing_mm;
     const growthDisc = th.alpha_1perK * (Td - 288.15) * th.rCasing_mm * 0.92 + th.centrifugalGrowth_mm * nHP * nHP;
     const delta = th.coldClearance_mm + growthCasing - growthDisc; // reported as computed; may be ≤ 0 (contact)
-    // efficiency relative to the design-point clearance (so the design point carries no penalty)
+    // fractional efficiency change relative to the design-point clearance (so the design point carries no penalty)
     const gcD = th.alpha_1perK * (T3des - 288.15) * th.rCasing_mm, gdD = th.alpha_1perK * (T3des - 288.15) * th.rCasing_mm * 0.92 + th.centrifugalGrowth_mm;
     const deltaDes = Math.max(CLEARANCE_FLOOR_MM, th.coldClearance_mm + gcD - gdD);
     const effDelta = -th.effPerClearance * (Math.max(CLEARANCE_FLOOR_MM, delta) - deltaDes) / th.bladeHeight_mm;
     return { delta_mm: delta, effDelta, rub: delta <= 0 };
   };
-  let deltas: Record<string, { eff?: number; Wc?: number }> | undefined;
+  let deltas: OffDesignInputs['deltas'] = ti.od.deltas;
 
   /** sub-idle initial guess for a fixed-speed solve: flow ∝ speed, turbine expansion ratios ∝ speed² */
   const subIdleGuess = (spd: typeof speeds, litNow: boolean): Record<string, number> => {
@@ -211,7 +221,8 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     const imb = best.result.offDesign?.shaftImbalance_W ?? {};
     const power: Record<string, number> = {};
     for (const k of names) power[k] = (imb[shaftOf(k)] ?? 0) + (k === 'HP' ? starterPower(spd) : 0);
-    return { dN: ratesFromPower(spd, power), r: best.result, conv: best.converged, xr: best.x, norm: best.norm, gasPath: true };
+    const invalid = best.result.components.find(c => (c.kind === 'compressor' || c.kind === 'turbine') && (!Number.isFinite(c.values.eff) || c.values.eff <= 0 || c.values.eff > 1));
+    return { invalidReason: invalid ? `${invalid.name} efficiency is outside (0, 1]` : undefined, dN: ratesFromPower(spd, power), r: best.result, conv: best.converged && !invalid, xr: best.x, norm: best.norm, gasPath: true };
   };
   /** starter-only regime: no through-flow, the HP spool sees the starter and friction only */
   const starterOnlyRate = (spd: typeof speeds): Rate => {
@@ -231,7 +242,7 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
   let lastP3 = st ? NaN : start.result.stations.find((s) => s.id === '3')!.Pt; // P3 of the last converged gas path, for the limiter
   let lastTriedHP = -Infinity; // HP speed at the last gas-path attempt in the starter-only regime
   const stop = (t: number, why: string) => { warnings.push(`${why} The trajectory stops at t = ${t.toFixed(2)} s of ${ti.duration_s} s; gas-path samples are converged solutions, and starter-only samples are marked separately.`); complete = false; stoppedAt = t; };
-  const describe = (r: Rate) => { const v = r.r.offDesign?.mapViolations ?? []; return `residual ${r.norm.toExponential(1)}${v.length ? `, outside the supported range: ${v.join(', ')}` : ''}`; };
+  const describe = (r: Rate) => { const v = r.r.offDesign?.mapViolations ?? []; return `${r.invalidReason ? r.invalidReason + ', ' : ''}residual ${r.norm.toExponential(1)}${v.length ? `, outside the supported range: ${v.join(', ')}` : ''}`; };
 
   for (let i = 0; i <= n; i++) {
     const t = Math.min(i * ti.dt_s, ti.duration_s);
@@ -251,7 +262,8 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     let clr = { delta_mm: NaN, effDelta: 0, rub: false };
     if (th) {
       clr = clearanceOf(Tcasing, Tdisc, speeds.HP / inp.speeds.HP);
-      deltas = { [hotId]: { eff: 1 + clr.effDelta, Wc: 1 + 0.3 * clr.effDelta }, [inp.arch === 'turbofan' ? 'hpt' : 'turb']: { eff: 1 + 0.6 * clr.effDelta } };
+      // This T3-driven clearance belongs to the compressor. It cannot stand in for turbine clearance.
+      deltas = { ...ti.od.deltas, [hotId]: { ...ti.od.deltas?.[hotId], eff: (ti.od.deltas?.[hotId]?.eff ?? 1) * (1 + clr.effDelta), Wc: (ti.od.deltas?.[hotId]?.Wc ?? 1) * (1 + 0.3 * clr.effDelta) } };
       minClearance = Math.min(minClearance, clr.delta_mm);
       if (clr.rub && !contact) { contact = true; warnings.push(`Tip clearance closes to ${clr.delta_mm.toFixed(3)} mm at t = ${t.toFixed(1)} s: blade/casing contact predicted. The clearance model is outside its valid range from here on (efficiency evaluated at the ${CLEARANCE_FLOOR_MM} mm floor).`); }
     }
@@ -265,12 +277,12 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     if (ctl && lit) {
       const fr = Math.min(1, Math.max(0, (tRef - ti.schedule.rampStart_s) / Math.max(ctl.targetRamp_s, 1e-6)));
       demand = startMeasured + (ctl.target - startMeasured) * fr;
-      const meas = Number.isFinite(lastMeasured) ? lastMeasured : startMeasured;
+      const meas = ctl.mode === 'Fn' ? (Number.isFinite(lastMeasured) ? lastMeasured : startMeasured) : measure(start.result, speeds);
       const e = (demand - meas) / Math.max(Math.abs(demand), 1e-9);
       controlError = e;
-      integ += e * ti.dt_s;
+      integ += e * (samples.length ? t - samples[samples.length - 1].t : 0);
       integ = Math.max(-0.5, Math.min(0.5, integ)); // anti-windup
-      WfCmd = Math.max(0.02 * WfDes, WfBase + WfDes * (ctl.Kp * e + ctl.Ki * integ));
+      WfCmd = Math.max(0, WfBase + WfDes * (ctl.Kp * e + ctl.Ki * integ));
     }
     // ratio-unit limiter on the commanded fuel, using P3 of the last converged gas path (refined below once this step is
     // solved); precedence: controller schedule or manual values, never both.  Nothing is limited while unlit.
@@ -280,7 +292,7 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
         const nc = speeds.HP / Math.sqrt(T2 / 288.15) / (inp.speeds.HP / Math.sqrt(dp.result.stations.find((q) => q.id === '2')!.Tt / 288.15));
         ruMax = interpSchedule(sched!.accelSchedule, nc); ruMin = sched!.decelFloor;
       }
-      let w = cmd, limited = false;
+      let w = Math.max(ctl ? 0.02 * WfDes : 2e-4 * WfDes, cmd), limited = w !== cmd;
       if (ruMax > 0 && w / P3 > ruMax * ruDes) { w = ruMax * ruDes * P3; limited = true; }
       if (ruMin > 0 && w / P3 < ruMin * ruDes) { w = ruMin * ruDes * P3; limited = true; }
       return { Wf: w, limited };
@@ -332,7 +344,7 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
       }
       if (!complete) break;
       if (!settled) { stop(t, 'Fuel limiter and compressor pressure did not settle within tolerance.'); break; }
-      limited = Math.abs(WfNow - WfCmd) > 5e-3 * Math.max(WfCmd, 1e-8 * WfDes);
+      limited = Math.abs(WfNow - WfCmd) > 5e-3 * Math.max(Math.abs(WfCmd), 1e-8 * WfDes);
       // Conditional integration: prevent further wind-up into an active fuel limit,
       // while allowing error of the opposite sign to unwind the integral.
       if (ctl && limited && (WfCmd - WfNow) * controlError > 0) integ = integBefore;
@@ -362,6 +374,12 @@ export function runTransient(dp: DesignPoint, ti: TransientInputs, progress?: (s
     }
     if (progress && t - lastProgress >= 0.5) { progress(samples); lastProgress = t; }
   }
+  const solved = samples.filter(s => s.gasPath && s.converged);
+  for (const id of Object.keys(dp.comps)) {
+    const beyondStall = solved.filter(s => Number.isFinite(s.SM[id]) && s.SM[id] < 0);
+    if (beyondStall.length) warnings.push(`${id.toUpperCase()}: ${beyondStall.length} sample(s) beyond the modeled stall line; minimum map surge margin ${beyondStall.reduce((min, s) => Math.min(min, s.SM[id]), Infinity).toFixed(2)} %. Surge dynamics are not modeled; these samples are outside the operable branch.`);
+  }
+  if (st && inp.arch === 'turbofan' && !samples.some(s => s.gasPath)) warnings.push('Turbofan startup is unsupported by this map set at the attempted spool speeds. Starter-only motion is not a validated engine start.');
   if (eulerSteps) warnings.push(`${eulerSteps} predictor step(s) did not converge; those steps were integrated with explicit Euler from the converged corrector (marked in the samples).`);
   if (starterOnlySteps) warnings.push(`${starterOnlySteps} sample(s) in the starter-only regime: no through-flow solution exists at the starter-driven speed, so the spool was integrated with starter torque and friction only (no gas-path quantities).`);
   return { samples, design: { Wf: WfDes, ratioUnit: ruDes }, warnings, complete, stoppedAt_s: stoppedAt, eulerSteps, starterOnlySteps, minClearance_mm: th ? minClearance : undefined, contact };

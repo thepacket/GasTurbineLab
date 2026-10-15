@@ -101,7 +101,7 @@ Implemented after authorization for UI fixes:
 1. Disable “Apply best design” for infeasible results and distinguish constraint feasibility from numerical convergence.
 2. Bind optimisation cards and trajectories to the submitted variable order, even after controls change; exclude unavailable variables from submission and the run-button check.
 3. Show explicit incomplete and not-applicable LTO states without incorrectly attributing every unsupported case to low rated thrust.
-4. Plot clearance (mm) and efficiency delta (percentage points) separately using the existing chart component. Preserve gaps in invalid/infeasible chart series.
+4. Plot clearance (mm) and relative efficiency delta (% of reference efficiency) separately using the existing chart component. Preserve gaps in invalid/infeasible chart series.
 5. Use returned Monte Carlo quantiles in histogram captions and default sigma values for newly available architecture inputs.
 6. Report invalid shared links and map-storage failures through existing error styles. Do not display a prior off-design result as the current solution while its replacement is pending; invalidate callbacks when the operating state changes.
 7. Correct the incomplete-transient message to account for hung starts, limit failures and starter-only samples.
@@ -126,3 +126,25 @@ Corrections:
 Regression coverage includes server-rendered plot boundary cases, custom rpm-axis maps, differing station sets, trajectory gaps, browser SVG-coordinate checks, invalid sweep recovery, stale controller labels and off-design family legends across desktop, tablet and phone. Rendering correctness does not add experimental validation to the underlying transient, mission or estimate-grade models.
 
 Plot-review verification: 160 tests passed across 23 unit-test files; 76 browser tests passed with two intentional duplicate PWA-upgrade skips. TypeScript and the production build passed. Temperature–entropy and controller plot screenshots were inspected on the regression build.
+
+
+## Transient/control plausibility audit (2026-10-15)
+
+This audit checks implementation and compares model scope with public research. It does **not** validate generic transients against engine-test data. Reproduce the trajectories with `node reference/run-transient-audit.mjs`; the checked-in [results](../reference/transient_audit_results.json) include initial conditions, extrema, completion and warnings. Frozen chemistry is used throughout.
+
+[NASA/TM-2010-216811](https://ntrs.nasa.gov/api/citations/20100037768/downloads/20100037768.pdf) describes C-MAPSS40k's gain-scheduled PI, protection logic and sensor/actuator dynamics. Its sea-level static acceleration example reaches 95 % rated thrust in 4.07 s from a stabilized low-power condition (Figure 9). That is a useful scale comparison, not a target for this app's different engines. The report's ratio-unit limiter uses static compressor discharge pressure; this app uses total pressure. Its controller architecture and schedules cannot be transferred unchanged.
+
+For the app, sea-level static rating uses each default engine's design T₄, fixed design geometry and a separately solved 15 %-rated-thrust initial condition. Fuel ramps to rated flow over 0.3 s, starting at t = 0.5 s; the default open-loop controller's acceleration limiter remains enabled. Times below are measured from that command start to the first sampled 95 %-thrust crossing.
+
+| Engine | dt = 0.04 s | dt = 0.02 s | dt = 0.01 s |
+| --- | ---: | ---: | ---: |
+| Default turbojet | 0.66 s | 0.62 s | 0.61 s |
+| Default turbofan | 1.74 s | 1.70 s | 1.67 s |
+
+Refinement does not remove the much faster response than NASA's example. At dt = 0.01 s, peak T₄ is about 1604 K (turbojet) and 1701 K (turbofan), versus design values 1500/1550 K; minimum compressor/HPC map surge margins are about 4.42/1.42 %. Design T₄ is not itself a specified transient redline. These small margins and temperature excursions show why this simplified limiter must not be treated as validated engine protection. No gains or inertias were tuned to force agreement with a different engine.
+
+[NASA/TM-2016-219146](https://ntrs.nasa.gov/api/citations/20170000885/downloads/20170000885.pdf) models turbine clearance using separate rotor, blade and shroud responses, including thermal and centrifugal effects. The app's two T₃-driven states lack those turbine-specific temperatures, cooling and geometry. Its former 0.6× transfer of compressor clearance loss to turbine efficiency was therefore removed. The remaining compressor model's time constants and magnitude are illustrative; this comparison does not validate them or establish a turbine pinch-point prediction.
+
+The default cruise turbofan thermal run crosses the modeled LPC stall line (minimum about −0.34 %). It now reports that limitation even when numerical integration completes. Default high-bypass startup still fails to establish a through-flow solution: this is an explicitly unsupported map regime, not a validated start. The turbojet startup exercises ignition and starter cut-out but has no independent start-test calibration.
+
+Implementation fixes preserve component overrides, use current speed feedback, integrate PI error over actual elapsed time, include minimum fuel in anti-windup, reject invalid controller/thermal/inertia inputs and stop on impossible component efficiency. Regression tests include the analytic constant-power rotor energy solution with second-order step refinement, fractional-step PI integration, ignition transfer, override preservation and compressor-only thermal coupling. The only visible change is correction of the efficiency plot's units; existing warnings carry the additional validity information.

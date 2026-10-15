@@ -29,8 +29,10 @@ describe('1. compressor flow matching is separate from the R-line boundary handl
     const r = runTransient(dp, { ...uiTransient(inp, false), thermal: { ...DEFAULT_THERMAL, enabled: true } });
     expectHonest(r);
     const minSM = Math.min(...r.samples.map((s) => s.SM.lpc));
+    expect(minSM).toBeLessThan(0);
+    expect(r.warnings.some(w => w.includes('LPC:') && w.includes('beyond the modeled stall line'))).toBe(true);
     const s = r.samples.find((q) => q.SM.lpc === minSM)!;
-    const sol = solveOffDesign(dp, { ...r.samples[0] && uiTransient(inp, false).od, throttle: { mode: 'Wf', value: s.Wf } }, undefined, { fixedSpeeds: { LP: s.N.LP, IP: inp.speeds.IP, HP: s.N.HP } });
+    const sol = solveOffDesign(dp, { ...uiTransient(inp, false).od, deltas: { hpc: { eff: 1 + s.effDeltaHPC!, Wc: 1 + 0.3 * s.effDeltaHPC! } }, throttle: { mode: 'Wf', value: s.Wf } }, undefined, { fixedSpeeds: { LP: s.N.LP, IP: inp.speeds.IP, HP: s.N.HP } });
     expect(sol.converged).toBe(true);
     for (const c of sol.result.components.filter((q) => q.kind === 'compressor')) expect(Math.abs(c.values.WcMap / c.values.Wc - 1)).toBeLessThan(1e-6);
     const lpc = sol.result.components.find((c) => c.id === 'lpc')!.values;
