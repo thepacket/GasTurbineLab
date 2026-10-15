@@ -106,6 +106,11 @@ test('changing optimiser bounds marks the result stale and prevents applying it'
 
 test('cross-section parts and station callouts respond to keyboard activation', async ({ page }) => {
   await openView(page, 'Section');
+  // This checks SVG keyboard activation, not continuously animated WebGL.
+  if (page.viewportSize()!.width >= 1180) {
+    await page.getByRole('button', { name: 'Rotating', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Static', exact: true })).toBeVisible();
+  }
   const part = page.locator('svg.cross g.part[role="button"]').first();
   await part.focus();
   await part.press('Enter');
