@@ -4,14 +4,18 @@ import { useStale, StaleBanner } from './useStale';
 import { Provenance } from './Provenance';
 import { request } from '../engine/client';
 import { UNCERTAIN, MonteCarloResult } from '../engine/montecarlo';
+import { extent, niceAxis, axisLabels } from '../viz/plotData';
 import { fmt } from './format';
 
-function Histogram({ title, values, stats, scale = 1, unit, digits = 1 }: { title: string; values: number[]; stats: MonteCarloResult['stats'][string]; scale?: number; unit: string; digits?: number }) {
-  if (values.length < 2) return null;
+export function Histogram({ title, values, stats, scale = 1, unit, digits = 1 }: { title: string; values: number[]; stats: MonteCarloResult['stats'][string]; scale?: number; unit: string; digits?: number }) {
+  values = values.filter(Number.isFinite);
+  if (!values.length) return <div className="chart"><h4>{title}</h4><div className="sub">No valid data to plot.</div></div>;
   const W = 420, H = 200, m = { l: 40, r: 12, t: 10, b: 30 };
-  const lo = Math.min(...values), hi = Math.max(...values);
+  const axis = niceAxis(...extent(values));
+  const lo = axis.lo, hi = axis.hi;
+  const labels = axisLabels([lo, (lo + hi) / 2, hi], v => fmt(v, digits));
   const nb = 24; const bins = new Array(nb).fill(0);
-  for (const v of values) bins[Math.min(nb - 1, Math.floor(((v - lo) / Math.max(hi - lo, 1e-12)) * nb))]++;
+  for (const v of values) bins[Math.min(nb - 1, Math.floor(((v - lo) / (hi - lo)) * nb))]++;
   const mx = Math.max(...bins);
   const sx = (i: number) => m.l + (i / nb) * (W - m.l - m.r), bw = (W - m.l - m.r) / nb;
   const sy = (c: number) => H - m.b - (c / mx) * (H - m.t - m.b);
@@ -20,9 +24,11 @@ function Histogram({ title, values, stats, scale = 1, unit, digits = 1 }: { titl
       <h4>{title}</h4>
       <div className="sub">p5 {fmt(stats.p5 * scale, digits)} · median {fmt(stats.p50 * scale, digits)} · p95 {fmt(stats.p95 * scale, digits)} {unit}</div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title}>
+        <text x={m.l} y={9}>count</text>
+        <text x={m.l - 4} y={sy(mx) + 4} textAnchor="end">{mx}</text>
         <g className="axis"><line x1={m.l} x2={W - m.r} y1={H - m.b} y2={H - m.b} /></g>
         {bins.map((c, i) => <rect key={i} x={sx(i) + 1} y={sy(c)} width={bw - 2} height={H - m.b - sy(c)} rx={2} fill="var(--series-1)" />)}
-        {[0, 0.5, 1].map((f) => <text key={f} x={m.l + f * (W - m.l - m.r)} y={H - m.b + 13} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}>{fmt(lo + f * (hi - lo), digits)}</text>)}
+        {[0, 0.5, 1].map((f, i) => <text key={f} x={m.l + f * (W - m.l - m.r)} y={H - m.b + 13} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}>{labels[i]}</text>)}
         <text x={(m.l + W - m.r) / 2} y={H - 2} textAnchor="middle">{unit}</text>
       </svg>
     </div>

@@ -23,7 +23,9 @@ export function MissionView({ store }: { store: Store }) {
   const stale = useStale({ inputs, ac, segs, ratings, od: store.state.od });
   const [error, setError] = useState<string | null>(null);
   const u = U(store.state.units);
+  const [runArch, setRunArch] = useState(inputs.arch);
   const run = () => {
+    setRunArch(inputs.arch);
     setBusy(true); setError(null); setRes(null); setPts([]); stale.snapshot();
     request<MissionResult>({ type: 'mission', inputs: { ...inputs, chemistry: 'frozen' }, mi: { aircraft: ac, segments: segs, od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, pointsPerSegment: 8, ratings } }, (p: MissionPoint[]) => setPts(p))
       .then((r) => { setRes(r); setPts(r.points); setBusy(false); })
@@ -74,7 +76,7 @@ export function MissionView({ store }: { store: Store }) {
         </div>
         <button className="btn" style={{ marginTop: 8 }} onClick={() => setSegs([...segs, { kind: 'cruise', label: `Segment ${segs.length + 1}`, alt0_m: 10000, alt1_m: 10000, mach: 0.78, value: 500 }])}>Add segment</button>
       </div>
-      {res && stale.stale && <StaleBanner what="mission" />}
+      {pts.length > 0 && stale.stale && <StaleBanner what="mission" />}
       {res?.warnings.slice(0, 8).map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {res && res.warnings.length > 8 && <div className="warn"><span>⚠</span><span>{res.warnings.length - 8} more warnings.</span></div>}
       {res && (
@@ -90,11 +92,11 @@ export function MissionView({ store }: { store: Store }) {
       {pts.length > 1 && (
         <div className="charts">
           <LineChart title="Altitude profile" series={[{ name: 'altitude', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.alt_m })) }]} xLabel="time (min)" yLabel="m" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
-          <LineChart title="Thrust per engine" sub="required vs delivered" series={[{ name: 'required', color: 'var(--series-2)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.FnReq / 1000 })) }, { name: 'delivered', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.Fn / 1000 })) }]} xLabel="time (min)" yLabel="kN" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
-          <LineChart title="Fuel flow (all engines)" series={[{ name: 'fuel flow', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.Wf })) }]} xLabel="time (min)" yLabel="kg/s" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />
+          <LineChart title="Thrust per engine" sub="required vs delivered; unconverged engine points shown as gaps" series={[{ name: 'required', color: 'var(--series-2)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.FnReq / 1000 })) }, { name: 'delivered', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.Fn / 1000 : NaN })) }]} xLabel="time (min)" yLabel="kN" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
+          <LineChart title="Fuel flow (all engines)" series={[{ name: 'fuel flow', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.Wf : NaN })) }]} xLabel="time (min)" yLabel="kg/s" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />
           <LineChart title="Aircraft mass" series={[{ name: 'mass', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.mass_kg / 1000 })) }]} xLabel="time (min)" yLabel="t" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 1)} />
-          <LineChart title="Spool speeds" series={[{ name: 'N2 (HP)', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.NHPpct })) }, ...(inputs.arch === 'turbofan' ? [{ name: 'N1 (LP)', color: 'var(--series-2)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.NLPpct })) }] : [])]} xLabel="time (min)" yLabel="% design" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
-          <LineChart title="TSFC" series={[{ name: 'TSFC', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.TSFC })) }]} xLabel="time (min)" yLabel="mg/(N·s)" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 1)} />
+          <LineChart title="Spool speeds" series={[{ name: 'N2 (HP)', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.NHPpct : NaN })) }, ...(runArch === 'turbofan' ? [{ name: 'N1 (LP)', color: 'var(--series-2)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.NLPpct : NaN })) }] : [])]} xLabel="time (min)" yLabel="% design" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 0)} />
+          <LineChart title="TSFC" series={[{ name: 'TSFC', color: 'var(--series-1)', points: pts.map((p) => ({ x: p.t_s / 60, y: p.converged ? p.TSFC : NaN })) }]} xLabel="time (min)" yLabel="mg/(N·s)" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 1)} />
         </div>
       )}
       {pts.length > 1 && (

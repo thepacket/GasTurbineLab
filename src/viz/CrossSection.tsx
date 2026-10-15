@@ -41,6 +41,7 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
   };
   const colorOf = (p: Part) => (overlay === 'T' ? tempColor(p.T) : pressureColor(p.P, geo.parts));
   const pMax = Math.max(...geo.parts.map((p) => p.P));
+  const pMin = Math.min(...geo.parts.map((p) => p.P)) * 0.95;
 
   const onEnter = (e: React.MouseEvent, title: string, lines: string[]) => {
     const r = (e.currentTarget as SVGElement).ownerSVGElement!.getBoundingClientRect();
@@ -143,7 +144,7 @@ export function CrossSection({ result, store }: { result: EngineResult; store: S
         <span className="chip">{result.inputs.arch}{result.offDesign ? ' · off-design' : ''} · length ≈ {u.length(geo.length).v} {u.length(geo.length).u} · max Ø {u.length(2 * geo.rMax).v} {u.length(2 * geo.rMax).u}</span>
       </div>
       <div className="legend">
-        {overlay === 'T' ? <><span>{T_MIN} K</span><div className="ramp" style={{ background: thermalGradient }} /><span>{T_MAX} K</span></> : <><span>{kPa(result.stations[0].Ps)} kPa</span><div className="ramp" style={{ background: 'linear-gradient(90deg, var(--seq-100), var(--seq-400), var(--seq-700))' }} /><span>{kPa(pMax)} kPa</span></>}
+        {overlay === 'T' ? <><span>≤{T_MIN} K</span><div className="ramp" style={{ background: thermalGradient }} /><span>≥{T_MAX} K</span></> : <><span>{kPa(pMin)} kPa</span><div className="ramp" style={{ background: 'linear-gradient(90deg, #cde2fb, #86b6ef, #3987e5, #1c5cab, #0d366b)' }} /><span>{kPa(pMax)} kPa (log)</span></>}
       </div>
       {hover && (
         <div className="tooltip" style={{ left: Math.min(hover.x + 12, (document.body.clientWidth || 800) - 220), top: hover.y + 12 }}>

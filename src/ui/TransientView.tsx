@@ -22,7 +22,9 @@ export function TransientView({ store }: { store: Store }) {
   const [busy, setBusy] = useState(false);
   const stale = useStale({ inputs, sch, duration, start, ctl, th, od: store.state.od });
   const [error, setError] = useState<string | null>(null);
+  const [runContext, setRunContext] = useState({ inputs, ctl, th, start, duration });
   const run = () => {
+    setRunContext({ inputs: { ...inputs, chemistry: 'frozen' }, ctl, th, start, duration });
     setBusy(true); setError(null); setResult(null); setSamples([]); stale.snapshot();
     request<TransientResult>({ type: 'transient', inputs: { ...inputs, chemistry: 'frozen' }, ti: { od: { ...store.state.od, throttle: { mode: 'T4', value: inputs.burner.T4_K } }, schedule: sch, duration_s: duration, dt_s: start.enabled ? 0.1 : 0.04, start, controller: ctl, thermal: th } }, (p: TransientSample[]) => setSamples(p))
       .then((r) => { setResult(r); setSamples(r.samples); setBusy(false); })
@@ -33,7 +35,7 @@ export function TransientView({ store }: { store: Store }) {
   const s = (pick: (x: TransientSample) => number, name: string, c = 0): Series => ({ name, color: colors[c], points: samples.map((x) => ({ x: x.t, y: pick(x) })) });
   const spools = samples[0] ? Object.keys(samples[0].Npct) : [];
   const comps = samples[0] ? Object.keys(samples[0].SM) : [];
-  const solved = samples.filter((x) => x.gasPath);
+  const solved = samples.filter((x) => x.gasPath && x.converged);
   const minSM = comps.map((c) => ({ c, v: solved.length ? Math.min(...solved.map((x) => x.SM[c])) : NaN }));
   const Set = (k: keyof FuelSchedule, v: number) => setSch({ ...sch, [k]: v });
   const manualLimiter = (ctl.limiter ?? 'schedule') === 'manual';
@@ -98,37 +100,37 @@ export function TransientView({ store }: { store: Store }) {
         )}
       </div>
       {samples.length > 1 && stale.stale && <StaleBanner what="transient" />}
-      {result && !result.complete && <div className="err" role="alert"><strong>Trajectory incomplete.</strong> The integration stopped at {fmt(result.stoppedAt_s ?? 0, 2)} s of {duration} s before completing the manoeuvre; see the warnings for the stopping reason. Samples may include the explicitly marked starter-only regime. The end-point cards describe the last available state.</div>}
+      {result && !result.complete && <div className="err" role="alert"><strong>Trajectory incomplete.</strong> The integration stopped at {fmt(result.stoppedAt_s ?? 0, 2)} s of {runContext.duration} s before completing the manoeuvre; see the warnings for the stopping reason. Samples may include the explicitly marked starter-only regime. The end-point cards describe the last available state.</div>}
       {unconverged > 0 && <div className="err" role="alert">{unconverged} plotted sample(s) are not converged gas-path solutions.</div>}
       {result?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {samples.length > 1 && (
         <>
           <div className="cards">
-            {!result?.complete && result && <div className="card" style={{ borderColor: 'var(--bad)' }}><div className="k">Stopped at</div><div className="v" style={{ color: 'var(--bad)' }}>{fmt(result.stoppedAt_s ?? 0, 1)}<small>s of {duration} s</small></div></div>}
+            {!result?.complete && result && <div className="card" style={{ borderColor: 'var(--bad)' }}><div className="k">Stopped at</div><div className="v" style={{ color: 'var(--bad)' }}>{fmt(result.stoppedAt_s ?? 0, 1)}<small>s of {runContext.duration} s</small></div></div>}
             {starterOnly.length > 0 && <div className="card"><div className="k">Starter-only regime</div><div className="v">{fmt(starterOnly[0].t, 1)} → {fmt(starterOnly[starterOnly.length - 1].t, 1)}<small>s, no gas-path solution</small></div></div>}
             {spools.map((k) => <div className="card" key={k}><div className="k">{k} spool</div><div className="v">{fmt(samples[0].Npct[k], 1)} → {fmt(samples[samples.length - 1].Npct[k], 1)}<small>%</small></div></div>)}
             <div className="card"><div className="k">Net thrust</div><div className="v">{fmt(samples[0].Fn / 1000, 1)} → {fmt(samples[samples.length - 1].Fn / 1000, 1)}<small>kN</small></div></div>
             {minSM.map((m) => <div className="card" key={m.c}><div className="k">Min {m.c.toUpperCase()} surge margin</div><div className="v" style={{ color: m.v < 5 ? 'var(--bad)' : m.v < 10 ? 'var(--warn)' : undefined }}>{Number.isFinite(m.v) ? fmt(m.v, 1) : '—'}<small>{Number.isFinite(m.v) ? `%${m.v < 0 ? ' (beyond stall line)' : ''}` : 'no gas-path solution'}</small></div></div>)}
             <div className="card"><div className="k">Peak T4</div><div className="v">{fmt(Math.max(...samples.map((x) => x.T4)), 0)}<small>K</small></div></div>
-            {th.enabled && result?.minClearance_mm !== undefined && <div className="card" style={result.contact ? { borderColor: 'var(--bad)' } : undefined}><div className="k">Min tip clearance</div><div className="v" style={{ color: result.contact ? 'var(--bad)' : undefined }}>{fmt(result.minClearance_mm, 3)}<small>mm{result.contact ? ' — contact' : ''}</small></div></div>}
-            {start.enabled && <div className="card"><div className="k">Light-off</div><div className="v">{(() => { const i = samples.findIndex((x) => x.lit); return i >= 0 ? fmt(samples[i].t, 1) + ' s' : 'none'; })()}</div></div>}
+            {runContext.th.enabled && result?.minClearance_mm !== undefined && <div className="card" style={result.contact ? { borderColor: 'var(--bad)' } : undefined}><div className="k">Min tip clearance</div><div className="v" style={{ color: result.contact ? 'var(--bad)' : undefined }}>{fmt(result.minClearance_mm, 3)}<small>mm{result.contact ? ' — contact' : ''}</small></div></div>}
+            {runContext.start.enabled && <div className="card"><div className="k">Light-off</div><div className="v">{(() => { const i = samples.findIndex((x) => x.lit); return i >= 0 ? fmt(samples[i].t, 1) + ' s' : 'none'; })()}</div></div>}
             <div className="card"><div className="k">Limiter active</div><div className="v">{fmt((100 * samples.filter((x) => x.limited).length) / samples.length, 0)}<small>% of time</small></div></div>
           </div>
           <div className="charts">
             <LineChart title="Spool speeds" series={spools.map((k, i) => s((x) => x.Npct[k], k + ' spool', i))} xLabel="time (s)" yLabel="% design" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
-            {ctl.mode !== 'open' && samples[0]?.demand !== undefined && <LineChart title={`Controller: ${ctl.mode} demand vs measured`} series={[s((x) => (ctl.mode === 'Fn' ? (x.demand ?? NaN) / 1000 : 100 * (x.demand ?? NaN)), 'demand', 1), s((x) => (ctl.mode === 'Fn' ? (x.measured ?? NaN) / 1000 : 100 * (x.measured ?? NaN)), 'measured', 0)]} xLabel="time (s)" yLabel={ctl.mode === 'Fn' ? 'kN' : '% design'} xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 1)} />}
+            {runContext.ctl.mode !== 'open' && samples.some(x => x.demand !== undefined) && <LineChart title={`Controller: ${runContext.ctl.mode} demand vs measured`} series={[s((x) => (runContext.ctl.mode === 'Fn' ? (x.demand ?? NaN) / 1000 : 100 * (x.demand ?? NaN)), 'demand', 1), s((x) => (runContext.ctl.mode === 'Fn' ? (x.measured ?? NaN) / 1000 : 100 * (x.measured ?? NaN)), 'measured', 0)]} xLabel="time (s)" yLabel={runContext.ctl.mode === 'Fn' ? 'kN' : '% design'} xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 1)} />}
             <LineChart title="Fuel flow" sub="command vs delivered (after limiter)" series={[s((x) => x.WfCmd, 'commanded', 1), s((x) => x.Wf, 'delivered', 0)]} xLabel="time (s)" yLabel="kg/s" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
-            <LineChart title="Net thrust" series={[s((x) => x.Fn / 1000, 'thrust')]} xLabel="time (s)" yLabel="kN" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
-            <LineChart title="Surge margins" series={comps.map((c, i) => s((x) => x.SM[c], c.toUpperCase(), i))} xLabel="time (s)" yLabel="%" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
-            <LineChart title="Turbine inlet and exit temperature" series={[s((x) => x.T4, 'T4', 1), s((x) => x.T5, 'T5', 0)]} xLabel="time (s)" yLabel="K" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
-            {th.enabled && samples[0]?.clearance_mm !== undefined && (
+            <LineChart title="Net thrust" sub="gaps omit samples without a converged gas path" series={[s((x) => x.gasPath && x.converged ? x.Fn / 1000 : NaN, 'thrust')]} xLabel="time (s)" yLabel="kN" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
+            <LineChart title="Surge margins" series={comps.map((c, i) => s((x) => x.gasPath && x.converged ? x.SM[c] : NaN, c.toUpperCase(), i))} xLabel="time (s)" yLabel="%" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
+            <LineChart title="Turbine inlet and exit temperature" series={[s((x) => x.gasPath && x.converged ? x.T4 : NaN, 'T4', 1), s((x) => x.gasPath && x.converged ? x.T5 : NaN, 'T5', 0)]} xLabel="time (s)" yLabel="K" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
+            {runContext.th.enabled && samples[0]?.clearance_mm !== undefined && (
               <>
                 <LineChart title="Metal temperatures" series={[s((x) => x.Tcasing ?? NaN, 'casing', 1), s((x) => x.Tdisc ?? NaN, 'disc', 0)]} xLabel="time (s)" yLabel="K" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 0)} />
                 <LineChart title="Tip clearance" sub="HP compressor" series={[s((x) => x.clearance_mm ?? NaN, 'clearance', 0)]} xLabel="time (s)" yLabel="mm" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
                 <LineChart title="Efficiency penalty" sub="HP compressor; delta relative to the design clearance" series={[s((x) => 100 * (x.effDeltaHPC ?? 0), 'Δη', 1)]} xLabel="time (s)" yLabel="percentage points" xFmt={(v) => fmt(v, 1)} yFmt={(v) => fmt(v, 2)} />
               </>
             )}
-            <MapTrajectory design={inputs} samples={samples} />
+            <MapTrajectory design={runContext.inputs} samples={samples} />
           </div>
         </>
       )}

@@ -16,6 +16,7 @@ export function OptimizeView({ store }: { store: Store }) {
   const inputs = store.state.inputs;
   const avail = VARIABLES.filter((v) => { const val = getPath(inputs, v.path); if (typeof val !== 'number') return false; if (inputs.arch !== 'turbofan' && ['BPR', 'fan.PR', 'lpc.PR', 'hpc.PR', 'mixer.MNcore'].includes(v.path)) return false; if (inputs.arch === 'turbofan' && v.path === 'comp.PR') return false; if (v.path === 'lpc.PR' && inputs.spools === 3) return false; if (v.path === 'mixer.MNcore' && !inputs.mixed) return false; return true; });
   const [sel, setSel] = useState<string[]>(() => (inputs.arch === 'turbofan' ? ['BPR', 'fan.PR'] : ['comp.PR']));
+  const [runObjective, setRunObjective] = useState<Objective>('tsfc');
   const [submittedVars, setSubmittedVars] = useState<typeof VARIABLES>([]);
   const selected = avail.filter((v) => sel.includes(v.path));
   const [bounds, setBounds] = useState<Record<string, [number, number]>>({});
@@ -32,7 +33,7 @@ export function OptimizeView({ store }: { store: Store }) {
   const run = () => {
     setBusy(true); setError(null); setRes(null); setTrace([]); stale.snapshot();
     const vars = selected.map((v) => ({ ...v, min: bounds[v.path]?.[0] ?? v.min, max: bounds[v.path]?.[1] ?? v.max }));
-    setSubmittedVars(vars);
+    setSubmittedVars(vars); setRunObjective(objective);
     const constraints = cons.filter((c) => !(c.kind === 'FnMin' && c.value <= 0));
     if (smCheck.enabled) constraints.push({ kind: 'surgeMarginMin', value: smCheck.min });
     const m = defaultMission(inputs.arch);
@@ -68,7 +69,7 @@ export function OptimizeView({ store }: { store: Store }) {
         {res && <button className="btn" disabled={stale.stale || !res.feasible} title={!res.feasible ? 'No feasible design found; constraints are not satisfied' : stale.stale ? 'Inputs changed since this run; optimise again before applying' : undefined} onClick={() => store.dispatch({ type: 'inputs', inputs: res.best, note: `Optimised: ${OBJ.find((o) => o.id === objective)!.label}` })}>Apply best design</button>}
         {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
       </div>
-      {res && stale.stale && <StaleBanner what="optimisation" />}
+      {trace.length > 0 && stale.stale && <StaleBanner what="optimisation" />}
       {res?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {(res || trace.length > 0) && (
         <div className="cards">
@@ -79,8 +80,8 @@ export function OptimizeView({ store }: { store: Store }) {
       )}
       {trace.length > 1 && (
         <div className="charts">
-          <LineChart title="Convergence" sub="objective per evaluation (infeasible points shown as gaps)" series={[{ name: 'objective', color: 'var(--series-1)', points: trace.map((t) => ({ x: t.eval, y: t.feasible ? t.objective : NaN })) }]} xLabel="evaluation" yLabel={objective === 'missionFuel' ? 'kg' : objective === 'tsfc' ? 'mg/(N·s)' : ''} xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />
-          {submittedVars.map((v, i) => <LineChart key={v.path} title={v.label} series={[{ name: v.path, color: 'var(--series-2)', points: trace.map((t) => ({ x: t.eval, y: t.x[i] })) }]} xLabel="evaluation" yLabel="" xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />)}
+          <LineChart title="Convergence" sub="objective per evaluation (infeasible points shown as gaps)" series={[{ name: 'objective', color: 'var(--series-1)', points: trace.map((t) => ({ x: t.eval, y: t.feasible ? t.objective : NaN })) }]} xLabel="evaluation" yLabel={{ missionFuel: 'kg', tsfc: 'mg/(N·s)', thrust: '−kN', specificThrust: '−N·s/kg', thermalEff: '−%' }[runObjective]} xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />
+          {submittedVars.map((v, i) => <LineChart key={v.path} title={v.label} series={[{ name: v.path, color: 'var(--series-2)', points: trace.map((t) => ({ x: t.eval, y: t.x[i] })) }]} xLabel="evaluation" yLabel={v.path === 'burner.T4_K' ? 'K' : v.path === 'flight.W_kgs' ? 'kg/s' : ''} xFmt={(v) => fmt(v, 0)} yFmt={(v) => fmt(v, 2)} />)}
         </div>
       )}
       {design && <div className="prose"><p style={{ color: 'var(--text-muted)' }}>Current design: TSFC {fmt(design.perf.TSFC_mg_Ns, 2)} mg/(N·s), net thrust {fmt(design.perf.Fn / 1000, 1)} kN, T3 {fmt(design.stations.find((s) => s.id === '3')!.Tt, 0)} K.</p></div>}

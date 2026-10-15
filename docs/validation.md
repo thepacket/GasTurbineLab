@@ -107,3 +107,22 @@ Implemented after authorization for UI fixes:
 7. Correct the incomplete-transient message to account for hung starts, limit failures and starter-only samples.
 
 Field-level numeric validation hints are deferred as an interface improvement; invalid values already receive engine-level errors. The existing layout, navigation, styling and compact controls remain the basis of the interface.
+
+## Plot review (2026-10-15, local follow-up)
+
+The review traced plotted quantities back to solver outputs across station diagrams, compressor maps, transient trajectories, mission profiles, parameter sweeps, optimisation, uncertainty histograms and the cross-section's quantitative colour overlays. It preserves the existing chart components and visual style. The 3D rendering is a schematic with approximate geometry, not a quantitative performance plot; its temperature colours and tooltip units were checked without changing its geometry or appearance.
+
+Corrections:
+
+* Shared axes now handle empty, invalid, constant and microscopic-range data without invalid SVG coordinates or unbounded tick generation. Invalid x or y values break paths; isolated valid points remain visible. Tick labels increase precision when rounding would otherwise make distinct ticks identical.
+* Hover values use the actual common x coordinate rather than assuming matching sample indices. Station labels are separated where they overlap, with leader lines retaining their point association. Tooltip boxes accommodate longer family names.
+* Station profiles use discrete station ticks. Comparisons align station identities across architectures rather than assigning B's data to A's station names. The bypass entropy path branches at the fan exit. Entropy comparisons use each engine's own inlet reference; these total-state diagrams are not closed-cycle work diagrams.
+* Sweep data is hidden until it matches the current inputs and axis/family selection. Invalid ranges fail explicitly. Off-design sweeps preserve the selected throttle mode unless temperature itself is swept. Speed and surge-margin curves include every family with solved data; failed points remain gaps in charts and exported data.
+* Compressor-map speed labels are normalized by the map's actual reference speed, including maps whose axes use percentages or rpm. All tabulated speed lines are drawn. Bounds include design/operating points, stall lines and pressure ratios below unity. Map trajectories retain gaps and can show a single valid point. Transient map axes now have numeric ticks. Map overlays identify the reference-map basis; variable-geometry/delta corrections are not represented by the background lines. Operating iterates and points outside tabulated R-line or speed ranges are identified.
+* Transient labels, controller units, thermal visibility and trajectory background remain tied to the submitted run when controls change. Gas-path plots omit unsolved/starter-only gas-path values; mechanical spool histories still include the explicitly identified starter-only interval.
+* Mission engine-performance plots omit unconverged solver points; prescribed altitude and integrated mass remain profile quantities. Spool selection remains tied to the submitted architecture. Optimisation axes retain the submitted objective and include signed objective units and dimensional variable units.
+* Histograms display single samples and constant distributions on finite axes, identify counts, and use the returned quantiles. The pressure colour legend now matches the actual logarithmic bounds and ramp; temperature endpoints identify clipping.
+
+Regression coverage includes server-rendered plot boundary cases, custom rpm-axis maps, differing station sets, trajectory gaps, browser SVG-coordinate checks, invalid sweep recovery, stale controller labels and off-design family legends across desktop, tablet and phone. Rendering correctness does not add experimental validation to the underlying transient, mission or estimate-grade models.
+
+Plot-review verification: 160 tests passed across 23 unit-test files; 76 browser tests passed with two intentional duplicate PWA-upgrade skips. TypeScript and the production build passed. Temperature–entropy and controller plot screenshots were inspected on the regression build.

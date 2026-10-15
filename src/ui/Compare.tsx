@@ -11,6 +11,7 @@ import { fmt, kN, kW, pct, kPa } from './format';
 export function Compare({ store, a }: { store: Store; a: EngineResult }) {
   const bInputs = store.state.compare;
   const b = useMemo(() => { if (!bInputs) return null; try { return solveEngine(bInputs); } catch { return null; } }, [bInputs]);
+  const stationIds = [...new Set([...a.stations, ...(b?.stations ?? [])].filter(s => s.stream !== 'bypass').map(s => s.id))].sort((a, b) => Number('0.' + a) - Number('0.' + b));
   const pick = (name: string) => {
     const p = PRESETS.find((x) => x.name === name); if (p) { store.dispatch({ type: 'compare', inputs: JSON.parse(JSON.stringify(p.inputs)), label: p.name }); return; }
     const e = ENGINES.find((x) => x.name === name); if (e) store.dispatch({ type: 'compare', inputs: calibrateEngine(e).inputs, label: `${e.maker} ${e.name}` });
@@ -39,9 +40,9 @@ export function Compare({ store, a }: { store: Store; a: EngineResult }) {
             </table>
           </div>
           <div className="charts">
-            <LineChart title="Temperature–entropy diagrams" sub="core stream, total conditions" series={[ts(a, 'A', 'var(--series-1)'), ts(b, 'B', 'var(--series-2)')]} xLabel="Δs (kJ/kg·K)" yLabel="Tt (K)" labelPoints xFmt={(v) => fmt(v, 2)} yFmt={(v) => fmt(v, 0)} />
-            <LineChart title="Total pressure along the core" series={[prof(a, 'Pt', 'A', 'var(--series-1)'), prof(b, 'Pt', 'B', 'var(--series-2)')]} xLabel="station index" yLabel="kPa" markers xFmt={(v) => a.stations.filter((s) => s.stream !== 'bypass')[Math.round(v)]?.id ?? ''} yFmt={(v) => kPa(v * 1000)} />
-            <LineChart title="Total temperature along the core" series={[prof(a, 'Tt', 'A', 'var(--series-1)'), prof(b, 'Tt', 'B', 'var(--series-2)')]} xLabel="station index" yLabel="K" markers xFmt={(v) => a.stations.filter((s) => s.stream !== 'bypass')[Math.round(v)]?.id ?? ''} yFmt={(v) => fmt(v, 0)} />
+            <LineChart title="Temperature–entropy diagrams" sub="core stream, total conditions; Δs relative to each engine’s inlet" series={[ts(a, 'A', 'var(--series-1)'), ts(b, 'B', 'var(--series-2)')]} xLabel="Δs (kJ/kg·K)" yLabel="Tt (K)" labelPoints xFmt={(v) => fmt(v, 2)} yFmt={(v) => fmt(v, 0)} />
+            <LineChart title="Total pressure along the core" series={[prof(a, 'Pt', 'A', 'var(--series-1)', stationIds), prof(b, 'Pt', 'B', 'var(--series-2)', stationIds)]} xLabel="station" xTicks={stationIds.map((_, i) => i)} yLabel="kPa" markers xFmt={(v) => stationIds[v] ?? ''} yFmt={(v) => kPa(v * 1000)} />
+            <LineChart title="Total temperature along the core" series={[prof(a, 'Tt', 'A', 'var(--series-1)', stationIds), prof(b, 'Tt', 'B', 'var(--series-2)', stationIds)]} xLabel="station" xTicks={stationIds.map((_, i) => i)} yLabel="K" markers xFmt={(v) => stationIds[v] ?? ''} yFmt={(v) => fmt(v, 0)} />
           </div>
         </>
       )}
@@ -49,7 +50,7 @@ export function Compare({ store, a }: { store: Store; a: EngineResult }) {
   );
 }
 const ts = (r: EngineResult, name: string, color: string) => { const core = r.stations.filter((s) => s.stream !== 'bypass'); const s0 = core[0].s; return { name, color, points: core.map((s) => ({ x: (s.s - s0) / 1000, y: s.Tt, label: s.id })) }; };
-const prof = (r: EngineResult, key: 'Pt' | 'Tt', name: string, color: string) => { const core = r.stations.filter((s) => s.stream !== 'bypass'); return { name, color, points: core.map((s, i) => ({ x: i, y: key === 'Pt' ? s.Pt / 1000 : s.Tt, label: s.id })) }; };
+const prof = (r: EngineResult, key: 'Pt' | 'Tt', name: string, color: string, stationIds: string[]) => { const core = r.stations.filter((s) => s.stream !== 'bypass'); return { name, color, points: core.map((s) => ({ x: stationIds.indexOf(s.id), y: key === 'Pt' ? s.Pt / 1000 : s.Tt, label: s.id })) }; };
 
 function metrics(a: EngineResult, b: EngineResult) {
   const row = (k: string, va: number, vb: number, f: (v: number) => string, rel = true) => ({ k, a: f(va), b: f(vb), d: Number.isFinite(va) && Number.isFinite(vb) ? (rel && vb !== 0 ? `${((va / vb - 1) * 100 >= 0 ? '+' : '')}${fmt((va / vb - 1) * 100, 1)} %` : f(va - vb)) : '–' });
