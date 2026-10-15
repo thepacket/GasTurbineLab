@@ -61,3 +61,7 @@ Following an external review of code, engineering and interface:
 - One-at-a-time sensitivities are clipped to the physical bounds and the perturbation actually applied is shown.
 - A worker-registration test exercises the request handler directly: an off-design request with a custom map fails before registration and succeeds after.
 - The build version (commit · time) is shown in the header; the service worker claims clients immediately and checks for updates hourly and on every return to the tab, so installed copies pick up new deployments without a second reload.
+
+## Review fixes, third pass (2026-10-15)
+- The comparison design B is validated by the same complete `sanitizeInputs` as design A (mixer settings, geopotential flag, chemistry, fuel, map assignments); a round-trip test checks B solves identically after sharing.
+- A test stubs the browser `Worker` and checks that a new worker receives the saved custom maps before its first request.

@@ -30,33 +30,7 @@ export async function encodeShare(data: Shared): Promise<string> {
  */
 export function sanitizeShared(raw: any, defaultsFor: (arch: any) => EngineInputs): Shared | null {
   if (!raw || typeof raw !== 'object' || !raw.inputs || typeof raw.inputs !== 'object') return null;
-  const arch = ['turbojet', 'turbofan', 'turboprop'].includes(raw.inputs.arch) ? raw.inputs.arch : 'turbofan';
-  const clean = (ref: any, val: any): any => {
-    if (typeof ref === 'number') return typeof val === 'number' && Number.isFinite(val) ? val : ref;
-    if (typeof ref === 'boolean') return typeof val === 'boolean' ? val : ref;
-    if (typeof ref === 'string') return typeof val === 'string' ? val.slice(0, 200) : ref;
-    if (ref && typeof ref === 'object' && !Array.isArray(ref)) {
-      const out: any = { ...ref };
-      if (val && typeof val === 'object') for (const k of Object.keys(ref)) out[k] = clean(ref[k], val[k]);
-      return out;
-    }
-    return ref;
-  };
-  const inputs: EngineInputs = clean(defaultsFor(arch), raw.inputs);
-  inputs.arch = arch;
-  // optional fields that have no default value but are valid settings
-  const ri = raw.inputs;
-  if (ri.mixer && typeof ri.mixer === 'object') {
-    if (ri.mixer.designedStream === 'core' || ri.mixer.designedStream === 'bypass') inputs.mixer.designedStream = ri.mixer.designedStream;
-    if (typeof ri.mixer.MNbyp === 'number' && Number.isFinite(ri.mixer.MNbyp)) inputs.mixer.MNbyp = Math.min(1, Math.max(0.05, ri.mixer.MNbyp));
-  }
-  if (ri.flight && typeof ri.flight.altIsGeopotential === 'boolean') inputs.flight.altIsGeopotential = ri.flight.altIsGeopotential;
-  if (ri.chemistry === 'frozen' || ri.chemistry === 'equilibrium') inputs.chemistry = ri.chemistry;
-  if (['jetA', 'saf', 'hydrogen', 'methane'].includes(ri.fuel)) inputs.fuel = ri.fuel;
-  if (raw.inputs.mapIds && typeof raw.inputs.mapIds === 'object') {
-    inputs.mapIds = {};
-    for (const [k, v] of Object.entries(raw.inputs.mapIds)) if (typeof v === 'string' && v.length < 120 && /^[\w:.-]+$/.test(v)) inputs.mapIds[k.slice(0, 20)] = v;
-  }
+  const inputs = sanitizeInputs(raw.inputs, defaultsFor);
   let od: OffDesignInputs | undefined;
   if (raw.od && typeof raw.od === 'object') {
     od = { altitude_m: num(raw.od.altitude_m, 0), mach: num(raw.od.mach, 0), dT_isa: num(raw.od.dT_isa, 0), throttle: { mode: ['T4', 'Wf', 'NHP', 'NLP', 'Fn'].includes(raw.od.throttle?.mode) ? raw.od.throttle.mode : 'T4', value: num(raw.od.throttle?.value, inputs.burner.T4_K) }, HPX_W: num(raw.od.HPX_W, 0), propPower_W: num(raw.od.propPower_W, inputs.prop.shaftPower_W) };
@@ -73,9 +47,45 @@ export function sanitizeShared(raw: any, defaultsFor: (arch: any) => EngineInput
       if (Object.keys(d).length) od.deltas = d;
     }
   }
-  const compare = raw.compare && typeof raw.compare === 'object' ? (clean(defaultsFor(['turbojet', 'turbofan', 'turboprop'].includes(raw.compare.arch) ? raw.compare.arch : 'turbofan'), raw.compare) as EngineInputs) : null;
+  // the comparison design goes through the same complete sanitizer as the main design
+  const compare = raw.compare && typeof raw.compare === 'object' ? sanitizeInputs(raw.compare, defaultsFor) : null;
   const maps = Array.isArray(raw.maps) ? raw.maps.filter((m: any) => m && typeof m.id === 'string' && /^custom:/.test(m.id) && (m.kind === 'compressor' || m.kind === 'turbine') && m.data && typeof m.data === 'object').slice(0, 12) : undefined;
   return { inputs, od, mode: raw.mode === 'offdesign' ? 'offdesign' : 'design', note: typeof raw.note === 'string' ? raw.note.slice(0, 500) : null, compare, maps };
+}
+
+/**
+ * Validate one EngineInputs object: keys present in the defaults are kept with type checks (numbers finite,
+ * strings length-limited, nested objects merged key by key), then the valid optional fields that have no
+ * default are added. Anything else is dropped.
+ */
+export function sanitizeInputs(ri: any, defaultsFor: (arch: any) => EngineInputs): EngineInputs {
+  const arch = ['turbojet', 'turbofan', 'turboprop'].includes(ri?.arch) ? ri.arch : 'turbofan';
+  const clean = (ref: any, val: any): any => {
+    if (typeof ref === 'number') return typeof val === 'number' && Number.isFinite(val) ? val : ref;
+    if (typeof ref === 'boolean') return typeof val === 'boolean' ? val : ref;
+    if (typeof ref === 'string') return typeof val === 'string' ? val.slice(0, 200) : ref;
+    if (ref && typeof ref === 'object' && !Array.isArray(ref)) {
+      const out: any = { ...ref };
+      if (val && typeof val === 'object') for (const k of Object.keys(ref)) out[k] = clean(ref[k], val[k]);
+      return out;
+    }
+    return ref;
+  };
+  const inputs: EngineInputs = clean(defaultsFor(arch), ri ?? {});
+  inputs.arch = arch;
+  if (!ri || typeof ri !== 'object') return inputs;
+  if (ri.mapIds && typeof ri.mapIds === 'object') {
+    inputs.mapIds = {};
+    for (const [k, v] of Object.entries(ri.mapIds)) if (typeof v === 'string' && v.length < 120 && /^[\w:.-]+$/.test(v)) inputs.mapIds[k.slice(0, 20)] = v;
+  }
+  if (ri.mixer && typeof ri.mixer === 'object') {
+    if (ri.mixer.designedStream === 'core' || ri.mixer.designedStream === 'bypass') inputs.mixer.designedStream = ri.mixer.designedStream;
+    if (typeof ri.mixer.MNbyp === 'number' && Number.isFinite(ri.mixer.MNbyp)) inputs.mixer.MNbyp = Math.min(1, Math.max(0.05, ri.mixer.MNbyp));
+  }
+  if (ri.flight && typeof ri.flight.altIsGeopotential === 'boolean') inputs.flight.altIsGeopotential = ri.flight.altIsGeopotential;
+  if (ri.chemistry === 'frozen' || ri.chemistry === 'equilibrium') inputs.chemistry = ri.chemistry;
+  if (['jetA', 'saf', 'hydrogen', 'methane'].includes(ri.fuel)) inputs.fuel = ri.fuel;
+  return inputs;
 }
 const num = (v: any, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 

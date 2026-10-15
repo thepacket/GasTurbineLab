@@ -49,3 +49,30 @@ describe('review fixes, third group', () => {
     expect(last.payload.converged).toBe(true);
   });
 });
+
+describe('review fixes, fourth group', () => {
+  it('the comparison design survives a share round trip with every setting, and solves identically', async () => {
+    const { encodeShare, decodeShare } = await import('../../ui/share');
+    const { solveEngine } = await import('../cycle');
+    const b = defaultInputs('turbofan'); b.chemistry = 'frozen'; b.mixed = true; b.mixer = { ...b.mixer, designedStream: 'core', MNbyp: 0.5 }; b.flight.altIsGeopotential = true; b.fuel = 'saf'; b.mapIds = { hpc: 'custom:x' };
+    const hash = await encodeShare({ inputs: defaultInputs('turbojet'), compare: b });
+    const raw = await decodeShare('#d=' + hash);
+    const d = sanitizeShared(raw, defaultInputs)!;
+    expect(d.compare!.mixer.designedStream).toBe('core'); expect(d.compare!.mixer.MNbyp).toBe(0.5);
+    expect(d.compare!.flight.altIsGeopotential).toBe(true); expect(d.compare!.fuel).toBe('saf'); expect(d.compare!.mapIds).toEqual({ hpc: 'custom:x' });
+    const before = solveEngine({ ...b, mapIds: undefined }).perf.Fn, after = solveEngine({ ...d.compare!, mapIds: undefined }).perf.Fn;
+    expect(after).toBe(before);
+  });
+  it('a browser worker registers saved custom maps before its first request', async () => {
+    const posted: any[] = [];
+    (globalThis as any).Worker = class { onmessage: any = null; constructor() { /* fake */ } postMessage(m: any) { posted.push(m); } terminate() { /* noop */ } };
+    const { saveCustomMaps } = await import('../custommaps');
+    saveCustomMaps([{ id: 'custom:startup', name: 's', kind: 'compressor', data: generateCompressorMap({ PRdes: 8, WcDes: 20 }) }]);
+    const { restart, request } = await import('../client');
+    restart();
+    void request({ type: 'offdesign', inputs: defaultInputs('turbojet'), od: { altitude_m: 0, mach: 0, dT_isa: 0, throttle: { mode: 'T4', value: 1500 } } }).catch(() => {});
+    expect(posted[0].type).toBe('maps');
+    expect(posted[0].maps.map((m: any) => m.id)).toContain('custom:startup');
+    expect(posted[1].type).toBe('offdesign');
+  });
+});
