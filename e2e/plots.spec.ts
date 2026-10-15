@@ -136,6 +136,10 @@ test('transient map keyboard inspection selects the same time on related charts'
   await openView(page, 'Transient');
   await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeEnabled();
   const map = page.getByRole('img', { name: 'transient trajectory on compressor map', exact: true });
+  // The button can initially be enabled before the mount effect starts the run.
+  // Require streamed output first, then wait for that run to finish.
+  await expect(map).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeEnabled();
   await map.focus();
   await map.press('Home');
   await map.press('ArrowRight');
