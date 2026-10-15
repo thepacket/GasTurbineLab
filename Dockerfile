@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY . .
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 RUN npm run build
 
 FROM nginx:1.27-alpine

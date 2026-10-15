@@ -87,7 +87,7 @@ GitHub Actions (`ci.yml`) runs type-check, unit tests, build, Chromium install a
 
 ## Deployment
 
-`fly deploy` builds the multi-stage `Dockerfile` (Node 22 build, nginx 1.27 runtime) and updates the single machine in region `yyz`. `deploy/nginx.conf` serves `index.html` for all routes, caches hashed assets for a year, and never caches the service worker or manifest.
+`fly deploy --build-arg GIT_SHA=$(git rev-parse --short HEAD)` builds the multi-stage `Dockerfile` (the hash appears in the header as the build version) (Node 22 build, nginx 1.27 runtime) and updates the single machine in region `yyz`. `deploy/nginx.conf` serves `index.html` for all routes, caches hashed assets for a year, and never caches the service worker or manifest.
 
 ## Regenerating validation data
 

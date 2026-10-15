@@ -42,7 +42,7 @@ npm run test:e2e   # layout and feature tests in a headless browser (Playwright)
 npm run build      # production bundle with service worker in dist/
 ```
 
-Deployment: `fly deploy` builds the `Dockerfile` (Node build stage, nginx runtime) and runs one shared-CPU machine in Toronto that stops when idle.
+Deployment: `fly deploy --build-arg GIT_SHA=$(git rev-parse --short HEAD)` builds the `Dockerfile` (Node build stage, nginx runtime) and runs one shared-CPU machine in Toronto that stops when idle.
 
 ## Status and limits
 
