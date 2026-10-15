@@ -118,7 +118,7 @@ export function Controls({ store }: { store: Store }) {
             {od.throttle.mode === 'Wf' && <OdSlider label="Fuel flow" path="throttle.value" value={od.throttle.value} min={designWf * 0.2} max={designWf * 1.3} step={designWf / 200} unit="kg/s" store={store} digits={4} />}
             {od.throttle.mode === 'NHP' && <OdSlider label="HP spool speed" path="throttle.value" value={od.throttle.value} min={0.6} max={1.1} step={0.001} unit="% design" scale={100} digits={1} store={store} />}
             {arch === 'turboprop' && <OdSlider label="Propeller load (shaft power)" path="propPower_W" value={od.propPower_W ?? i.prop.shaftPower_W} min={50e3} max={i.prop.shaftPower_W * 1.2} step={5e3} unit="kW" scale={1e-3} digits={0} store={store} />}
-            <OdSlider label="Power extraction" path="HPX_W" value={od.HPX_W ?? 0} min={0} max={1000e3} step={5e3} unit="kW" scale={1e-3} digits={0} store={store} />
+            <OdSlider label="Power extraction" path="HPX_W" value={od.HPX_W ?? i.HPX_W} min={0} max={1000e3} step={5e3} unit="kW" scale={1e-3} digits={0} store={store} />
           </div>
         ) : (
           <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>All sliders below define the design point: component pressure ratios and efficiencies are specified, turbine pressure ratios are solved for the shaft balance, and nozzle and mixer areas follow.</div>

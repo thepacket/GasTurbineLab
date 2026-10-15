@@ -27,7 +27,7 @@ export function MapsPanel({ store }: { store: Store }) {
       let parsed: { kind: 'compressor' | 'turbine'; data: any };
       if (f.name.toLowerCase().endsWith('.json') || text.trim().startsWith('{')) parsed = parseJsonMap(text);
       else parsed = { kind: kind === 'auto' ? 'compressor' : kind, data: parseCsvMap(text, kind === 'auto' ? 'compressor' : kind) };
-      const id = `custom:${f.name.replace(/\.[^.]+$/, '')}:${Date.now().toString(36)}`;
+      const id = `custom:import:${crypto.randomUUID()}`;
       if (!persist([...custom, { id, name: f.name, kind: parsed.kind, data: parsed.data }])) return;
       setMsg(`Loaded ${parsed.kind} map “${f.name}”.`);
     } catch (e: any) { setMsg(`Could not read map: ${e.message}`); }

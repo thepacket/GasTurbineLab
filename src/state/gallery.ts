@@ -24,7 +24,7 @@ export function parseGallery(raw: unknown): SavedDesign[] {
     if (ids.has(id)) id = crypto.randomUUID();
     ids.add(id);
     const numeric = (v: unknown) => typeof v === 'number' && Number.isFinite(v) ? v : NaN;
-    return { id, name: typeof entry.name === 'string' ? entry.name.slice(0, 200) : `Design ${i + 1}`, savedAt: typeof entry.savedAt === 'string' && Number.isFinite(Date.parse(entry.savedAt)) ? entry.savedAt : '1970-01-01T00:00:00Z', inputs: data.inputs, od: data.od, mode: data.mode, maps: data.maps, note: data.note, summary: { arch: data.inputs.arch, Fn_kN: numeric(entry.summary?.Fn_kN), TSFC: numeric(entry.summary?.TSFC), T4: data.inputs.burner.T4_K } };
+    return { id, name: typeof entry.name === 'string' ? entry.name.slice(0, 200) : `Design ${i + 1}`, savedAt: typeof entry.savedAt === 'string' && Number.isFinite(Date.parse(entry.savedAt)) ? entry.savedAt : '1970-01-01T00:00:00Z', inputs: data.inputs, od: data.od, mode: data.mode, maps: data.maps, note: data.note, summary: { arch: data.inputs.arch, Fn_kN: numeric(entry.summary?.Fn_kN), TSFC: numeric(entry.summary?.TSFC), T4: typeof entry.summary?.T4 === 'number' && Number.isFinite(entry.summary.T4) ? entry.summary.T4 : data.inputs.burner.T4_K } };
   });
 }
 export function loadGallery(): SavedDesign[] {

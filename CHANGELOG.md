@@ -95,3 +95,10 @@ Following an external review of the transient/control implementation:
 - Retain negative thrust demand, flag unmodeled braking, stop before unconverged intervals and exclude partial fuel from optimisation objectives.
 - Validate connected altitudes and level segments; connect the default turbofan descent to its hold. Correct installed TSFC and the exact 2% feasibility boundary.
 - Correct mass-estimate wording and reset-rating behavior without changing the UI structure. Add mission regression tests and reproducible refinement evidence.
+
+## Release workflow audit — 2026-10-15 (local review)
+- Check for PWA updates on each visit and after reconnection; handle offline update failures. A cached-page regression reproduced the missing startup update before the fix and verifies automatic refresh and offline loading afterward.
+- Save Gallery thrust, TSFC and T4 from the current operating result; prevent saving an unfinished off-design calculation and preserve operating T4 through import/export.
+- Preserve absent off-design power overrides and the optional burner state through sharing and persistence.
+- Preserve legacy custom-map IDs containing spaces/Unicode; give newly imported maps filename-independent IDs so ordinary filenames cannot break saved assignments.
+- Add browser coverage for report/CSV/Gallery agreement, custom-map portability into a clean browser, worker recreation, mission/uncertainty stale banners, and cached-app updates. UI structure unchanged.

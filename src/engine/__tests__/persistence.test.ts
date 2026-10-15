@@ -52,3 +52,23 @@ it('exports referenced custom maps and preserves operating mode through a Galler
   expect(restored[0].maps?.[0].data).toEqual(map.data);
   expect(restored[0].mode).toBe('offdesign');
 });
+it('preserves an off-design summary temperature instead of replacing it with design T4', () => {
+  const entry = { inputs: defaultInputs('turbojet'), mode: 'offdesign', summary: { Fn_kN: 10, TSFC: 25, T4: 1200 } };
+  expect(parseGallery([entry])[0].summary.T4).toBe(1200);
+});
+it('preserves optional burner state and absent power overrides through sharing', async () => {
+  const inputs = defaultInputs('turbojet'); inputs.HPX_W = 100000;
+  const raw = { inputs, od: { altitude_m: 0, mach: 0, dT_isa: 0, throttle: { mode: 'T4' as const, value: 1200 }, burnerLit: false } };
+  const restored = sanitizeShared(await decodeShare('#d=' + await encodeShare(raw)), defaultInputs)!;
+  expect(restored.od?.burnerLit).toBe(false);
+  expect(restored.od?.HPX_W).toBeUndefined();
+  expect(restored.od?.propPower_W).toBeUndefined();
+});
+it('keeps legacy imported map identifiers containing spaces and Unicode through Gallery and sharing', async () => {
+  const map = { id: 'custom:My HPC é:123', kind: 'compressor' as const, data: generateCompressorMap({PRdes:10,WcDes:50}) };
+  const inputs = {...defaultInputs('turbojet'), mapIds:{comp:map.id}};
+  const raw = {inputs,maps:[map]};
+  const shared = sanitizeShared(await decodeShare('#d=' + await encodeShare(raw)), defaultInputs)!;
+  expect(shared.inputs.mapIds?.comp).toBe(map.id);
+  expect(parseGallery([raw])[0].inputs.mapIds?.comp).toBe(map.id);
+});

@@ -4,14 +4,17 @@ import './index.css';
 import App from './App';
 import { registerSW } from 'virtual:pwa-register';
 
-// Update the service worker as soon as a new build is published: check hourly and on every return to the tab,
-// and reload when the new worker has taken control so existing installs do not keep showing an old version.
+// Check for deployments at startup, hourly, on return to the tab and after reconnection.
+// The PWA registration helper reloads the page when it observes the updated worker activate.
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_url, reg) {
     if (!reg) return;
-    setInterval(() => reg.update(), 60 * 60 * 1000);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update(); });
+    const check = () => { void reg.update().catch(() => { /* Offline: keep the installed app usable. */ }); };
+    check(); // Registration alone may reuse a recent update check; explicitly check on every visit.
+    setInterval(check, 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    window.addEventListener('online', check);
   },
   onNeedRefresh() { updateSW(true); },
 });

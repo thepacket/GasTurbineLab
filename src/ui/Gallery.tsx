@@ -3,7 +3,6 @@ import { Store, odFromDesign } from '../state/store';
 import { type SavedDesign, loadGallery, saveGallery, parseGallery, galleryForExport, restoreGalleryMaps } from '../state/gallery';
 import { shareUrl } from './share';
 import { fmt } from './format';
-import { solveEngine } from '../engine/cycle';
 
 
 /** Named saved designs in this browser, with sharing links and import/export as JSON. */
@@ -15,7 +14,8 @@ export function Gallery({ store }: { store: Store }) {
   const save = () => {
     const inputs = store.state.inputs;
     let summary = { arch: inputs.arch, Fn_kN: NaN, TSFC: NaN, T4: inputs.burner.T4_K };
-    try { const r = solveEngine(inputs); summary = { ...summary, Fn_kN: r.perf.Fn / 1000, TSFC: r.perf.TSFC_mg_Ns }; } catch { /* keep NaN */ }
+    const r = store.result;
+    if (!('error' in r)) summary = { ...summary, Fn_kN: r.perf.Fn / 1000, TSFC: r.perf.TSFC_mg_Ns, T4: r.stations.find(s => s.id === '4')?.Tt ?? inputs.burner.T4_K };
     const d: SavedDesign = galleryForExport([{ id: Date.now().toString(36), name: name.trim() || `${inputs.arch} · ${new Date().toLocaleString()}`, savedAt: new Date().toISOString(), inputs: JSON.parse(JSON.stringify(inputs)), od: store.state.od, mode: store.state.mode, note: store.state.note, summary }])[0];
     if (persist([d, ...list])) { setName(''); setMsg(`Saved “${d.name}”.`); }
   };
@@ -28,7 +28,7 @@ export function Gallery({ store }: { store: Store }) {
       <div className="prose"><h2>Saved designs</h2><p>Designs are stored in this browser. Export the list as JSON to move it elsewhere or share it; each entry can also be copied as a link.</p></div>
       <div className="explore-controls">
         <input className="num" aria-label="Design name" placeholder="name this design" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 240 }} />
-        <button className="btn primary" onClick={save}>Save current design</button>
+        <button className="btn primary" onClick={save} disabled={store.odPending}>Save current design</button>
         <button className="btn" onClick={exportAll} disabled={!list.length}>Export JSON</button>
         <label className="btn">Import JSON <input type="file" accept=".json" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} /></label>
         {msg && <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{msg}</span>}

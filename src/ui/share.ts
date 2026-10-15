@@ -33,13 +33,15 @@ export function sanitizeShared(raw: any, defaultsFor: (arch: any) => EngineInput
   const inputs = sanitizeInputs(raw.inputs, defaultsFor);
   let od: OffDesignInputs | undefined;
   if (raw.od && typeof raw.od === 'object') {
-    od = { altitude_m: num(raw.od.altitude_m, 0), mach: num(raw.od.mach, 0), dT_isa: num(raw.od.dT_isa, 0), throttle: { mode: ['T4', 'Wf', 'NHP', 'NLP', 'Fn'].includes(raw.od.throttle?.mode) ? raw.od.throttle.mode : 'T4', value: num(raw.od.throttle?.value, inputs.burner.T4_K) }, HPX_W: num(raw.od.HPX_W, 0), propPower_W: num(raw.od.propPower_W, inputs.prop.shaftPower_W) };
+    od = { altitude_m: num(raw.od.altitude_m, 0), mach: num(raw.od.mach, 0), dT_isa: num(raw.od.dT_isa, 0), throttle: { mode: ['T4', 'Wf', 'NHP', 'NLP', 'Fn'].includes(raw.od.throttle?.mode) ? raw.od.throttle.mode : 'T4', value: num(raw.od.throttle?.value, inputs.burner.T4_K) } };
+    for (const key of ['HPX_W', 'propPower_W'] as const) if (typeof raw.od[key] === 'number' && Number.isFinite(raw.od[key])) od[key] = raw.od[key];
     // optional overrides: geometry (numeric keys of the geometry block), installation flag, component deltas
     if (raw.od.geometry && typeof raw.od.geometry === 'object') {
       const g: Partial<EngineInputs['geometry']> = {};
       for (const k of Object.keys(inputs.geometry) as (keyof EngineInputs['geometry'])[]) if (typeof raw.od.geometry[k] === 'number' && Number.isFinite(raw.od.geometry[k])) g[k] = raw.od.geometry[k];
       if (Object.keys(g).length) od.geometry = g;
     }
+    if (typeof raw.od.burnerLit === 'boolean') od.burnerLit = raw.od.burnerLit;
     if (typeof raw.od.installation === 'boolean') od.installation = raw.od.installation;
     if (raw.od.deltas && typeof raw.od.deltas === 'object') {
       const d: Record<string, { eff?: number; Wc?: number }> = {};
@@ -83,7 +85,7 @@ export function sanitizeInputs(ri: any, defaultsFor: (arch: any) => EngineInputs
   if (!ri || typeof ri !== 'object') return inputs;
   if (ri.mapIds && typeof ri.mapIds === 'object') {
     inputs.mapIds = {};
-    for (const [k, v] of Object.entries(ri.mapIds)) if (typeof v === 'string' && v.length < 120 && /^[\w:.-]+$/.test(v)) inputs.mapIds[k.slice(0, 20)] = v;
+    for (const [k, v] of Object.entries(ri.mapIds)) if (typeof v === 'string' && (v.startsWith('custom:') ? v.length <= 512 && !/[\u0000-\u001f\u007f]/.test(v) : v.length < 120 && /^[\w:.-]+$/.test(v))) inputs.mapIds[k.slice(0, 20)] = v;
   }
   if (ri.mixer && typeof ri.mixer === 'object') {
     if (ri.mixer.designedStream === 'core' || ri.mixer.designedStream === 'bypass') inputs.mixer.designedStream = ri.mixer.designedStream;
