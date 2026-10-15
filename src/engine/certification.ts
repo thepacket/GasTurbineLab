@@ -5,7 +5,7 @@
  * for the standard times in mode, integrates the emission indices into
  * Dp/Foo (g per kN of rated thrust) and compares NOx with the CAEP/8 limit
  * and CO / HC with their fixed limits.  Fan noise follows a simplified
- * Heidmann broadband correlation; jet noise comes from the cycle.
+ * uncalibrated broadband heuristic; jet noise comes from the cycle.
  */
 import { DesignPoint, solveOffDesign } from './offdesign';
 import { EngineResult } from './types';
@@ -34,7 +34,7 @@ export function caep8NOxLimit(opr: number, Foo_kN: number): number {
 }
 
 export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]) => void): LtoResult {
-  const warnings: string[] = [];
+  const warnings: string[] = ['Generic combustor correlations; comparison margins are indicative, without certification characteristic-level adjustments.'];
   // rated thrust: sea-level static at the design T4 (the design itself if it is SLS)
   const inp = dp.inputs;
   if (Foo_N !== undefined && (!Number.isFinite(Foo_N) || Foo_N <= 0)) throw new Error('Rated thrust must be finite and positive.');
@@ -44,7 +44,7 @@ export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]
   let oprRef = dp.result.perf.OPR;
   if (Foo_N === undefined && inp.flight.altitude_m === 0 && inp.flight.mach === 0 && inp.flight.dT_isa === 0) { Foo = dp.result.perf.Fn; }
   else {
-    const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, throttle: Foo_N === undefined ? { mode: 'T4', value: inp.burner.T4_K } : { mode: 'Fn', value: Foo_N } });
+    const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, installation: false, throttle: Foo_N === undefined ? { mode: 'T4', value: inp.burner.T4_K } : { mode: 'Fn', value: Foo_N } });
     if (s.converged) { if (!Foo) Foo = s.result.perf.Fn; oprRef = s.result.perf.OPR; }
     else throw new Error('Sea-level static rating did not converge; LTO reference thrust and pressure ratio are unavailable.');
   }
@@ -52,7 +52,7 @@ export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]
   const modes: LtoMode[] = [];
   let warm: Record<string, number> | undefined;
   for (const m of LTO) {
-    const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, throttle: { mode: 'Fn', value: m.thrustFrac * Foo } }, warm);
+    const s = solveOffDesign(dp, { altitude_m: 0, mach: 0, dT_isa: 0, installation: false, throttle: { mode: 'Fn', value: m.thrustFrac * Foo } }, warm);
     if (s.converged) warm = s.x; else warnings.push(`${m.name} (${(m.thrustFrac * 100).toFixed(0)} %) did not converge.`);
     const p = s.result.perf;
     const T3 = s.result.stations.find((q) => q.id === '3')!.Tt;
@@ -76,27 +76,29 @@ export function runLto(dp: DesignPoint, Foo_N?: number, progress?: (m: LtoMode[]
 }
 
 export interface NoiseEstimate { fanInlet_dB: number; fanTone_dB: number; jet_dB: number; total_dB: number; tipMach: number; notes: string[] }
-/** Simplified Heidmann fan inlet broadband + jet mixing noise, overall level at 1 m. */
+/** Heuristic fan inlet broadband + jet mixing noise, overall level at 1 m. */
 export function estimateNoise(r: EngineResult): NoiseEstimate {
   const inp = r.inputs;
-  const notes: string[] = [];
+  const notes: string[] = ['Uncalibrated source-level estimate; no directivity, acoustic treatment or certification noise metric.'];
   const fan = r.components.find((c) => c.id === 'fan' || c.id === 'comp');
   const st2 = r.stations.find((s) => s.id === '2')!;
   const exit = r.stations.find((s) => s.id === (inp.arch === 'turbofan' ? '21' : '3'))!;
   const rpm = inp.arch === 'turbofan' ? (r.shafts.find((s) => s.name === 'LP shaft')?.rpm ?? inp.speeds.LP) / inp.fanGear.ratio : (r.shafts[0]?.rpm ?? inp.speeds.HP);
-  const rTip = Math.sqrt(st2.A / (Math.PI * (1 - 0.09)));
+  const rTip = Math.sqrt((r.designInletArea_m2 ?? st2.A) / (Math.PI * (1 - 0.09)));
   const Utip = (2 * Math.PI * rpm / 60) * rTip;
   const a2 = Math.sqrt(1.4 * 287.05 * st2.Ts);
   const tipMach = Math.sqrt(Utip * Utip + st2.V * st2.V) / a2;
   const dT = Math.max(exit.Tt - st2.Tt, 1);
   const W = st2.W;
-  // Heidmann inlet broadband: L = 20 log(ΔT/ΔT0) + 10 log(W/W0) + F(Mtip) + const
+  // Heuristic temperature/flow scaling; not the spectral Heidmann method.
   const F = tipMach < 0.9 ? 0 : Math.min(12, 40 * (tipMach - 0.9));
-  const fanInlet = 80 + 12 * Math.log10(dT / 0.555) + 10 * Math.log10(W / 0.453) + F; // calibrated: HBPR take-off fan ~150 dB at 1 m
+  const fanInlet = 80 + 12 * Math.log10(dT / 0.555) + 10 * Math.log10(W / 0.453) + F; // nominal scale only; no matched acoustic calibration
   const fanTone = fanInlet + (tipMach > 1 ? 6 : 3); // blade-passing tone a few dB above broadband; buzz-saw when supersonic
   const jet = r.perf.jetNoise_dB;
   const total = 10 * Math.log10(Math.pow(10, fanInlet / 10) + Math.pow(10, fanTone / 10) + Math.pow(10, jet / 10));
-  if (tipMach > 1) notes.push('Supersonic fan tip: multiple-pure-tone (buzz-saw) noise expected; acoustic liners not modelled.');
-  if (fan?.values.PR && fan.values.PR > 1.7) notes.push('High fan pressure ratio: fan noise dominates the forward arc.');
+  if (tipMach > 1) notes.push(`Supersonic ${inp.arch === 'turbofan' ? 'fan' : 'compressor'} tip: additional tonal noise is possible; acoustic liners not modeled.`);
+  if (inp.arch === 'turbofan' && fan?.values.PR && fan.values.PR > 1.7) notes.push('High fan pressure ratio can increase inlet noise; directional dominance is not calculated.');
+  if (inp.arch !== 'turbofan') notes.push('Compressor noise uses whole-compressor temperature rise; first-stage data are unavailable.');
+  if (inp.arch === 'turboprop') notes.push('Propeller noise is not modeled; this is not total turboprop noise.');
   return { fanInlet_dB: fanInlet, fanTone_dB: fanTone, jet_dB: jet, total_dB: total, tipMach, notes };
 }

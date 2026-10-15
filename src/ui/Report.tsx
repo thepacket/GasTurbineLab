@@ -26,7 +26,7 @@ export function buildReport(result: EngineResult, store: Store, extras?: { missi
   const stationRows = result.stations.map((s) => `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td class="n">${kPa(s.Pt)}</td><td class="n">${fmt(s.Tt, 1)}</td><td class="n">${fmt(s.W, 2)}</td><td class="n">${kPa(s.Ps)}</td><td class="n">${fmt(s.MN, 3)}</td><td class="n">${fmt(s.V, 0)}</td><td class="n">${Number.isFinite(s.A) ? fmt(s.A, 4) : '∞'}</td></tr>`).join('');
   const compRows = result.components.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(Object.entries(c.values).map(([k, v]) => `${k.replace(/_/g, ' ')} = ${typeof v === 'number' ? (Math.abs(v) >= 1000 ? fmt(v, 0) : fmt(v, 3)) : v}`).join(' · '))}</td></tr>`).join('');
   const shaftRows = result.shafts.map((s) => row(`${s.name} (${fmt(s.rpm, 0)} rpm)`, `turbine ${kW(s.powerIn_W)} → load ${kW(s.powerOut_W)} · turbine PR ${fmt(s.turbinePR, 3)}`)).join('');
-  const weightRows = w ? w.parts.map((x) => row(x.name, `${fmt(x.mass_kg, 0)} kg`)).join('') + row('Total dry mass (estimate)', `${fmt(w.total_kg, 0)} kg`) + row('Length · diameter', `${fmt(w.length_m, 2)} m · ${fmt(w.diameter_m, 2)} m`) : '';
+  const weightRows = w ? w.parts.map((x) => row(x.name, `${fmt(x.mass_kg, 0)} kg`)).join('') + row('Assembly mass (estimate)', `${fmt(w.total_kg, 0)} kg`) + row('Length · diameter', `${fmt(w.length_m, 2)} m · ${fmt(w.diameter_m, 2)} m`) : '';
   const svg = (document.querySelector('svg.cross')?.outerHTML ?? '').replace(/<(script|foreignObject)[\s\S]*?<\/\1>/gi, '').replace(/\son[a-z]+="[^"]*"/gi, '');
   const warn = result.warnings.map((x) => `<li>${esc(x)}</li>`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Gas Turbine Lab report</title>

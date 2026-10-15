@@ -1,0 +1,440 @@
+{
+  "description": "Independent magnitude comparison. No empirical coefficients have been fitted to these references. Emissions compare generic catalogue simulations with measured entries; internal temperatures and combustor technology are not matched.",
+  "emissions": [
+    {
+      "name": "CFM56-5B4",
+      "uid": "2CM014",
+      "sourceRow": 87,
+      "referenceOPR": 27.1,
+      "modelOPR": 32.6,
+      "referenceRating_kN": 117.9,
+      "modelRating_kN": 119.89102422171347,
+      "complete": true,
+      "modes": [
+        {
+          "mode": "Take-off",
+          "converged": true,
+          "fuelFlow": {
+            "model": 1.0700968044738715,
+            "reference": 1.166
+          },
+          "NOx": {
+            "model": 33.64476764571807,
+            "reference": 28.7
+          },
+          "CO": {
+            "model": 1.6904145484992443,
+            "reference": 0.5
+          },
+          "HC": {
+            "model": 0.14024303204298555,
+            "reference": 0.1
+          }
+        },
+        {
+          "mode": "Climb-out",
+          "converged": true,
+          "fuelFlow": {
+            "model": 0.8437259273424563,
+            "reference": 0.961
+          },
+          "NOx": {
+            "model": 25.466398272547778,
+            "reference": 23.3
+          },
+          "CO": {
+            "model": 2.2819087978646033,
+            "reference": 0.5
+          },
+          "HC": {
+            "model": 0.19311936650910455,
+            "reference": 0.1
+          }
+        },
+        {
+          "mode": "Approach",
+          "converged": true,
+          "fuelFlow": {
+            "model": 0.26809015161577654,
+            "reference": 0.326
+          },
+          "NOx": {
+            "model": 8.730298389623588,
+            "reference": 10
+          },
+          "CO": {
+            "model": 7.638995190653395,
+            "reference": 2.33
+          },
+          "HC": {
+            "model": 0.7926699218327762,
+            "reference": 0.13
+          }
+        },
+        {
+          "mode": "Taxi / idle",
+          "converged": true,
+          "fuelFlow": {
+            "model": 0.08939412305008775,
+            "reference": 0.107
+          },
+          "NOx": {
+            "model": 3.5671717985902194,
+            "reference": 4.3
+          },
+          "CO": {
+            "model": 20.793289626704013,
+            "reference": 31.9
+          },
+          "HC": {
+            "model": 2.683676264268315,
+            "reference": 3.87
+          }
+        }
+      ],
+      "integrated": {
+        "model": {
+          "NOx": 45.103900810624545,
+          "CO": 31.039392897824044,
+          "HC": 3.7789688856181143
+        },
+        "referenceAverage": {
+          "NOx": 49.7,
+          "CO": 47.3,
+          "HC": 5.7
+        }
+      },
+      "warnings": [
+        "Generic combustor correlations; comparison margins are indicative, without certification characteristic-level adjustments."
+      ]
+    },
+    {
+      "name": "CFM56-7B27",
+      "uid": "3CM034",
+      "sourceRow": 146,
+      "referenceOPR": 28.63,
+      "modelOPR": 32.699999999999996,
+      "referenceRating_kN": 121.44,
+      "modelRating_kN": 121.18711448702891,
+      "complete": true,
+      "modes": [
+        {
+          "mode": "Take-off",
+          "converged": true,
+          "fuelFlow": {
+            "model": 1.2132402301906784,
+            "reference": 1.284
+          },
+          "NOx": {
+            "model": 33.82615830271153,
+            "reference": 30.9
+          },
+          "CO": {
+            "model": 1.6810004100243177,
+            "reference": 0.2
+          },
+          "HC": {
+            "model": 0.13943902040813094,
+            "reference": 0.1
+          }
+        },
+        {
+          "mode": "Climb-out",
+          "converged": true,
+          "fuelFlow": {
+            "model": 0.9449413084447932,
+            "reference": 1.043
+          },
+          "NOx": {
+            "model": 25.318043595489208,
+            "reference": 23.7
+          },
+          "CO": {
+            "model": 2.297646974071611,
+            "reference": 0.5
+          },
+          "HC": {
+            "model": 0.19458358842793677,
+            "reference": 0.1
+          }
+        },
+        {
+          "mode": "Approach",
+          "converged": true,
+          "fuelFlow": {
+            "model": 0.283175119024969,
+            "reference": 0.349
+          },
+          "NOx": {
+            "model": 8.303689233173303,
+            "reference": 11
+          },
+          "CO": {
+            "model": 8.05872333266483,
+            "reference": 1.4
+          },
+          "HC": {
+            "model": 0.8456343132007456,
+            "reference": 0.1
+          }
+        },
+        {
+          "mode": "Taxi / idle",
+          "converged": true,
+          "fuelFlow": {
+            "model": 0.09221614125732562,
+            "reference": 0.116
+          },
+          "NOx": {
+            "model": 3.441153608801949,
+            "reference": 4.8
+          },
+          "CO": {
+            "model": 21.629550359860563,
+            "reference": 17.9
+          },
+          "HC": {
+            "model": 2.816269293918827,
+            "reference": 1.7
+          }
+        }
+      ],
+      "integrated": {
+        "model": {
+          "NOx": 49.0233273806402,
+          "CO": 33.266748039213425,
+          "HC": 4.0762394727840725
+        },
+        "referenceAverage": {
+          "NOx": 55.27,
+          "CO": 28.3,
+          "HC": 2.76
+        }
+      },
+      "warnings": [
+        "Generic combustor correlations; comparison margins are indicative, without certification characteristic-level adjustments."
+      ]
+    },
+    {
+      "name": "GE90-115B",
+      "uid": "07P27GE240",
+      "sourceRow": 372,
+      "referenceOPR": 43.2267283614589,
+      "modelOPR": 42,
+      "referenceRating_kN": 513.947623959728,
+      "modelRating_kN": 511.0144917871132,
+      "complete": true,
+      "modes": [
+        {
+          "mode": "Take-off",
+          "converged": true,
+          "fuelFlow": {
+            "model": 4.961202424094593,
+            "reference": 4.594140184400638
+          },
+          "NOx": {
+            "model": 51.14973907299937,
+            "reference": 50.35070773126543
+          },
+          "CO": {
+            "model": 1.1370560121767368,
+            "reference": 0.12226826709460037
+          },
+          "HC": {
+            "model": 0.0955128556728537,
+            "reference": 0.03805346755470496
+          }
+        },
+        {
+          "mode": "Climb-out",
+          "converged": true,
+          "fuelFlow": {
+            "model": 3.8205901083501,
+            "reference": 3.5615863252825637
+          },
+          "NOx": {
+            "model": 36.81940177800971,
+            "reference": 34.92078485207531
+          },
+          "CO": {
+            "model": 1.5568434210258357,
+            "reference": 0.38977923321027635
+          },
+          "HC": {
+            "model": 0.12896116126029966,
+            "reference": 0.028860282056889466
+          }
+        },
+        {
+          "mode": "Approach",
+          "converged": true,
+          "fuelFlow": {
+            "model": 1.0234805164487535,
+            "reference": 1.068690094236447
+          },
+          "NOx": {
+            "model": 10.094379906593081,
+            "reference": 15.98677866283314
+          },
+          "CO": {
+            "model": 6.316982850662467,
+            "reference": 2.4518421953247125
+          },
+          "HC": {
+            "model": 0.6304383314403621,
+            "reference": 0.028744291576655947
+          }
+        },
+        {
+          "mode": "Taxi / idle",
+          "converged": true,
+          "fuelFlow": {
+            "model": 0.286862265022016,
+            "reference": 0.3393126958639383
+          },
+          "NOx": {
+            "model": 3.621395463521153,
+            "reference": 5.115440926374784
+          },
+          "CO": {
+            "model": 20.19082283054276,
+            "reference": 42.431141117493574
+          },
+          "HC": {
+            "model": 2.5888956798850806,
+            "reference": 5.880296194083788
+          }
+        }
+      ],
+      "integrated": {
+        "model": {
+          "NOx": 65.21715107202473,
+          "CO": 22.71803267441927,
+          "HC": 2.736402853305239
+        },
+        "referenceAverage": {
+          "NOx": 64.09364441815978,
+          "CO": 45.32696098428272,
+          "HC": 6.111298628361654
+        }
+      },
+      "warnings": [
+        "Generic combustor correlations; comparison margins are indicative, without certification characteristic-level adjustments."
+      ]
+    }
+  ],
+  "weights": [
+    {
+      "name": "CFM56-7B27",
+      "source": "https://www.easa.europa.eu/en/downloads/7795/en",
+      "referenceDryMass_kg": 2386,
+      "modelAssemblyMass_kg": 1939.56731105467,
+      "difference_pct": -18.710506661581306,
+      "caveat": "Assembly includes heuristic nacelle/accessory allowances; not identical mass scope."
+    },
+    {
+      "name": "GE90-115B",
+      "source": "https://www.easa.europa.eu/en/downloads/7799/en",
+      "referenceDryMass_kg": 8761,
+      "modelAssemblyMass_kg": 8858.987957017242,
+      "difference_pct": 1.118456306554516,
+      "caveat": "Assembly includes heuristic nacelle/accessory allowances; not identical mass scope."
+    },
+    {
+      "name": "PT6A-67D",
+      "source": "https://www.easa.europa.eu/en/downloads/7787/en",
+      "referenceDryMass_kg": 233.5,
+      "modelAssemblyMass_kg": 252.42014457949563,
+      "difference_pct": 8.102845644323619,
+      "caveat": "Assembly includes heuristic nacelle/accessory allowances; not identical mass scope."
+    }
+  ],
+  "installation": [
+    {
+      "T4fraction": 0.8,
+      "converged": true,
+      "inletArea_m2": 2.1685766563822413,
+      "stationFlowArea_m2": 1.8175088392474614,
+      "uninstalledNetThrust_N": 12689.576925889902,
+      "installedThrust_N": 9130.280779964902,
+      "nacelleDrag_N": 627.6018525447543,
+      "inletDrag_N": 2562.1927807801685,
+      "afterbodyDrag_N": 369.50151260007567,
+      "noise": {
+        "fanInlet_dB": 136.82541592138796,
+        "fanTone_dB": 142.82541592138796,
+        "jet_dB": 106.54185902719956,
+        "total_dB": 143.7994605630572,
+        "tipMach": 1.316710983342047,
+        "notes": [
+          "Uncalibrated source-level estimate; no directivity, acoustic treatment or certification noise metric.",
+          "Supersonic fan tip: additional tonal noise is possible; acoustic liners not modeled."
+        ]
+      }
+    },
+    {
+      "T4fraction": 1,
+      "converged": true,
+      "inletArea_m2": 2.1685766563822413,
+      "stationFlowArea_m2": 2.1685766563822413,
+      "uninstalledNetThrust_N": 26573.35949665695,
+      "installedThrust_N": 24314.284186671423,
+      "nacelleDrag_N": 627.6018525447543,
+      "inletDrag_N": 1261.9719448401222,
+      "afterbodyDrag_N": 369.50151260065087,
+      "noise": {
+        "fanInlet_dB": 140.21572310711662,
+        "fanTone_dB": 146.21572310711662,
+        "jet_dB": 138.75505760011356,
+        "total_dB": 147.77101006359294,
+        "tipMach": 1.5560781353373456,
+        "notes": [
+          "Uncalibrated source-level estimate; no directivity, acoustic treatment or certification noise metric.",
+          "Supersonic fan tip: additional tonal noise is possible; acoustic liners not modeled."
+        ]
+      }
+    }
+  ],
+  "cooling": [
+    {
+      "targetMetal_K": 1200,
+      "inletFrac": 0.25,
+      "exitFrac": 0.09375,
+      "metal_K": 1206.711409395973,
+      "effectiveness": 0.587248322147651,
+      "life_h": 19811.76790619845,
+      "infeasible": true,
+      "Tcoolant": 860
+    },
+    {
+      "targetMetal_K": 1100,
+      "inletFrac": 0.25,
+      "exitFrac": 0.09375,
+      "metal_K": 1206.711409395973,
+      "effectiveness": 0.587248322147651,
+      "life_h": 19811.76790619845,
+      "infeasible": true,
+      "Tcoolant": 860
+    },
+    {
+      "targetMetal_K": 1000,
+      "inletFrac": 0.25,
+      "exitFrac": 0.09375,
+      "metal_K": 1206.711409395973,
+      "effectiveness": 0.587248322147651,
+      "life_h": 19811.76790619845,
+      "infeasible": true,
+      "Tcoolant": 860
+    },
+    {
+      "targetMetal_K": 900,
+      "inletFrac": 0.25,
+      "exitFrac": 0.09375,
+      "metal_K": 1206.711409395973,
+      "effectiveness": 0.587248322147651,
+      "life_h": 19811.76790619845,
+      "infeasible": true,
+      "Tcoolant": 860
+    }
+  ]
+}

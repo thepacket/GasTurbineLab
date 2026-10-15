@@ -79,7 +79,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
         <div className="section">
           <h3>Weight & size <span className="hint"><Provenance level="estimate" /></span></h3>
           <div className="kv">
-            <span className="k">Dry mass</span><span className="v">{fmt(w.total_kg, 0)} kg</span>
+            <span className="k">Assembly mass</span><span className="v">{fmt(w.total_kg, 0)} kg</span>
             <span className="k">{arch === 'turboprop' ? 'Power / weight' : 'Thrust / weight'}</span><span className="v">{arch === 'turboprop' ? fmt(w.powerToWeight_kW_kg, 2) + ' kW/kg' : fmt(w.thrustToWeight, 1)}</span>
             <span className="k">Length · max diameter</span><span className="v">{u.length(w.length_m).v} · {u.length(w.diameter_m).v} {u.length(1).u}</span>
             {w.parts.map((p) => <span key={p.name} style={{ display: 'contents' }}><span className="k" style={{ paddingLeft: 12, color: 'var(--text-muted)' }}>{p.name}</span><span className="v" style={{ color: 'var(--text-secondary)' }}>{fmt(p.mass_kg, 0)} kg</span></span>)}
@@ -199,11 +199,11 @@ function Certification({ store, result }: { store: Store; result: EngineResult }
   if (result.inputs.arch === 'turboprop') return null;
   return (
     <div className="section">
-      <h3>Certification estimates <span className="hint"><Provenance level="estimate" /> ICAO LTO cycle · CAEP/8 NOx · Heidmann fan noise</span></h3>
+      <h3>Certification estimates <span className="hint"><Provenance level="estimate" /> ICAO LTO cycle · CAEP/8 NOx · heuristic source noise</span></h3>
       {lto && stale.stale && <StaleBanner what="LTO cycle" />}
       {noise && (
         <div className="kv" style={{ marginBottom: 8 }}>
-          <span className="k">Fan inlet broadband · tone</span><span className="v">{fmt(noise.fanInlet_dB, 0)} · {fmt(noise.fanTone_dB, 0)} dB at 1 m (tip Mach {fmt(noise.tipMach, 2)})</span>
+          <span className="k">{result.inputs.arch === 'turbofan' ? 'Fan' : 'Compressor'} inlet broadband · tone</span><span className="v">{fmt(noise.fanInlet_dB, 0)} · {fmt(noise.fanTone_dB, 0)} dB at 1 m (tip Mach {fmt(noise.tipMach, 2)})</span>
           <span className="k">Jet mixing</span><span className="v">{fmt(noise.jet_dB, 0)} dB</span>
           <span className="k">Total OASPL at 1 m · 100 m</span><span className="v">{fmt(noise.total_dB, 0)} · {fmt(noise.total_dB - 40, 0)} dB</span>
           {noise.notes.map((n, k) => <span key={k} style={{ gridColumn: '1 / -1', color: 'var(--text-muted)', fontSize: 12 }}>{n}</span>)}

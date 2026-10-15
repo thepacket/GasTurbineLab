@@ -324,7 +324,7 @@ export function Controls({ store }: { store: Store }) {
         )}
         {S({ label: 'Maximum cooling effectiveness', path: 'cooling.effectivenessMax', value: i.cooling.effectivenessMax, min: 0.4, max: 0.85, step: 0.01 })}
         {S({ label: 'Coolant temperature rise (pre-swirl, ducting)', path: 'cooling.coolantTempRise_K', value: i.cooling.coolantTempRise_K, min: 0, max: 150, step: 5, unit: 'K' })}
-        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>ε = (T4 − T_metal)/(T4 − T_coolant), ε(m) = ε_max·m/(m + 3 %). Metal temperature and a creep-life estimate (25 000 h at 1200 K, halving every 20 K) are reported under the turbine.</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>ε = (T4 − T_metal)/(T4 − T_coolant), ε(m) = ε_max·m/(m + 3 %). Metal temperature and a temperature-only life proxy (25 000 h at 1200 K, halving every 20 K; no material or stress calibration) are reported under the turbine.</div>
       </Section>
 
       <Section title="Fuel & gas model" hint="CEA polynomials">

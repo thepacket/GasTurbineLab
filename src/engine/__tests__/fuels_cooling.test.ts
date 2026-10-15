@@ -33,9 +33,9 @@ describe('fuels, humidity and cooling', () => {
     const lo = solveEngine({ ...base, burner: { ...base.burner, T4_K: 1500 } });
     const hi = solveEngine({ ...base, burner: { ...base.burner, T4_K: 1800 } });
     const cLo = lo.components.find((c) => c.id === 'hpt')!.values, cHi = hi.components.find((c) => c.id === 'hpt')!.values;
-    console.log('cooling frac 1500K', cLo.coolingFrac.toFixed(3), 'metal', cLo.metalTemp_K.toFixed(0), 'life', cLo.creepLife_h.toFixed(0), '| 1800K', cHi.coolingFrac.toFixed(3), 'metal', cHi.metalTemp_K.toFixed(0));
+    console.log('cooling frac 1500K', cLo.coolingFrac.toFixed(3), 'metal', cLo.metalTemp_K.toFixed(0), 'life', cLo.thermalLifeProxy_h.toFixed(0), '| 1800K', cHi.coolingFrac.toFixed(3), 'metal', cHi.metalTemp_K.toFixed(0));
     expect(cHi.coolingFrac).toBeGreaterThan(cLo.coolingFrac);
     expect(Math.abs(cLo.metalTemp_K - 1250)).toBeLessThan(2);
-    expect(cLo.creepLife_h).toBeGreaterThan(0);
+    expect(cLo.thermalLifeProxy_h).toBeGreaterThan(0);
   });
 });

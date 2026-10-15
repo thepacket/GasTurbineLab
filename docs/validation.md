@@ -73,7 +73,7 @@ An off-design point is reported as converged only when the Newton residual norm 
 
 ## What is not validated
 
-Transients, control, heat soak, the secondary air system, missions, optimisation and uncertainty use the validated cycle but have no external reference; their models are documented in [methods.md](methods.md). The sub-idle regime (start-up) uses the sub-idle map extension, dynamic-head scaling of the fixed pressure losses below 50 % corrected flow and an explicit starter-only regime where no through-flow solution exists; a high-bypass turbofan start-up does not get past that regime with the generic maps. Weight, emissions, noise, creep life and installation drag are correlations calibrated to published data where available and labelled as estimates in the interface. The commercial-engine catalogue reproduces published take-off ratings by construction; its internal temperatures and efficiencies are assumptions by generation.
+Transients, control, heat soak, the secondary air system, missions, optimisation and uncertainty use the validated cycle but have no external reference; their models are documented in [methods.md](methods.md). The sub-idle regime (start-up) uses the sub-idle map extension, dynamic-head scaling of the fixed pressure losses below 50 % corrected flow and an explicit starter-only regime where no through-flow solution exists; a high-bypass turbofan start-up does not get past that regime with the generic maps. Weight, emissions, noise, temperature-only life and installation drag are heuristic estimates; the independent magnitude checks below do not establish engine-specific calibration. The commercial-engine catalogue reproduces published take-off ratings by construction; its internal temperatures and efficiencies are assumptions by generation.
 
 ## Engineering readiness pass (2026-10-15, local changes)
 
@@ -92,7 +92,7 @@ Automated checks cover the cycle references and catalogue, new boundary cases, w
 
 Final local regression: 152 unit tests passed across 22 files; 64 browser tests passed, with the duplicate tablet/phone upgrade fixtures intentionally skipped (the upgrade runs on desktop). TypeScript and the production build also passed.
 
-The [NASA Heidmann report](https://ntrs.nasa.gov/citations/19750017876) includes spectral and directional source-noise modelling. This app's simplified overall-level correlation is not an implementation of the full method and has not been validated against measured spectra. Likewise, matching a few engine dry weights does not independently validate the weight correlation, and the creep-life rule has no stress/material calibration. These features are suitable for indicative comparisons within their stated limits, not certification or hardware-life decisions.
+The [NASA Heidmann report](https://ntrs.nasa.gov/citations/19750017876) includes spectral and directional source-noise modelling. This app's simplified overall-level correlation is not an implementation of the full method and has not been validated against measured spectra. Likewise, matching a few engine dry weights does not independently validate the weight correlation, and the temperature-only life proxy has no stress/material calibration. These features are suitable for indicative comparisons within their stated limits, not certification or hardware-life decisions.
 
 ### UI correctness follow-up
 
@@ -148,3 +148,40 @@ Refinement does not remove the much faster response than NASA's example. At dt =
 The default cruise turbofan thermal run crosses the modeled LPC stall line (minimum about −0.34 %). It now reports that limitation even when numerical integration completes. Default high-bypass startup still fails to establish a through-flow solution: this is an explicitly unsupported map regime, not a validated start. The turbojet startup exercises ignition and starter cut-out but has no independent start-test calibration.
 
 Implementation fixes preserve component overrides, use current speed feedback, integrate PI error over actual elapsed time, include minimum fuel in anti-windup, reject invalid controller/thermal/inertia inputs and stop on impossible component efficiency. Regression tests include the analytic constant-power rotor energy solution with second-order step refinement, fractional-step PI integration, ignition transfer, override preservation and compressor-only thermal coupling. The only visible change is correction of the efficiency plot's units; existing warnings carry the additional validity information.
+
+
+## Estimate-model audit (2026-10-15)
+
+Reproduce with `node reference/run-estimate-audit.mjs`. [Reference values](../reference/estimate_references.json) preserve EASA dataset edition, SHA-256, sheet, rows, columns and engine UIDs; [audit results](../reference/estimate_audit_results.json) preserve the model outputs. No empirical coefficient was adjusted to fit these samples.
+
+### Emissions
+
+The [EASA ICAO emissions databank, March 2026](https://www.easa.europa.eu/en/downloads/131424/en), sheet “Gaseous Emissions and Smoke”, supplies non-superseded entries 2CM014 (row 87), 3CM034 (146) and 07P27GE240 (372). The table compares integrated model values with databank **average**, not certification characteristic, Dp/Foo values in g/kN.
+
+| Catalogue engine | NOx model / reference | CO model / reference | HC model / reference |
+| --- | ---: | ---: | ---: |
+| CFM56-5B4 | 45.10 / 49.70 | 31.04 / 47.30 | 3.78 / 5.70 |
+| CFM56-7B27 | 49.02 / 55.27 | 33.27 / 28.30 | 4.08 / 2.76 |
+| GE90-115B | 65.22 / 64.09 | 22.72 / 45.33 | 2.74 / 6.11 |
+
+NOx is within roughly 12 % for these three integrated comparisons; that does not validate the correlation. At take-off, CFM56-7B27 CO is 1.68 versus 0.20 g/kg and GE90 CO is 1.14 versus 0.122 g/kg. The apparently reasonable integrated NOx masks much poorer species/mode agreement. Catalogue OPR differs from the selected entries (32.6/27.1, 32.7/28.63, 42/43.23), and internal temperatures, combustor configuration and fuel flow are not measured matches. Retain these as magnitude checks, not an engine-specific fit. CO and HC are only indicative. The model margins now explicitly disclose the absent certification characteristic-level adjustment. LTO always uses uninstalled thrust, independently of the design's installation toggle. Hydrogen/methane and afterburner extrapolations are explicitly warned; fuel-carbon CO₂ is a separate complete-oxidation calculation, not lifecycle emissions.
+
+### Mass
+
+| Engine | Model assembly, kg | Reference dry engine, kg | Difference |
+| --- | ---: | ---: | ---: |
+| CFM56-7B27 | 1939.6 | 2386 | −18.7 % |
+| GE90-115B | 8859.0 | 8761 | +1.1 % |
+| PT6A-67D | 252.4 | 233.5 | +8.1 % |
+
+Sources: EASA type-certificate sheets [E.004, §III.5](https://www.easa.europa.eu/en/downloads/7795/en), [IM.E.002, §III.5](https://www.easa.europa.eu/en/downloads/7799/en), and [IM.E.008, dimensions/dry weight](https://www.easa.europa.eu/en/downloads/7787/en). These are approximate magnitude checks with different assembly boundaries: the turbofan estimate includes a nacelle/accessory allowance. The former “dry mass” label and blanket ±30 % calibration claim were unjustified. The report now also omits weight at off-design, where flow-derived areas would resize the engine. [NASA WATE](https://ntrs.nasa.gov/api/citations/20100000016/downloads/20100000016.pdf) uses geometry, material and structural design information absent from these simple correlations; its accuracy cannot be claimed for this app.
+
+### Installation
+
+Fixed hardware must remain fixed when throttle changes. Off-design installation and fan-tip radius now use the design inlet area. At the default turbofan cruise condition, reducing T₄ to 80 % changes flow-derived station area from 2.169 to 1.818 m², but nacelle drag correctly remains 627.6 N. Spillage increases with the reduced airflow. Thrust matching now inherits the design installation setting unless explicitly overridden. [NASA inlet guidance](https://www.grc.nasa.gov/WWW/BGH/inleth.html) supports a fixed capture area and engine-dependent flow, but its momentum/pressure formulation is more detailed than this app's area-deficit approximation. The 0.4 coefficient and drag magnitudes remain uncalibrated; no matched installation wind-tunnel dataset was established.
+
+### Noise and life
+
+[Heidmann's method](https://ntrs.nasa.gov/api/citations/19750017876/downloads/19750017876.pdf) predicts spectra and direction-dependent components using stage data. The app instead uses a fitted-form heuristic, including a 12-log temperature-rise term and fixed tone offsets. Renaming it avoids claiming an implementation of that method; replacing 12 by 20 alone would not implement it. [NASA's jet-noise review](https://ntrs.nasa.gov/api/citations/19740019374/downloads/19740019374.pdf) supports the eighth-power trend for subsonic jet sound power, not the app's arbitrary absolute normalization over every exhaust regime. No matched microphone-angle, distance and operating-condition measurements validate the absolute dB levels. Noise values are therefore indicative source trends only.
+
+[NASA creep-rupture work](https://ntrs.nasa.gov/citations/19840011857) requires material-dependent data and strength/time-temperature relationships. The app has no stress, alloy, coating, fatigue or exposure-history inputs; the renamed temperature-only life proxy cannot predict component service life. A separate implementation defect was fixed: computed cooling previously grew beyond its intended supply limit and then abruptly dropped at a higher demand. It now saturates monotonically at 25 % inlet cooling and reports unreachable targets. Tests cover the full target-temperature sweep, insufficient coolant temperature, fixed installation geometry, inherited thrust settings and LTO isolation. No material-life or absolute acoustic calibration is claimed.

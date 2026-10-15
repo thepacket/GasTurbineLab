@@ -27,6 +27,8 @@ export interface Provider {
   nozzleArea(id: string): number | undefined;
   /** fixed mixer areas in off-design */
   mixerAreas(): { Acore: number; Abyp: number } | undefined;
+  /** Fixed design inlet annulus for hardware-based installation and acoustic estimates. */
+  designInletArea_m2?: number;
   residuals: Record<string, number>;
   /** multiplier on a duct / burner pressure-loss fraction at the station feeding it (1 at design; off-design scales with dynamic head at low corrected flow) */
   lossScale?(stationId: string, flow: Flow): number;
@@ -84,7 +86,7 @@ export function designProvider(inp: EngineInputs): Provider {
 /**
  * Turbine cooling: effectiveness ε = (T_gas − T_metal)/(T_gas − T_coolant) with ε(m) = ε_max · m/(m + m½),
  * m½ = 3 % of core flow per cooled row.  Returns the per-row flow fraction needed for a target metal temperature,
- * or the metal temperature reached with a given fraction.  Creep life: a Larson–Miller-type rule of thumb,
+ * or the metal temperature reached with a given fraction.  Temperature-only life proxy (no stress or material model),
  * 25 000 h at 1200 K halving every 20 K.
  */
 const M_HALF = 0.03;
@@ -93,8 +95,16 @@ export function coolingModel(T4: number, T3: number, c: EngineInputs['cooling'],
   const epsOf = (m: number) => (c.effectivenessMax * m) / (m + M_HALF);
   let mRow: number, infeasible = false;
   if (c.mode === 'computed') {
-    const epsReq = Math.max(0, (T4 - c.targetMetal_K) / Math.max(T4 - Tc, 1));
-    if (epsReq >= 0.95 * c.effectivenessMax) { mRow = 0.25 / 1.6; infeasible = true; } else mRow = (M_HALF * epsReq) / (c.effectivenessMax - epsReq);
+    // A fixed maximum supply must saturate continuously as the cooling demand rises.
+    const maxRow = 0.25 / 1.6;
+    if (T4 <= c.targetMetal_K) mRow = 0;
+    else if (Tc >= T4) { mRow = 0; infeasible = true; }
+    else {
+      const epsReq = (T4 - c.targetMetal_K) / (T4 - Tc);
+      const maxEffectiveness = epsOf(maxRow);
+      infeasible = epsReq > maxEffectiveness;
+      mRow = infeasible ? maxRow : (M_HALF * epsReq) / (c.effectivenessMax - epsReq);
+    }
   } else mRow = mFixedInlet / 1.6;
   const eps = epsOf(mRow);
   const Tmetal = T4 - eps * (T4 - Tc);
@@ -178,8 +188,8 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     const cm = coolingModel(T4, T3, { ...inp.cooling, mode: 'fixed' }, fracInlet);
     const comp = components.find((c) => c.id === id)!;
     comp.values.coolingFrac = fracInlet + 0.6 * (fracInlet / 1.6);
-    comp.values.metalTemp_K = cm.metal_K; comp.values.coolingEffectiveness = cm.effectiveness; comp.values.creepLife_h = cm.life_h; comp.values.coolantTemp_K = cm.Tcoolant;
-    if (inp.cooling.mode === 'computed' && coolingModel(inp.burner.T4_K, T3, inp.cooling, fracInlet).infeasible) warnings.push(`${comp.name}: target metal temperature ${inp.cooling.targetMetal_K} K is not reachable with the cooling effectiveness available; cooling flow capped at 25 %.`);
+    comp.values.metalTemp_K = cm.metal_K; comp.values.coolingEffectiveness = cm.effectiveness; comp.values.thermalLifeProxy_h = cm.life_h; comp.values.coolantTemp_K = cm.Tcoolant;
+    if (inp.cooling.mode === 'computed' && coolingModel(inp.burner.T4_K, T3, inp.cooling, fracInlet).infeasible) warnings.push(`${comp.name}: target metal temperature ${inp.cooling.targetMetal_K} K is not reachable with the available coolant temperature and supply (maximum inlet cooling fraction 25 %).`);
     if (cm.metal_K > 1350) warnings.push(`${comp.name} metal temperature ${cm.metal_K.toFixed(0)} K is above typical single-crystal limits (~1350 K).`);
   };
 
@@ -428,9 +438,10 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   if (perf.FAR > 0.9 * fuel.stoichFAR) warnings.push('Fuel/air ratio is close to stoichiometric.');
 
   // ---- installed performance (optional): additive inlet drag, nacelle friction, afterbody drag
+  const designInletArea_m2 = prov.designInletArea_m2 ?? st2.A;
   const q0 = 0.5 * amb.rho * V0 * V0;
   if (inp.installation.enabled) {
-    const A2 = st2.A;
+    const A2 = designInletArea_m2;
     const rTip = Math.sqrt(A2 / (Math.PI * (1 - 0.3 * 0.3)));
     const Ahl = A2 / inp.installation.captureRatioDesign; // highlight area sized at the design capture ratio
     const A0 = V0 > 0 ? W0 / (amb.rho * V0) : Ahl;
@@ -449,10 +460,12 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   perf.EI_CO_g_kg = 0.4 + 40 * Math.exp(-(T3 - 450) / 110);
   perf.NOx_g_s = perf.EI_NOx_g_kg * Wf; perf.CO_g_s = perf.EI_CO_g_kg * Wf; perf.CO2_g_s = fuel.comp.C * 44.0095 * 1000 * Wf;
   if (inp.fuel === 'hydrogen') { perf.EI_CO_g_kg = 0; perf.CO_g_s = 0; }
+  if (inp.fuel === 'hydrogen' || inp.fuel === 'methane') warnings.push('P3–T3 emissions correlations are not calibrated for this fuel; only the fuel-carbon CO₂ calculation is composition-based.');
+  if (inp.afterburner.enabled) warnings.push('Emissions apply the main-combustor correlation to total fuel; afterburner emissions are not independently modeled.');
 
-  // ---- jet mixing noise (Lighthill V^8 scaling, SAE ARP 876 style constant), OASPL at 1 m
+  // ---- jet mixing noise (Lighthill V^8 trend, uncalibrated normalization), OASPL at 1 m
   let pw = 0;
   for (const j of jets) { if (j.V > V0 + 1) pw += Math.pow(j.rho / amb.rho, 2) * Math.pow((j.V - V0) / a0, 8) * j.A; }
   perf.jetNoise_dB = pw > 0 ? 141 + 10 * Math.log10(pw) : 0;
-  return { inputs: inp, stations, components, perf, warnings, shafts };
+  return { inputs: inp, stations, components, perf, warnings, shafts, designInletArea_m2 };
 }

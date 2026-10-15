@@ -132,6 +132,8 @@ export interface Performance {
 export interface ShaftResult { name: string; powerIn_W: number; powerOut_W: number; turbinePR: number; rpm: number; outputRpm?: number }
 
 export interface EngineResult {
+  /** Hardware inlet annulus retained from the design point, m². */
+  designInletArea_m2?: number;
   inputs: EngineInputs;
   stations: Station[];
   components: ComponentResult[];

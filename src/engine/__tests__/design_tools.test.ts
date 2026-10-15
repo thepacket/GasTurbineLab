@@ -23,8 +23,9 @@ describe('design tools', () => {
     expect(r.stats.TSFC.sd / r.stats.TSFC.mean).toBeGreaterThan(0.002);
     expect(r.stats.TSFC.sd / r.stats.TSFC.mean).toBeLessThan(0.03);
   });
-  it('weight estimates land near published dry weights', () => {
-    const cases: [string, number][] = [['CFM56-7B27', 2370], ['GE90-115B', 8280], ['PT6A-67D', 250], ['JT8D-9A', 1500]];
+  it('weight heuristics have plausible magnitude, without asserting dry-weight accuracy', () => {
+    // EASA TCDS E.004, IM.E.002 and IM.E.008; assembly/dry-engine scopes differ.
+    const cases: [string, number][] = [['CFM56-7B27', 2386], ['GE90-115B', 8761], ['PT6A-67D', 233.5]];
     for (const [name, pub] of cases) {
       const e = ENGINES.find((x) => x.name === name)!;
       const r = solveEngine({ ...calibrateEngine(e).inputs, chemistry: 'frozen' });

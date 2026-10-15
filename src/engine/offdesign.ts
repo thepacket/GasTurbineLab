@@ -120,6 +120,7 @@ function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<strin
   const speeds = fs ? { ...fs, PT: inp.speeds.PT } : { LP: x.N_LP ?? inp.speeds.LP, IP: x.N_IP ?? inp.speeds.IP, HP: x.N_HP, PT: inp.speeds.PT };
   const geometry = { ...inp.geometry, ...(od.geometry ?? {}) };
   return {
+    designInletArea_m2: dp.result.stations.find(s => s.id === '2')!.A,
     W: x.W, BPR: x.BPR ?? inp.BPR, speeds, residuals, flowErr, geometry, sasAreas: dp.sasAreas, designHptPR: dp.designHptPR,
     compressor: (id, inlet, N, _d) => {
       const c = dp.comps[id];
@@ -215,7 +216,7 @@ export interface OffDesignSolution { result: EngineResult; converged: boolean; i
 function residualVector(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>, opt: SolveOptions): { r: number[]; names: string[]; result: EngineResult; flowErr: Record<string, number> } {
   const prov = offDesignProvider(dp, od, x, opt);
   const result = evaluate(inp, prov);
-  if (od.throttle.mode === 'Fn') prov.residuals.burner = (od.installation ? result.perf.installedFn : result.perf.Fn) / od.throttle.value - 1;
+  if (od.throttle.mode === 'Fn') prov.residuals.burner = (inp.installation.enabled ? result.perf.installedFn : result.perf.Fn) / od.throttle.value - 1;
   if (opt.fixedSpeeds) {
     // speeds are states: the power residuals become the reported imbalance
     const imb: Record<string, number> = {};

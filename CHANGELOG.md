@@ -81,3 +81,10 @@ Following an external review of the transient/control implementation:
 - Use current spool-speed feedback, integrate PI error over elapsed time including fractional final steps, and include minimum-fuel saturation in anti-windup.
 - Reject invalid inertia, controller, starter and thermal settings; stop on impossible component efficiencies. Report negative surge margins and unsupported turbofan startup through existing warnings.
 - Correct the efficiency plot's relative units without changing its layout. Document model scope, NASA comparisons, reproducible trajectories and time-step refinement; engine-specific calibration remains unvalidated.
+
+## Estimate-model audit — 2026-10-15 (unreleased)
+- Hold nacelle dimensions and acoustic fan radius fixed at design geometry off-design; inherit the installation toggle during thrust matching and explicitly isolate uninstalled LTO calculations.
+- Saturate computed cooling continuously at its inlet supply limit and flag unreachable targets, including insufficient coolant temperature.
+- Stop estimating hardware mass from off-design flow areas. Correct dry-mass, Heidmann and creep-life claims to assembly mass, heuristic source noise and temperature-only life proxy; preserve existing layout.
+- Add reproducible EASA emissions/type-certificate magnitude comparisons, reference provenance and regression tests. Document the remaining CO/HC, acoustic, installation and life-model calibration limits without tuning to the small reference sample.
+- Validation: 171 unit tests and 76 browser checks pass; two intentional browser skips. TypeScript and production build pass.

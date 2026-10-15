@@ -1,0 +1,135 @@
+{
+  "source": "https://www.easa.europa.eu/en/downloads/131424/en",
+  "edition": "03/2026",
+  "sha256": "57a9ff572458ad3a3141afc1aea932b5faa5796d279f0ac74600b27869302530",
+  "sheet": "Gaseous Emissions and Smoke",
+  "modeOrder": [
+    "takeoff",
+    "climbout",
+    "approach",
+    "idle"
+  ],
+  "columns": {
+    "identification": "A:P",
+    "HC": "Q:T",
+    "CO": "AD:AG",
+    "NOx": "AQ:AT",
+    "fuelFlow": "BZ:CC"
+  },
+  "engines": [
+    {
+      "name": "CFM56-5B4",
+      "uid": "2CM014",
+      "row": 87,
+      "dataStatus": "C",
+      "superseded": null,
+      "OPR": 27.1,
+      "ratedThrust_kN": 117.9,
+      "fuelFlow_kgs": [
+        1.166,
+        0.961,
+        0.326,
+        0.107
+      ],
+      "EI_NOx_g_kg": [
+        28.7,
+        23.3,
+        10,
+        4.3
+      ],
+      "EI_CO_g_kg": [
+        0.5,
+        0.5,
+        2.33,
+        31.9
+      ],
+      "EI_HC_g_kg": [
+        0.1,
+        0.1,
+        0.13,
+        3.87
+      ],
+      "DpFooAvg_g_kN": {
+        "NOx": 49.7,
+        "CO": 47.3,
+        "HC": 5.7
+      }
+    },
+    {
+      "name": "CFM56-7B27",
+      "uid": "3CM034",
+      "row": 146,
+      "dataStatus": "C",
+      "superseded": null,
+      "OPR": 28.63,
+      "ratedThrust_kN": 121.44,
+      "fuelFlow_kgs": [
+        1.284,
+        1.043,
+        0.349,
+        0.116
+      ],
+      "EI_NOx_g_kg": [
+        30.9,
+        23.7,
+        11,
+        4.8
+      ],
+      "EI_CO_g_kg": [
+        0.2,
+        0.5,
+        1.4,
+        17.9
+      ],
+      "EI_HC_g_kg": [
+        0.1,
+        0.1,
+        0.1,
+        1.7
+      ],
+      "DpFooAvg_g_kN": {
+        "NOx": 55.27,
+        "CO": 28.3,
+        "HC": 2.76
+      }
+    },
+    {
+      "name": "GE90-115B",
+      "uid": "07P27GE240",
+      "row": 372,
+      "dataStatus": "C",
+      "superseded": null,
+      "OPR": 43.2267283614589,
+      "ratedThrust_kN": 513.947623959728,
+      "fuelFlow_kgs": [
+        4.594140184400638,
+        3.5615863252825637,
+        1.068690094236447,
+        0.3393126958639383
+      ],
+      "EI_NOx_g_kg": [
+        50.35070773126543,
+        34.92078485207531,
+        15.98677866283314,
+        5.115440926374784
+      ],
+      "EI_CO_g_kg": [
+        0.12226826709460037,
+        0.38977923321027635,
+        2.4518421953247125,
+        42.431141117493574
+      ],
+      "EI_HC_g_kg": [
+        0.03805346755470496,
+        0.028860282056889466,
+        0.028744291576655947,
+        5.880296194083788
+      ],
+      "DpFooAvg_g_kN": {
+        "NOx": 64.09364441815978,
+        "CO": 45.32696098428272,
+        "HC": 6.111298628361654
+      }
+    }
+  ]
+}

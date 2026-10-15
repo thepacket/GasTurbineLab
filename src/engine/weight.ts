@@ -3,8 +3,8 @@
  * Component correlations follow the style of NASA WATE++ / Raymer: fan and
  * compressors scale with annulus area and stage count, turbines with inlet
  * area and temperature, the combustor with volume, the nacelle with wetted
- * area.  Coefficients were tuned so that generic engines land near published
- * dry weights (CFM56-7B ≈ 2.4 t, GE90-115B ≈ 8.3 t, PT6A-67 ≈ 0.25 t).  Estimates only.
+ * area.  Coefficients are heuristic. The assembly includes nacelle/accessory allowances
+ * and is not a like-for-like certified dry engine weight. Estimates only.
  */
 import { EngineResult } from './types';
 import { buildGeometry } from '../viz/geometry';
@@ -12,6 +12,7 @@ import { buildGeometry } from '../viz/geometry';
 export interface WeightBreakdown { parts: { name: string; mass_kg: number }[]; total_kg: number; length_m: number; diameter_m: number; thrustToWeight: number; powerToWeight_kW_kg: number }
 
 export function estimateWeight(r: EngineResult): WeightBreakdown {
+  if (r.offDesign) throw new Error('Weight must be estimated from the design point, not resized at an operating point.');
   const g = buildGeometry(r);
   const inp = r.inputs;
   const parts: { name: string; mass_kg: number }[] = [];
@@ -46,7 +47,7 @@ export function estimateWeight(r: EngineResult): WeightBreakdown {
     parts.push({ name: 'Reduction gearbox', mass_kg: 0.12 * (r.perf.shaftPower_W / 1000) });
     parts.push({ name: 'Exhaust and accessories', mass_kg: 20 * st('9')!.A * 4 + 10 * PI * 2 * g.rMax * g.length });
   }
-  // global calibration factor against published dry weights (structure, bearings, systems not itemised)
+  // heuristic allowance for structure, bearings and systems not itemised
   for (const p of parts) p.mass_kg *= 1.5;
   const total = parts.reduce((s, p) => s + p.mass_kg, 0);
   return { parts, total_kg: total, length_m: g.length, diameter_m: 2 * g.rMax, thrustToWeight: r.perf.Fn / (total * 9.80665), powerToWeight_kW_kg: r.perf.shaftPower_W / 1000 / total };
