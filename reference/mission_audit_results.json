@@ -1,0 +1,197 @@
+[
+  {
+    "arch": "turbojet",
+    "estimatedMass": 69500,
+    "slsConverged": true,
+    "slsThrust_N": 47556.584950116216,
+    "massFromSolvedRating": 69500,
+    "refinement": [
+      {
+        "pointsPerSegment": 4,
+        "time_s": 12488.491599643969,
+        "fuel_kg": 20839.79003024652,
+        "dist_km": 2969.089782851309,
+        "blockFuelFrac": 0.29985309396038157,
+        "complete": true,
+        "feasible": true,
+        "maxShortfall": 5.191280738614523e-11,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 8,
+        "time_s": 12488.491599643972,
+        "fuel_kg": 20771.8074595605,
+        "dist_km": 2969.1456582311725,
+        "blockFuelFrac": 0.29887492747569067,
+        "complete": true,
+        "feasible": true,
+        "maxShortfall": 8.65085780787922e-11,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 16,
+        "time_s": 12488.491599643976,
+        "fuel_kg": 20760.10863832609,
+        "dist_km": 2969.1554966431304,
+        "blockFuelFrac": 0.29870659911260566,
+        "complete": true,
+        "feasible": true,
+        "maxShortfall": 1.0553879992158954e-10,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 32,
+        "time_s": 12488.491599643958,
+        "fuel_kg": 20757.54892445072,
+        "dist_km": 2969.1575946058365,
+        "blockFuelFrac": 0.29866976869713263,
+        "complete": true,
+        "feasible": true,
+        "maxShortfall": 2.0730195338103385e-11,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      }
+    ]
+  },
+  {
+    "arch": "turbofan",
+    "estimatedMass": 65000,
+    "slsConverged": true,
+    "slsThrust_N": 100759.93604063685,
+    "massFromSolvedRating": 73500,
+    "refinement": [
+      {
+        "pointsPerSegment": 4,
+        "time_s": 12834.850038655803,
+        "fuel_kg": 7193.660791098169,
+        "dist_km": 2691.9574718180043,
+        "blockFuelFrac": 0.11067170447843337,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.30364697277551467,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 8,
+        "time_s": 12834.850038655797,
+        "fuel_kg": 7187.287755163605,
+        "dist_km": 2692.021200276678,
+        "blockFuelFrac": 0.11057365777174777,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.30364697277551467,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 16,
+        "time_s": 12834.850038655788,
+        "fuel_kg": 7186.556766538917,
+        "dist_km": 2692.0324220953125,
+        "blockFuelFrac": 0.11056241179290642,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.30364697277551456,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 32,
+        "time_s": 12834.850038655797,
+        "fuel_kg": 7186.1806082144685,
+        "dist_km": 2692.0348150839154,
+        "blockFuelFrac": 0.11055662474176105,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.3036469727755148,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      }
+    ]
+  },
+  {
+    "arch": "turboprop",
+    "estimatedMass": 16500,
+    "slsConverged": true,
+    "slsThrust_N": 38872.3253588479,
+    "massFromSolvedRating": 16500,
+    "refinement": [
+      {
+        "pointsPerSegment": 4,
+        "time_s": 6370.9879665273065,
+        "fuel_kg": 889.1077156475421,
+        "dist_km": 835.9252837868693,
+        "blockFuelFrac": 0.05388531609985104,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.29349272600722043,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 8,
+        "time_s": 6370.987966527309,
+        "fuel_kg": 888.11119618468,
+        "dist_km": 835.9380096589646,
+        "blockFuelFrac": 0.0538249209808897,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.2934962748179464,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 16,
+        "time_s": 6370.987966527304,
+        "fuel_kg": 887.9867992437958,
+        "dist_km": 835.9402498572998,
+        "blockFuelFrac": 0.05381738177235126,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.2934946414694002,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      },
+      {
+        "pointsPerSegment": 32,
+        "time_s": 6370.987966527317,
+        "fuel_kg": 887.9537899687984,
+        "dist_km": 835.9407275405208,
+        "blockFuelFrac": 0.05381538121023021,
+        "complete": true,
+        "feasible": false,
+        "maxShortfall": 0.2934945762880389,
+        "ratingViolations": 0,
+        "operabilityViolations": 0,
+        "trajectoryViolations": 0,
+        "unconvergedPoints": 0
+      }
+    ]
+  }
+]

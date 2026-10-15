@@ -88,3 +88,10 @@ Following an external review of the transient/control implementation:
 - Stop estimating hardware mass from off-design flow areas. Correct dry-mass, Heidmann and creep-life claims to assembly mass, heuristic source noise and temperature-only life proxy; preserve existing layout.
 - Add reproducible EASA emissions/type-certificate magnitude comparisons, reference provenance and regression tests. Document the remaining CO/HC, acoustic, installation and life-model calibration limits without tuning to the small reference sample.
 - Validation: 171 unit tests and 76 browser checks pass; two intentional browser skips. TypeScript and production build pass.
+
+## Mission audit — 2026-10-15 (local review)
+- Check all ratings on independently solved N1/N2/T4 fallback candidates; include the formerly missing T4 fallback and preserve failed explicit throttle commands.
+- Integrate fuel with coupled endpoint mass and trapezoidal flow; include constant-Mach climb/descent acceleration, normal force and horizontal-distance integration.
+- Retain negative thrust demand, flag unmodeled braking, stop before unconverged intervals and exclude partial fuel from optimisation objectives.
+- Validate connected altitudes and level segments; connect the default turbofan descent to its hold. Correct installed TSFC and the exact 2% feasibility boundary.
+- Correct mass-estimate wording and reset-rating behavior without changing the UI structure. Add mission regression tests and reproducible refinement evidence.

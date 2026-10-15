@@ -13,8 +13,9 @@ export function MissionView({ store }: { store: Store }) {
   const inputs = store.state.inputs;
   const design = 'error' in store.design ? null : store.design;
   // estimate sea-level static thrust from the design point (scale by ambient pressure and a ram/speed factor)
-  const FnSLS = design ? design.perf.Fn * (101325 / isa(inputs.flight.altitude_m).P) * (inputs.flight.mach > 0.3 ? 0.75 : 1) : 1e5;
-  const [ac, setAc] = useState<Aircraft>(() => { const d = defaultMission(inputs.arch); return { ...d.aircraft, mass_kg: scaledAircraftMass(inputs.arch, FnSLS, d.aircraft.engines, inputs.prop.shaftPower_W) }; });
+  const FnSLS = design ? design.perf.Fn * (101325 / isa(inputs.flight.altitude_m, inputs.flight.dT_isa, inputs.flight.altIsGeopotential).P) * (inputs.flight.mach > 0.3 ? 0.75 : 1) : 1e5;
+  const initialAircraft = () => { const d = defaultMission(inputs.arch).aircraft; const rating = inputs.arch === 'turboprop' ? inputs.prop.shaftPower_W : FnSLS; return { ...d, mass_kg: Number.isFinite(rating) && rating > 0 ? scaledAircraftMass(inputs.arch, FnSLS, d.engines, inputs.prop.shaftPower_W) : d.mass_kg }; };
+  const [ac, setAc] = useState<Aircraft>(initialAircraft);
   const [segs, setSegs] = useState<Segment[]>(() => defaultMission(inputs.arch).segments);
   const [ratings, setRatings] = useState<Ratings>({ NLPmax: 1.04, NHPmax: 1.02, T4max_K: inputs.burner.T4_K });
   const [pts, setPts] = useState<MissionPoint[]>([]);
@@ -50,8 +51,8 @@ export function MissionView({ store }: { store: Store }) {
         <label>N2 max {num(ratings.NHPmax, (v) => setRatings({ ...ratings, NHPmax: v }), 60, 0.01, 'N2 limit')}</label>
         <label>T4 max {num(ratings.T4max_K, (v) => setRatings({ ...ratings, T4max_K: v }), 70, 10, 'T4 limit')} K</label>
         <button className="btn primary" onClick={run} disabled={busy}>{busy ? 'Flying…' : 'Fly mission'}</button>
-        <button className="btn" onClick={() => { const d = defaultMission(inputs.arch); setAc({ ...d.aircraft, mass_kg: scaledAircraftMass(inputs.arch, FnSLS, d.aircraft.engines, inputs.prop.shaftPower_W) }); setSegs(d.segments); }}>Reset profile</button>
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Aircraft mass defaults to a thrust/weight ratio of 0.28 at sea level for this engine.</span>
+        <button className="btn" onClick={() => { const d = defaultMission(inputs.arch); setAc(initialAircraft()); setSegs(d.segments); setRatings({ NLPmax: 1.04, NHPmax: 1.02, T4max_K: inputs.burner.T4_K }); }}>Reset profile</button>
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{inputs.arch === 'turboprop' ? 'Aircraft mass is a rough design-power loading estimate (0.17 kW/kg).' : 'Aircraft mass is a rough estimate using pressure-scaled thrust and a nominal thrust/weight ratio of 0.28.'}</span>
         {error && <span style={{ color: 'var(--bad)' }}>{error}</span>}
       </div>
       <div className="section" style={{ padding: '8px 14px' }}>

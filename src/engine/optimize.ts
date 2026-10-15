@@ -55,7 +55,7 @@ export function runOptimization(base: EngineInputs, oi: OptimizeInputs, progress
       case 'missionFuel': {
         if (!oi.mission) { f = r.perf.TSFC_mg_Ns; break; }
         try {
-          const dp = makeDesignPoint(inp); const m = runMission(dp, oi.mission); f = m.totals.fuel_kg;
+          const dp = makeDesignPoint(inp); const m = runMission(dp, oi.mission); f = m.complete ? m.totals.fuel_kg : 1e9;
           // mission completion is a hard constraint: a thrust shortfall or an unconverged point is infeasible,
           // with a penalty that grows with the shortfall so the simplex is pushed back toward feasibility
           if (!m.feasible) missionPen = 1 + 50 * m.maxShortfall + m.unconvergedPoints;

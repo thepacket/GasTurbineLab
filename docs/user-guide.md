@@ -77,3 +77,9 @@ Every result area carries a badge: **reference-checked** (agrees with pyCycle on
 ## Units and conventions
 
 Inputs are SI. The units toggle changes the display of results, tables and callouts to US customary (lbf, psi, °R, lb/s, hp, lb/(lbf·h), ft/s, in²). Station numbers follow SAE ARP 755A. Temperatures are total unless marked static. Efficiencies are isentropic. Fuel/air ratio is fuel mass per air mass at the combustor.
+
+### Mission interpretation
+
+Mission feasibility checks sampled thrust demand (2% tolerance), N1/N2/T4 ratings, compressor surge margin and excess thrust requiring unmodeled drag. Take-off/fixed-T4 segments are fuel allowances at specified conditions; ground roll and speed transitions are not simulated. Altitudes must join continuously, and cruise/hold/take-off rows must be level. The default turbofan descent joins the 1500 m hold. Default profiles are examples and can be infeasible for the selected engine.
+
+Fuel is integrated with changing mass. An engine convergence failure stops integration and the warning identifies partial totals; other infeasible runs may evaluate the prescribed profile throughout, but those totals are not achievable flight fuel. The aircraft mass initializer is a rough pressure-scaled thrust or design-power estimate, not aircraft sizing. Fuel capacity, empty mass, reserves, stall and airbrakes are outside this model. Reset profile also restores the ratings for the current design. See the mission audit in `docs/validation.md` for reproducible sampling and mass checks.
