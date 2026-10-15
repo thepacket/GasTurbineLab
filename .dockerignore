@@ -3,3 +3,12 @@ dist
 dev-dist
 .git
 reference/venv*
+
+.env
+.env.*
+*.pem
+*.key
+*_out
+test-results
+playwright-report
+.claude

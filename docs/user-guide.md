@@ -26,7 +26,7 @@ The cross-section is drawn from the solved flow areas and coloured by total temp
 
 ## Results
 
-Performance cards (thrust, TSFC, specific thrust, efficiencies, shaft power for turboprops, installed thrust when enabled), warnings, the off-design solver summary, shaft balances with speeds, the T–s diagram and station profiles, compressor maps with design and operating points, the station table (CSV export), component details including cooling flows, metal temperature and creep life, the weight and size estimate, the secondary air system when enabled, the certification panel (noise estimate and the ICAO LTO cycle on request), and emissions.
+Performance cards (thrust, TSFC, specific thrust, efficiencies, shaft power for turboprops, installed thrust when enabled), warnings, the off-design solver summary, shaft balances with speeds, the T–s diagram and station profiles, compressor maps with design and operating points, the station table (CSV export), component details including cooling flows, metal temperature and temperature-only life proxy, the weight and size estimate, the secondary air system when enabled, the certification-estimates panel (noise estimate and the ICAO LTO cycle on request), and emissions.
 
 ## Explore
 
@@ -72,7 +72,7 @@ Every station and performance figure against pyCycle for the design-point, off-d
 
 ## Provenance and stale results
 
-Every result area carries a badge: **reference-checked** (agrees with pyCycle on the validation cases: design point, off-design, mixer), **uncalibrated model** (physically based but without an external reference: transients, control, thermal, secondary air, mission, optimisation, uncertainty) or **correlation estimate** (weight, emissions, noise, creep life, installation drag, certification). Analyses that run on request keep a snapshot of their inputs; if you change the design afterwards, a banner marks the old result as stale and, for the optimiser, disables applying it until it is rerun. The status bar at the top of Results shows the operating mode, condition, fuel, chemistry and solver state.
+Every result area carries a badge: **reference-checked** (agrees with pyCycle on the validation cases: design point, off-design, mixer), **uncalibrated model** (physically based but without an external reference: transients, control, thermal, secondary air, mission, optimisation, uncertainty) or **correlation estimate** (weight, emissions, noise, temperature-only life proxy, installation drag, certification). Analyses that run on request keep a snapshot of their inputs; if you change the design afterwards, a banner marks the old result as stale and, for the optimiser, disables applying it until it is rerun. The status bar at the top of Results shows the operating mode, condition, fuel, chemistry and solver state.
 
 ## Units and conventions
 

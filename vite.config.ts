@@ -12,7 +12,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon.png'],
+      includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon.png', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt'],
       manifest: {
         name: 'Gas Turbine Lab',
         short_name: 'TurbineLab',

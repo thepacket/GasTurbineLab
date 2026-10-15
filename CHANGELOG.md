@@ -1,6 +1,6 @@
 # Changelog
 
-All dates 2026-10-14 unless noted. Each entry is one pushed step.
+All dates 2026-10-14 unless noted. Entries record development steps; entries marked local are not yet pushed.
 
 ## Round 1 — the lab
 - Design-point cycle solver for turbojet, two-spool separate-flow turbofan and free-turbine turboprop on NASA CEA polynomials (frozen products), ISA-1976, per-spool shaft balances, statics and areas at every station.
@@ -102,3 +102,8 @@ Following an external review of the transient/control implementation:
 - Preserve absent off-design power overrides and the optional burner state through sharing and persistence.
 - Preserve legacy custom-map IDs containing spaces/Unicode; give newly imported maps filename-independent IDs so ordinary filenames cannot break saved assignments.
 - Add browser coverage for report/CSV/Gallery agreement, custom-map portability into a clean browser, worker recreation, mission/uncertainty stale banners, and cached-app updates. UI structure unchanged.
+
+## Documentation and MIT preparation — 2026-10-15 (local)
+- Add MIT licensing for original project work, preserve pyCycle Apache-2.0 notices, and include license texts in static builds.
+- Update setup, model scope, mission integration, bounded uncertainty, persistence and deployment documentation.
+- Add contribution/security guidance and a public-release audit covering provenance, generated artifacts, Git history, dependencies and GitHub settings. Repository visibility is unchanged.

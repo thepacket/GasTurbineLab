@@ -2,21 +2,23 @@
 
 ## Stack
 
-Vite 8, React 19, TypeScript 6, Three.js, vite-plugin-pwa (Workbox). Tests with Vitest (unit, solver and validation) and Playwright (end-to-end across three layouts). No runtime dependencies beyond React and Three.js; no server.
+Vite 8, React 19, TypeScript 7, Three.js, vite-plugin-pwa (Workbox). Tests with Vitest (unit, solver and validation) and Playwright (end-to-end across three layouts). React/React DOM, Three.js and Workbox execute in the browser. nginx serves static files; there is no server-side calculation API.
 
 ## Running
 
+Use Node.js 22.12+; Node 22 is used by CI and the Docker build. Install the Chromium test browser with `npx playwright install chromium` (Linux CI uses `--with-deps`).
+
 ```bash
-npm install
+npm ci
 npm run dev          # Vite dev server on :5173
 npm test             # vitest run
 npm run test:e2e     # playwright test (builds, serves dist on :4173, three projects)
-npm run build        # tsc -b && vite build → dist/
+npm run build        # license notices, tsc -b && vite build → dist/
 npm run preview      # serve dist on :4173
 node scripts/icons.mjs   # regenerate PWA icons from public/icons/icon.svg
 ```
 
-The Playwright run needs the Chromium build (`npx playwright install chromium`). Lighthouse can be run against the preview with `npm run lighthouse`; the last audit scored 100/100/100/100.
+The Playwright run needs the Chromium build (`npx playwright install chromium`). Lighthouse is optional and must be installed separately to use `npm run lighthouse`. Historical scores do not certify the current build.
 
 ## Code layout
 
@@ -50,7 +52,9 @@ src/viz/               SVG cross-section, shared parametric geometry, charts, ma
 src/three/             Three.js cutaway (Engine3D.tsx)
 src/state/store.ts     reducer, persistence, worker-backed off-design result
 e2e/                   Playwright specs
-reference/             pyCycle scripts (Python)
+reference/             optional local Python generators and TypeScript plausibility-audit runners
+scripts/licenses.mjs   static-distribution license notices
+licenses/              upstream pyCycle notice and Apache-2.0 text
 deploy/nginx.conf, Dockerfile, fly.toml
 .github/workflows/ci.yml, .github/dependabot.yml
 ```
@@ -60,7 +64,7 @@ Engine code must stay free of DOM and React imports so it runs unchanged in the 
 ## Conventions
 
 * SI internally; display units converted in `ui/units.ts`.
-* `EngineInputs` is the single source of design truth; it is persisted to `localStorage`, encoded into share links and stored in the gallery. New fields need a default in `defaults.ts` and, if nested, an entry in the store's deep-merge list so old saved states load.
+* `EngineInputs` is the single source of design truth; it is persisted to `localStorage`, encoded into share links and stored in the gallery. New fields need a default in `defaults.ts` and type handling in `ui/share.ts` for any optional or enumerated fields so old saved states and shared links load without losing overrides.
 * Component results are `{ id, kind, name, values }` with numeric values whose keys carry a unit suffix (`_W`, `_N`, `_kgs`, `_m2`, `_Pa`, `_pct`, `_rpm`) that `Results` formats automatically.
 * Off-design unknown names are `W`, `BPR`, `N_LP`, `N_IP`, `N_HP`, `FAR`, `Rl_<comp>`, `PR_<turb>`; residual names are `<comp>_flow`, `<turb>_flow`, `<shaft>_power`, `<nozzle>_area`, `mixer_ps`, `burner`. The system must stay square: adding a component means adding its unknown and its residual.
 * Chemistry: tests and heavy loops use `chemistry: 'frozen'` (0.6 ms per solve); the interactive design point uses equilibrium (16 ms).
@@ -79,7 +83,7 @@ Engine code must stay free of DOM and React imports so it runs unchanged in the 
 
 `npm test` runs: pyCycle design-point comparison (equilibrium and frozen), pyCycle off-design and mixed-flow comparison, catalogue calibration, off-design round trips and throttling for every architecture, transient and mission behaviour, FADEC, start-up, thermal, secondary air, fuels and cooling, optimiser, Monte Carlo, weight, map generators, certification, and a 354-point envelope fuzz over the catalogue. Solver-heavy tests have a 120 s timeout because CI runners are several times slower than a laptop.
 
-`npm run test:e2e` runs 15 specs on desktop, tablet and phone: layouts, overflow, architecture switching, off-design in the worker, PWA manifest and service worker, share links, transient, transient start-up from shutdown, mission, maps, learn, optimise, uncertainty, gallery and the language toggle.
+`npm run test:e2e` builds the production PWA and exercises desktop, tablet and phone workflows, including exports, saved off-design values, custom-map portability, keyboard interaction, stale results and service-worker updates. At the 2026-10-15 release audit: 185 unit tests passed; 86 browser tests passed with four intentional duplicate PWA lifecycle skips. Later changes must be checked against their own results. Test artifacts are local and ignored.
 
 ## CI and dependencies
 
@@ -87,8 +91,14 @@ GitHub Actions (`ci.yml`) runs type-check, unit tests, build, Chromium install a
 
 ## Deployment
 
-`fly deploy --build-arg GIT_SHA=$(git rev-parse --short HEAD)` builds the multi-stage `Dockerfile` (the hash appears in the header as the build version) (Node 22 build, nginx 1.27 runtime) and updates the single machine in region `yyz`. `deploy/nginx.conf` serves `index.html` for all routes, caches hashed assets for a year, and never caches the service worker or manifest.
+`fly deploy --build-arg GIT_SHA=$(git rev-parse --short HEAD)` builds the multi-stage `Dockerfile` (the hash appears in the header as the build version) (Node 22 build, nginx 1.27 runtime) and updates the single machine in region `yyz`. `deploy/nginx.conf` serves `index.html` for all routes, caches hashed assets for a year, and marks the service worker, manifest and HTML for revalidation. The service worker separately precaches the app for offline use; an old installed client may initially show its cached build. Verify the header version and the live bundle after deployment. Startup, visibility and reconnect checks request updates, with offline failures handled.
 
 ## Regenerating validation data
 
 See [validation.md](validation.md). The Python environment is not part of the repository.
+
+## Licensing and publication
+
+`npm run licenses` assembles project, pyCycle and browser dependency license texts under `public/`; `npm run build` runs it automatically and precaches those files. Keep generated notices committed alongside dependency changes. Do not replace the pyCycle data license with MIT. See [../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) and [public-release.md](public-release.md).
+
+Run reference generators with `OPENMDAO_REPORTS=0` to avoid creating bulky HTML reports. `*_out/` and local Python environments are ignored; older generated reports are still tracked and must be addressed before publication. Neither Python nor its virtual environment is part of the deployed app.

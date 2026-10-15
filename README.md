@@ -2,11 +2,11 @@
 
 A gas-turbine engine laboratory that runs entirely in the browser. It is an installable progressive web app with no server-side code: the static bundle is served by nginx on Fly.io and every calculation, including the solvers, runs on the device.
 
-**Live:** https://gas-turbine-lab.fly.dev/
+**Live:** [gas-turbine-lab.fly.dev](https://gas-turbine-lab.fly.dev/)
 
 Build a **turbojet** (optionally afterburning), a **turbofan** (two or three spools, separate or mixed flow, direct-drive or geared fan) or a **free-turbine turboprop**, solve its design point, then run the fixed engine **off-design**, through **transients** with a control system, over a **mission**, through **optimisation** and **uncertainty** studies, and check **emissions and noise**. Results appear on an engine cross-section, a 3D cutaway, station tables, cycle diagrams, component maps and parametric sweeps. Everything can be compared, saved, shared as a link, exported to CSV or PNG, or written up as an engineering report.
 
-The thermodynamics are validated against NASA's pyCycle to better than 0.05 % at design and off-design; see [docs/validation.md](docs/validation.md).
+The documented design/off-design reference cases agree with NASA's pyCycle to the tolerances reported in [docs/validation.md](docs/validation.md).
 
 ## Documentation
 
@@ -16,6 +16,7 @@ The thermodynamics are validated against NASA's pyCycle to better than 0.05 % at
 | [docs/methods.md](docs/methods.md) | The physics: gas model, components, design and off-design solvers, transients, control, thermal, secondary air, mission, optimisation, estimates |
 | [docs/validation.md](docs/validation.md) | pyCycle reference cases, tolerances, how to regenerate the references, known differences |
 | [docs/development.md](docs/development.md) | Code layout, running and testing, CI, deployment, how to add an architecture, a map, a preset or a scenario |
+| [docs/public-release.md](docs/public-release.md) | Publication readiness, licensing boundaries and remaining release checks |
 | [CHANGELOG.md](CHANGELOG.md) | What was added, in order |
 
 ## Capabilities at a glance
@@ -28,14 +29,17 @@ The thermodynamics are validated against NASA's pyCycle to better than 0.05 % at
 
 **Design studies.** Mission analysis against an aircraft polar with ratings, Nelder–Mead optimisation with constraints, Monte Carlo uncertainty, weight and size estimates, installed performance, emissions (P3–T3 and ICAO LTO with CAEP/8 limits) and noise (jet and fan).
 
-**Catalogue.** 59 commercial engines calibrated to published take-off ratings, with provenance notes.
+**Catalogue.** 59 named engine models calibrated to nominal take-off ratings. Internal parameters and generic maps are estimates; per-entry primary-source citations are still being completed.
 
 **Interface.** Desktop, tablet and phone layouts; SI or US units; English or French; dark or light theme; guided teaching scenarios.
 
 ## Quick start
 
+Use Node.js 22.12 or newer (Node 22 is used by CI and Docker). Python is optional and used only to regenerate reference data locally.
+
 ```bash
-npm install
+npm ci
+npx playwright install chromium
 npm run dev        # http://localhost:5173
 npm test           # unit and validation tests (vitest)
 npm run test:e2e   # layout and feature tests in a headless browser (Playwright)
@@ -46,8 +50,12 @@ Deployment: `fly deploy --build-arg GIT_SHA=$(git rev-parse --short HEAD)` build
 
 ## Status and limits
 
-The design-point thermodynamics, the fixed-geometry off-design solver and the mixer match pyCycle to the stated tolerances. Everything else is physically based but not validated against an external reference: transients, control, thermal, secondary air, mission, optimisation and uncertainty use the validated cycle but their own models and defaults. Weight, emissions, noise, creep life and installation drag are correlation estimates and are labelled as such in the interface. The generic maps are not the catalogue engines' real maps, so off-design trends for a named engine are representative rather than engine-specific.
+Agreement with pyCycle covers the listed reference cases, not every architecture/configuration or an engine-test envelope. Everything else is physically based but not validated against an external reference: transients, control, thermal, secondary air, mission, optimisation and uncertainty use the validated cycle but their own models and defaults. Weight, emissions, noise, a temperature-only life proxy and installation drag are correlation estimates and are labelled as such in the interface. The generic maps are not the catalogue engines' real maps, so off-design trends for a named engine are representative rather than engine-specific.
 
 ## Licence and acknowledgements
 
-Thermodynamic coefficients and component maps are taken from NASA's open-source [pyCycle](https://github.com/OpenMDAO/pyCycle) (Apache-2.0). The catalogue uses only manufacturer-published nominal figures. No licence file has been added to this repository yet; it is private.
+Original project code and documentation are licensed under the [MIT License](LICENSE). Third-party material retains its own terms: in particular, the pyCycle-derived thermodynamic and map data remain Apache-2.0. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Production builds include `/LICENSE.txt` and `/THIRD_PARTY_NOTICES.txt`.
+
+The repository remains private pending the checks in [docs/public-release.md](docs/public-release.md). MIT licensing does not change GitHub visibility. `private: true` in `package.json` prevents accidental npm publication; it is independent of GitHub repository visibility.
+
+For development contributions, see [CONTRIBUTING.md](CONTRIBUTING.md); for sensitive reports, see [SECURITY.md](SECURITY.md). Manufacturer names identify the modeled products and do not imply affiliation or endorsement.

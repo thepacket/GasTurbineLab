@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "lighthouse": "lighthouse http://localhost:4173 --preset=desktop --output=html --output-path=./lighthouse.html --quiet"
+    "lighthouse": "lighthouse http://localhost:4173 --preset=desktop --output=html --output-path=./lighthouse.html --quiet",
+    "licenses": "node scripts/licenses.mjs",
+    "prebuild": "npm run licenses"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -30,5 +32,6 @@
     "typescript": "~7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.4"
-  }
+  },
+  "license": "MIT"
 }

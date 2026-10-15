@@ -9,3 +9,14 @@ test-results
 playwright-report
 lighthouse*.html
 lighthouse*.json
+
+# Local credentials and regenerated reference reports
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*_out/
+__pycache__/
+.venv/
+venv*/
