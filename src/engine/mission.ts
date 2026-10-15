@@ -20,7 +20,15 @@ export interface Segment {
 export interface Ratings { NLPmax: number; NHPmax: number; T4max_K: number } // engine limits applied when matching thrust
 export interface MissionInputs { aircraft: Aircraft; segments: Segment[]; od: OffDesignInputs; pointsPerSegment: number; ratings?: Ratings }
 export interface MissionPoint { t_s: number; dist_km: number; alt_m: number; mach: number; mass_kg: number; FnReq: number; Fn: number; Wf: number; T4: number; NHPpct: number; NLPpct: number; TSFC: number; converged: boolean; segment: string; limited: string | null }
-export interface MissionResult { points: MissionPoint[]; segments: { label: string; time_s: number; fuel_kg: number; dist_km: number }[]; totals: { time_s: number; fuel_kg: number; dist_km: number; blockFuelFrac: number }; warnings: string[] }
+export interface MissionResult {
+  points: MissionPoint[]; segments: { label: string; time_s: number; fuel_kg: number; dist_km: number }[];
+  totals: { time_s: number; fuel_kg: number; dist_km: number; blockFuelFrac: number }; warnings: string[];
+  /** every point converged and delivered the required thrust (within 2 %) */
+  feasible: boolean;
+  /** largest relative thrust shortfall over the mission, 0 when none */
+  maxShortfall: number;
+  unconvergedPoints: number;
+}
 
 export function runMission(dp: DesignPoint, mi: MissionInputs, progress?: (p: MissionPoint[]) => void): MissionResult {
   const ac = mi.aircraft;
@@ -85,7 +93,12 @@ export function runMission(dp: DesignPoint, mi: MissionInputs, progress?: (p: Mi
     progress?.(points);
   }
   const fuel = ac.mass_kg - mass;
-  return { points, segments: segOut, totals: { time_s: t, fuel_kg: fuel, dist_km: dist, blockFuelFrac: fuel / ac.mass_kg }, warnings };
+  const shortfalls = points.map((p) => (p.FnReq > 0 ? Math.max(0, 1 - p.Fn / p.FnReq) : 0));
+  const maxShortfall = Math.max(0, ...shortfalls);
+  const unconvergedPoints = points.filter((p) => !p.converged).length;
+  const feasible = unconvergedPoints === 0 && maxShortfall <= 0.02;
+  if (!feasible) warnings.unshift(`Mission infeasible: ${unconvergedPoints} unconverged point(s), maximum thrust shortfall ${(100 * maxShortfall).toFixed(0)} %. Fuel and time totals are for the flown profile and do not represent a completed mission.`);
+  return { points, segments: segOut, totals: { time_s: t, fuel_kg: fuel, dist_km: dist, blockFuelFrac: fuel / ac.mass_kg }, warnings, feasible, maxShortfall, unconvergedPoints };
 }
 
 /** Aircraft mass scaled so the engines give a thrust/weight ratio of ~0.28 at sea level (power loading ~ 0.17 kW/kg for turboprops). */

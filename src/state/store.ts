@@ -4,8 +4,8 @@ import { defaultInputs } from '../engine/defaults';
 import { solveEngine } from '../engine/cycle';
 import { OffDesignInputs } from '../engine/offdesign';
 import { request } from '../engine/client';
-import { decodeShare } from '../ui/share';
-import { loadCustomMaps } from '../engine/custommaps';
+import { decodeShare, sanitizeShared } from '../ui/share';
+import { loadCustomMaps, saveCustomMaps } from '../engine/custommaps';
 loadCustomMaps();
 
 export type View = 'build' | 'section' | 'model' | 'results' | 'explore' | 'compare' | 'transient' | 'mission' | 'optimize' | 'uncertainty' | 'maps' | 'gallery' | 'learn' | 'validate';
@@ -93,9 +93,15 @@ export function useEngineStore() {
   // a shared link (#d=...) overrides the stored state once
   useEffect(() => {
     if (!location.hash.startsWith('#d=')) return;
-    decodeShare(location.hash).then((d) => {
+    decodeShare(location.hash).then((raw) => {
+      const d = sanitizeShared(raw, defaultInputs);
       if (!d) return;
-      const inputs = { ...defaultInputs(d.inputs.arch), ...d.inputs };
+      const inputs = d.inputs;
+      if (d.maps?.length) { // custom maps carried by the link: register and keep them
+        const existing = loadCustomMaps();
+        const merged = [...existing.filter((m) => !d.maps!.some((n) => n.id === m.id)), ...d.maps.map((m) => ({ id: m.id, name: m.id.split(':')[1] ?? m.id, kind: m.kind, data: m.data as any }))];
+        saveCustomMaps(merged);
+      }
       dispatch({ type: 'load', state: { inputs, od: d.od ?? odFromDesign(inputs), mode: d.mode ?? 'design', note: d.note ?? null, compare: d.compare ?? null } });
       history.replaceState(null, '', location.pathname);
     });

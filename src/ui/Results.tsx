@@ -99,7 +99,7 @@ export function Results({ store, result }: { store: Store; result: EngineResult 
         <div className="kv">
           <span className="k">NOx emission index</span><span className="v">{fmt(p.EI_NOx_g_kg, 1)} g/kg fuel · {fmt(p.NOx_g_s, 2)} g/s</span>
           <span className="k">CO emission index</span><span className="v">{fmt(p.EI_CO_g_kg, 1)} g/kg fuel · {fmt(p.CO_g_s, 2)} g/s</span>
-          <span className="k">CO₂</span><span className="v">{fmt(p.CO2_g_s / 1000, 2)} kg/s · {fmt((p.CO2_g_s * 3.6) / 1000, 0)} kg/h</span>
+          <span className="k">CO₂</span><span className="v">{fmt(p.CO2_g_s / 1000, 2)} kg/s · {fmt(p.CO2_g_s * 3.6, 0)} kg/h</span>
           <span className="k">Jet mixing noise, OASPL at 1 m</span><span className="v">{fmt(p.jetNoise_dB, 0)} dB · at 100 m {fmt(p.jetNoise_dB - 40, 0)} dB</span>
         </div>
       </div>

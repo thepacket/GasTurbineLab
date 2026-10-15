@@ -40,6 +40,7 @@ export function runOptimization(base: EngineInputs, oi: OptimizeInputs, progress
     evals++;
     let r; try { r = solveEngine(inp); } catch { return { f: 1e9, pen: 1e9, feasible: false }; }
     let f: number;
+    let missionPen = 0;
     switch (oi.objective) {
       case 'tsfc': f = r.perf.TSFC_mg_Ns; break;
       case 'specificThrust': f = -r.perf.specificThrust; break;
@@ -47,11 +48,16 @@ export function runOptimization(base: EngineInputs, oi: OptimizeInputs, progress
       case 'thermalEff': f = -r.perf.thermalEff * 100; break;
       case 'missionFuel': {
         if (!oi.mission) { f = r.perf.TSFC_mg_Ns; break; }
-        try { const dp = makeDesignPoint(inp); const m = runMission(dp, oi.mission); f = m.totals.fuel_kg; if (m.warnings.some((w) => w.includes('exceeds available'))) f *= 1.05; } catch { f = 1e9; }
+        try {
+          const dp = makeDesignPoint(inp); const m = runMission(dp, oi.mission); f = m.totals.fuel_kg;
+          // mission completion is a hard constraint: a thrust shortfall or an unconverged point is infeasible,
+          // with a penalty that grows with the shortfall so the simplex is pushed back toward feasibility
+          if (!m.feasible) missionPen = 1 + 50 * m.maxShortfall + m.unconvergedPoints;
+        } catch { f = 1e9; missionPen = 10; }
         break;
       }
     }
-    let pen = 0;
+    let pen = missionPen;
     const T3 = r.stations.find((s) => s.id === '3')!.Tt;
     for (const c of oi.constraints) {
       if (c.kind === 'T3max' && T3 > c.value) pen += Math.pow((T3 - c.value) / 50, 2);

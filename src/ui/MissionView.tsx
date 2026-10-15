@@ -74,6 +74,7 @@ export function MissionView({ store }: { store: Store }) {
       {res && res.warnings.length > 8 && <div className="warn"><span>⚠</span><span>{res.warnings.length - 8} more warnings.</span></div>}
       {res && (
         <div className="cards">
+          <div className="card hero" style={{ borderColor: res.feasible ? 'var(--good)' : 'var(--bad)' }}><div className="k">Mission {res.feasible ? 'feasible' : 'infeasible'}</div><div className="v" style={{ fontSize: 16 }}>{res.feasible ? 'All points converged and the required thrust was delivered.' : `Thrust shortfall up to ${fmt(100 * res.maxShortfall, 0)} %${res.unconvergedPoints ? `, ${res.unconvergedPoints} unconverged point(s)` : ''}. The totals below are for the flown profile, not a completed mission.`}</div></div>
           <div className="card hero"><div className="k">Block fuel</div><div className="v">{fmt(res.totals.fuel_kg, 0)}<small>kg · {fmt(res.totals.blockFuelFrac * 100, 1)} % of take-off mass</small></div></div>
           <div className="card"><div className="k">Block time</div><div className="v">{fmt(res.totals.time_s / 60, 0)}<small>min</small></div></div>
           <div className="card"><div className="k">Distance</div><div className="v">{fmt(res.totals.dist_km, 0)}<small>km</small></div></div>

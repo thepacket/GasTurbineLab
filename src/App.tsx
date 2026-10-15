@@ -19,6 +19,7 @@ import { shareUrl } from './ui/share';
 import { t, getLang, setLang, initLang, onLangChange } from './ui/i18n';
 import { openReport } from './ui/Report';
 import { svgToPng } from './ui/exportImage';
+import { loadCustomMaps } from './engine/custommaps';
 initLang();
 import { EngineResult } from './engine/types';
 
@@ -62,7 +63,10 @@ export default function App() {
   useEffect(() => onLangChange(() => setLangTick((x) => x + 1)), []);
   const exportSection = () => { const svg = document.querySelector('svg.cross') as SVGSVGElement | null; if (svg) svgToPng(svg, 'gas-turbine-lab-section.png').catch(() => {}); };
   const share = async () => {
-    const url = await shareUrl({ inputs: store.state.inputs, od: store.state.od, mode: store.state.mode, note: store.state.note, compare: store.state.compare });
+    // custom maps referenced by the design travel with the link so the recipient can solve off-design
+    const used = new Set(Object.values(store.state.inputs.mapIds ?? {}).filter((id) => id.startsWith('custom:')));
+    const maps = loadCustomMaps().filter((m) => used.has(m.id)).map((m) => ({ id: m.id, kind: m.kind, data: m.data }));
+    const url = await shareUrl({ inputs: store.state.inputs, od: store.state.od, mode: store.state.mode, note: store.state.note, compare: store.state.compare, maps: maps.length ? maps : undefined });
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { prompt('Copy this link', url); }
   };
 
