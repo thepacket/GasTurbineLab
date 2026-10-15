@@ -177,6 +177,8 @@ function ValueRow({ k, v, units = 'SI' }: { k: string; v: number; units?: 'SI' |
   else if (k.endsWith('_m')) { label = k.slice(0, -2); text = j(u.length(v)); }
   else if (k.endsWith('_W_m2')) { label = k.slice(0, -5); text = fmt(v / 1000, 1) + ' kW/m²'; }
   else if (k === 'choked') text = v ? 'yes' : 'no';
+  else if (k === 'offMap') { label = 'beyond map range'; text = v ? 'yes' : 'no'; }
+  else if (k === 'subAmbient') { label = 'Pt below ambient'; text = v ? 'yes' : 'no'; }
   else if (k.endsWith('_pct')) { label = k.slice(0, -4); text = fmt(v, 1) + ' %'; }
   else if (k === 'rpm' || k.endsWith('_rpm') || k.startsWith('N_')) text = fmt(v, 0) + ' rpm';
   else if (k.endsWith('_Pa')) { label = k.slice(0, -3); text = j(u.pressure(v)); }

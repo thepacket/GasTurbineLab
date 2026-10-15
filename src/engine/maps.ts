@@ -34,6 +34,8 @@ function locate(xs: number[], x: number): number {
   return i;
 }
 
+/** flow gain available beyond the last tabulated R-line, as a fraction of the last R-line step (choke-side extension) */
+export const CHOKE_FLOW_GAIN = 0.5;
 export interface CompScalars { sNc: number; sPR: number; sEff: number; sWc: number }
 export interface TurbScalars { sNp: number; sPR: number; sEff: number; sWp: number }
 
@@ -44,10 +46,22 @@ export class CompressorMap {
   raw(Nc: number, Rline: number): { Wc: number; PR: number; eff: number } {
     const NcMin = this.d.NcMap[0];
     if (Nc < NcMin) {
-      // sub-idle extension: flow ~ speed, pressure rise ~ speed², efficiency falls toward zero speed (windmilling branch is PR < 1 at zero speed)
+      // sub-idle extension: flow ~ speed, pressure rise ~ speed², efficiency falls toward zero speed.  The windmilling
+      // loss (the blading acting as a resistance) scales with the dynamic head of the through-flow, i.e. with f², so a
+      // starter-driven compressor at static conditions keeps a small positive pressure rise instead of a fixed −2 %.
       const f = Math.max(Nc, 0) / NcMin;
       const b = this.raw(NcMin, Rline);
-      return { Wc: b.Wc * f, PR: 1 + (b.PR - 1) * f * f - 0.02 * (1 - f), eff: b.eff * (0.35 + 0.65 * f) };
+      return { Wc: b.Wc * f, PR: 1 + f * f * ((b.PR - 1) - 0.02 * (1 - f)), eff: b.eff * (0.35 + 0.65 * f) };
+    }
+    const rhi = this.d.RlineMap[this.d.RlineMap.length - 1];
+    if (Rline > rhi) {
+      // choke-side extension: the last tabulated R-line is close to choke, so the flow saturates (a near-vertical choke
+      // line, gaining at most CHOKE_FLOW_GAIN of the last R-line step) while the pressure ratio and efficiency keep
+      // falling, steepening with distance.  This is the throttled branch of a choked compressor, flagged offMap by the
+      // off-design solver.
+      const e = this.raw(Nc, rhi), p = this.raw(Nc, rhi - 1);
+      const s = Rline - rhi;
+      return { Wc: e.Wc + (e.Wc - p.Wc) * CHOKE_FLOW_GAIN * (1 - Math.exp(-s / CHOKE_FLOW_GAIN)), PR: e.PR + (e.PR - p.PR) * s * (1 + 0.5 * s), eff: Math.max(0.2, e.eff + (e.eff - p.eff) * s) };
     }
     return { Wc: interp2(this.d.NcMap, this.d.RlineMap, this.d.WcMap[0], Nc, Rline), PR: interp2(this.d.NcMap, this.d.RlineMap, this.d.PRmap[0], Nc, Rline), eff: interp2(this.d.NcMap, this.d.RlineMap, this.d.effMap[0], Nc, Rline) };
   }

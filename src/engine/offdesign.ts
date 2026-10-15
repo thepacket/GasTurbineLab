@@ -20,7 +20,21 @@ export interface OffDesignInputs {
   installation?: boolean; // installed thrust in the Fn throttle target
   /** multiplicative deltas on component efficiency and flow (e.g. from tip-clearance changes): id -> {eff, Wc} */
   deltas?: Record<string, { eff?: number; Wc?: number }>;
+  /** false = burner not lit (start-up before ignition): zero fuel and zero heat release whatever the throttle says */
+  burnerLit?: boolean;
 }
+/** R-line band (map units) below the first tabulated R-line (stall side) over which the map is extrapolated linearly before the solver is clamped. */
+export const RLINE_BAND_STALL = 1.0;
+/** R-line band above the last tabulated R-line (choke side) over which the choke-side extension of the map is used before the solver is clamped. */
+export const RLINE_BAND_CHOKE = 3.0;
+/** Burner and duct pressure-loss fractions are held at their design value (pyCycle convention) down to this fraction of the
+ *  design corrected flow and scale with dynamic head (corrected flow squared) below it, so that the sub-idle gas path has a
+ *  physical through-flow solution. */
+export const LOSS_CONST_ABOVE = 0.5;
+/** smallest turbine expansion ratio the solver may ask for */
+const TURB_PR_MIN = 1.001;
+/** dummy value the fuel/air unknown is driven to while the burner is unlit (the burner itself runs at FAR = 0) */
+const UNLIT_FAR = 1e-3;
 export interface SolveOptions {
   /** transient mode: spool speeds are states, not unknowns; shaft power imbalance is reported instead */
   fixedSpeeds?: { LP: number; IP: number; HP: number };
@@ -94,37 +108,62 @@ export function unknownNames(inp: EngineInputs): string[] {
   return u;
 }
 
-function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>, opt: SolveOptions = {}): Provider {
+/** Provider plus the physical flow-matching error of every compressor, kept apart from the R-line penalty. */
+type OdProvider = Provider & { flowErr: Record<string, number> };
+function offDesignProvider(dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>, opt: SolveOptions = {}): OdProvider {
   const inp = dp.inputs;
   const residuals: Record<string, number> = {};
+  const flowErr: Record<string, number> = {};
   const fs = opt.fixedSpeeds;
   const speeds = fs ? { ...fs, PT: inp.speeds.PT } : { LP: x.N_LP ?? inp.speeds.LP, IP: x.N_IP ?? inp.speeds.IP, HP: x.N_HP, PT: inp.speeds.PT };
   const geometry = { ...inp.geometry, ...(od.geometry ?? {}) };
   return {
-    W: x.W, BPR: x.BPR ?? inp.BPR, speeds, residuals, geometry, sasAreas: dp.sasAreas, designHptPR: dp.designHptPR,
+    W: x.W, BPR: x.BPR ?? inp.BPR, speeds, residuals, flowErr, geometry, sasAreas: dp.sasAreas, designHptPR: dp.designHptPR,
     compressor: (id, inlet, N, _d) => {
       const c = dp.comps[id];
       const Nc = correctedSpeed(N, inlet.Tt);
-      // maps extrapolate linearly beyond their tabulated R-line range (a soft bound keeps the solver sane);
-      // operation beyond the stall line shows up as a negative surge margin.
+      // The map is read at the solver's R-line: linearly extrapolated up to RLINE_BAND_STALL below the tabulated range
+      // (past the stall line: negative surge margin) and on the choke-side extension up to RLINE_BAND_CHOKE above it;
+      // both are flagged offMap.  Beyond the bands the R-line is clamped and a penalty steers the solver back; the
+      // physical flow-matching error is recorded separately in flowErr so that the penalty can never cancel it and
+      // fake convergence.
       const [rlo, rhi] = c.map.RlineRange;
-      const Rl = Math.min(rhi, Math.max(rlo, x['Rl_' + id])); // clamped to the tabulated R-lines; the penalty term below keeps the solver consistent
+      const RlRaw = x['Rl_' + id];
+      const Rl = Math.min(rhi + RLINE_BAND_CHOKE, Math.max(rlo - RLINE_BAND_STALL, RlRaw));
       const m = c.map.read(c.sc, Nc, Rl);
       const d = od.deltas?.[id];
       const vsv = ((id === 'fan' || id === 'hpc' || id === 'comp') ? 1 + geometry.vsvFlowGain * (Nc / c.NcDes - 1) : 1) * (d?.Wc ?? 1);
       const Wc = correctedFlow(inlet.W, inlet.Tt, inlet.Pt);
-      const pen = (x['Rl_' + id] - Rl);
-      return { PR: m.PR, eff: m.eff * (d?.eff ?? 1), residual: (m.Wc * vsv) / Wc - 1 + pen, extra: { Nc_pct: 100 * (Nc / c.NcDes), Rline: Rl, surgeMargin_pct: c.map.surgeMargin(c.sc, Nc, Rl), rpm: N, Wc, effDelta: (d?.eff ?? 1) - 1 } };
+      const flow = (m.Wc * vsv) / Wc - 1;
+      const pen = RlRaw - Rl;
+      flowErr[id] = flow;
+      const offMap = Rl < rlo || Rl > rhi ? 1 : 0;
+      return { PR: m.PR, eff: m.eff * (d?.eff ?? 1), residual: flow + pen, extra: { Nc_pct: 100 * (Nc / c.NcDes), Rline: Rl, offMap, surgeMargin_pct: c.map.surgeMargin(c.sc, Nc, Rl), rpm: N, Wc, WcMap: m.Wc * vsv, effDelta: (d?.eff ?? 1) - 1 } };
     },
     turbine: (id, inlet, N, _cooling: TurbineStream[], _d, _powerReq, _PRmax) => {
       const t = dp.turbs[id];
-      const PR = Math.max(1.01, x['PR_' + id]);
+      const PRraw = x['PR_' + id];
+      const PR = Math.max(TURB_PR_MIN, PRraw);
       const m = t.map.read(t.sc, paramSpeed(N, inlet.Tt), PR);
       const d = od.deltas?.[id];
       const Wp = paramFlow(inlet.W, inlet.Tt, inlet.Pt);
-      return { PR, eff: m.eff * (d?.eff ?? 1), residual: (m.Wp * (d?.Wc ?? 1)) / Wp - 1, extra: { Np_pct: 100 * m.NpMap / t.map.d.defaults.NpMap, rpm: N, effDelta: (d?.eff ?? 1) - 1 } };
+      // as for the compressors: the flow-matching error is tracked apart from the floor penalty
+      const flow = (m.Wp * (d?.Wc ?? 1)) / Wp - 1;
+      flowErr[id] = flow;
+      return { PR, eff: m.eff * (d?.eff ?? 1), residual: flow + (PRraw - PR), extra: { Np_pct: 100 * m.NpMap / t.map.d.defaults.NpMap, rpm: N, WpMap: m.Wp * (d?.Wc ?? 1), Wp, effDelta: (d?.eff ?? 1) - 1 } };
+    },
+    lossScale: (sid, f) => {
+      const s = dp.result.stations.find((q) => q.id === sid);
+      if (!s) return 1;
+      const r = correctedFlow(f.W, f.Tt, f.Pt) / correctedFlow(s.W, s.Tt, s.Pt) / LOSS_CONST_ABOVE;
+      return r >= 1 ? 1 : r * r;
     },
     burner: (_id, inlet: Flow, d) => {
+      if (od.burnerLit === false) {
+        // unlit: no fuel and no heat release; the FAR unknown is parked at a dummy value so the system stays square
+        const b0 = burnerAtFAR(inlet, 0, d.dPqP, d.eff, d.hFuel, d.LHV);
+        return { ...b0, residual: x.FAR / UNLIT_FAR - 1 };
+      }
       const b = burnerAtFAR(inlet, x.FAR, d.dPqP, d.eff, d.hFuel, d.LHV);
       let residual = 0;
       if (od.throttle.mode === 'T4') residual = b.out.Tt / od.throttle.value - 1;
@@ -170,7 +209,7 @@ export function debugResiduals(dp: DesignPoint, od: OffDesignInputs, x: Record<s
 
 export interface OffDesignSolution { result: EngineResult; converged: boolean; iterations: number; norm: number; x: Record<string, number> }
 
-function residualVector(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>, opt: SolveOptions): { r: number[]; names: string[]; result: EngineResult } {
+function residualVector(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x: Record<string, number>, opt: SolveOptions): { r: number[]; names: string[]; result: EngineResult; flowErr: Record<string, number> } {
   const prov = offDesignProvider(dp, od, x, opt);
   const result = evaluate(inp, prov);
   if (od.throttle.mode === 'Fn') prov.residuals.burner = (od.installation ? result.perf.installedFn : result.perf.Fn) / od.throttle.value - 1;
@@ -182,7 +221,7 @@ function residualVector(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs,
     result.offDesign = { converged: false, iterations: 0, residualNorm: 0, throttle: '', x, shaftImbalance_W: imb };
   }
   const names = Object.keys(prov.residuals).sort();
-  return { r: names.map((n) => prov.residuals[n]), names, result };
+  return { r: names.map((n) => prov.residuals[n]), names, result, flowErr: prov.flowErr };
 }
 
 /** Solve the off-design point. Uses Newton with backtracking and, if needed, continuation in the throttle from the design value. */
@@ -265,9 +304,13 @@ function newton(inp: EngineInputs, dp: DesignPoint, od: OffDesignInputs, x0: Rec
     if (!accepted) break;
     if ((globalThis as any).__OD_TRACE) console.log('  it', it, 'norm', norm.toExponential(2), 'lam', lam.toFixed(3), JSON.stringify(Object.fromEntries(Object.entries(x).map(([k, v]) => [k, +v.toPrecision(5)]))));
   }
-  const converged = norm < 1e-6;
+  // convergence needs the physical flow match of every compressor, not just the penalised residual vector
+  const flowMismatch = Math.max(0, ...Object.values(cur.flowErr).map(Math.abs));
   const result = cur.result;
-  result.offDesign = { ...(result.offDesign ?? {}), converged, iterations: it, residualNorm: norm, throttle: `${od.throttle.mode} ${od.throttle.value}`, x };
+  const subAmbient = result.components.some((c) => c.kind === 'nozzle' && c.values.subAmbient);
+  const converged = norm < 1e-6 && flowMismatch < 1e-6 && !subAmbient;
+  const mapViolations = result.components.filter((c) => (c.kind === 'compressor' && c.values.offMap) || (c.kind === 'nozzle' && c.values.subAmbient)).map((c) => c.id);
+  result.offDesign = { ...(result.offDesign ?? {}), converged, iterations: it, residualNorm: norm, flowMismatch, mapViolations, throttle: `${od.throttle.mode} ${od.throttle.value}`, x };
   return { result, converged, iterations: it, norm, x };
 }
 

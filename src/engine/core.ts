@@ -7,7 +7,7 @@
 import { Gas, FUELS, warFromRH } from './gas';
 import { isa } from './atmosphere';
 import { Flow, staticFromMN, totalFromStatic, StaticState } from './flow';
-import { compressor, turbineAtPR, turbineForPower, burnerToT, nozzle, mixer, TurbineStream, BurnerOut } from './components';
+import { compressor, turbineAtPR, turbineForPower, burnerToT, nozzle, mixer, TurbineStream, BurnerOut, NOZZLE_CAP } from './components';
 import { EngineInputs, EngineResult, Station, ComponentResult, Performance, ShaftResult } from './types';
 
 export interface CompOp { PR: number; eff: number; residual?: number; extra?: Record<string, number> }
@@ -28,6 +28,8 @@ export interface Provider {
   /** fixed mixer areas in off-design */
   mixerAreas(): { Acore: number; Abyp: number } | undefined;
   residuals: Record<string, number>;
+  /** multiplier on a duct / burner pressure-loss fraction at the station feeding it (1 at design; off-design scales with dynamic head at low corrected flow) */
+  lossScale?(stationId: string, flow: Flow): number;
   /** effective variable geometry / bleed settings for this evaluation */
   geometry: EngineInputs['geometry'];
   /** secondary-air orifice areas (Cd·A, m²) sized at the design point; undefined at design */
@@ -121,10 +123,11 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   stations.push(station('0', 'Free stream', f0, { Ts: amb.T, Ps: amb.P, V: V0, MN: inp.flight.mach, A: V0 > 0 ? W0 / (amb.rho * V0) : Infinity, rho: amb.rho }, 0.0, 'ambient'));
 
   // ---- inlet
-  const f2: Flow = { ...f0, Pt: f0.Pt * inp.inlet.ramRecovery };
+  const ramRecovery = 1 - (1 - inp.inlet.ramRecovery) * (prov.lossScale?.('0', f0) ?? 1);
+  const f2: Flow = { ...f0, Pt: f0.Pt * ramRecovery };
   const st2 = staticFromMN(f2, inp.inlet.MN);
   const ramDrag = W0 * V0;
-  components.push({ id: 'inlet', kind: 'inlet', name: 'Inlet', values: { ramRecovery: inp.inlet.ramRecovery, ramDrag_N: ramDrag, Pt_ratio: f2.Pt / amb.P } });
+  components.push({ id: 'inlet', kind: 'inlet', name: 'Inlet', values: { ramRecovery, ramDrag_N: ramDrag, Pt_ratio: f2.Pt / amb.P } });
 
   const perf: Performance = {
     Fn: 0, Fg: 0, ramDrag, Fg_core: 0, Fg_byp: 0, TSFC_kg_Nh: 0, TSFC_mg_Ns: 0, Wfuel: 0, specificThrust: 0, OPR: 1, FAR: 0,
@@ -141,6 +144,7 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   const compValues = (id: string, name: string, op: CompOp, c: ReturnType<typeof compressor>) => {
     const v: Record<string, number> = { PR: op.PR, eff: op.eff, effPoly: c.effPoly, power_W: c.power, Tt_out: c.out.Tt, ...(op.extra ?? {}) };
     components.push({ id, kind: 'compressor', name, values: v });
+    if (op.extra?.offMap) warnings.push(`${name} runs beyond the tabulated R-line range of its map (R-line ${op.extra.Rline.toFixed(2)}, surge margin ${op.extra.surgeMargin_pct.toFixed(1)} %): the map is extrapolated and the result is outside the supported operating range.`);
   };
   const turbValues = (id: string, name: string, op: TurbOp, power: number, Tt: number) => {
     components.push({ id, kind: 'turbine', name, values: { PR: op.PR, eff: op.eff, power_W: power, Tt_out: Tt, ...(op.extra ?? {}) } });
@@ -151,7 +155,11 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
   };
   const nozzleBlock = (id: string, name: string, f: Flow, type: 'CV' | 'CD', Cv: number, key: string) => {
     const n = nozzle(f, amb.P, type, Cv);
-    components.push({ id, kind: 'nozzle', name, values: { PR: n.PR, choked: n.choked ? 1 : 0, Fg_N: n.Fg, [`V${key}`]: n.exit.V, [`A${key}_m2`]: n.exit.A, Ath_m2: n.throat.A, Cv } });
+    // the nozzle model caps its back pressure at 0.995·Pt so areas stay finite; a solution resting on that cap has no
+    // physical through-flow and is flagged so the off-design solver does not report it as converged
+    const subAmbient = n.PR < 1 / NOZZLE_CAP ? 1 : 0;
+    components.push({ id, kind: 'nozzle', name, values: { PR: n.PR, choked: n.choked ? 1 : 0, subAmbient, Fg_N: n.Fg, [`V${key}`]: n.exit.V, [`A${key}_m2`]: n.exit.A, Ath_m2: n.throat.A, Cv } });
+    if (subAmbient) warnings.push(`${name}: total pressure below ambient (Pt/Pamb ${n.PR.toFixed(3)}); no physical through-flow at this state.`);
     const Ades = prov.nozzleArea(id);
     if (Ades !== undefined) R[id + '_area'] = n.throat.A / Ades - 1;
     kineticPowerOut += 0.5 * f.W * (n.Fg / f.W) ** 2;
@@ -188,11 +196,12 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     compValues('comp', 'Compressor', op, c);
     if (geom.customerBleed_kgs > 0 || geom.handlingBleedFrac > 0) components[components.length - 1].values.bleed_kgs = c.bleeds[2].W + c.out.W * geom.handlingBleedFrac;
     T3 = f3.Tt; P3 = f3.Pt;
-    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel, LHV });
+    const dPqPb = inp.burner.dPqP * (prov.lossScale?.('3', f3) ?? 1);
+    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: dPqPb, eff: inp.burner.eff, hFuel, LHV });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'Turbine inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.56));
-    burnerBlock('burner', 'Combustor', b, inp.burner.dPqP);
+    burnerBlock('burner', 'Combustor', b, dPqPb);
     const req = (c.power + hpx) / inp.mechEff;
     const coolingTJ: TurbineStream[] = [{ flow: c.bleeds[0], fracP: 1 }, { flow: c.bleeds[1], fracP: 0 }];
     const top = prov.turbine('turb', b.out, N, coolingTJ, inp.hpt, req, PRavail(b.out.Pt));
@@ -279,11 +288,12 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     if (Whb > 0) components[components.length - 1].values.handlingBleed_kgs = Whb;
     T3 = hpc.out.Tt; P3 = hpc.out.Pt;
     if (hpc.out.Tt > 950) warnings.push(`HPC exit temperature ${hpc.out.Tt.toFixed(0)} K exceeds typical material limits (~950 K).`);
-    const b = prov.burner('burner', hpc.out, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel, LHV });
+    const dPqPb = inp.burner.dPqP * (prov.lossScale?.('3', hpc.out) ?? 1);
+    const b = prov.burner('burner', hpc.out, { T4: inp.burner.T4_K, dPqP: dPqPb, eff: inp.burner.eff, hFuel, LHV });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'HPT inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.59));
-    burnerBlock('burner', 'Combustor', b, inp.burner.dPqP);
+    burnerBlock('burner', 'Combustor', b, dPqPb);
     const cooling: TurbineStream[] = [{ flow: hpc.bleeds[0], fracP: 1 }, { flow: hpc.bleeds[1], fracP: 0 }];
     const reqHP = (hpc.power + hpx) / inp.mechEff;
     const hop2 = prov.turbine('hpt', b.out, Nhp, cooling, inp.hpt, reqHP, PRavail(b.out.Pt) / (three ? 1.6 : 1.3));
@@ -315,7 +325,7 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     stations.push(station('5', 'LPT exit', lpt.out, staticFromMN(lpt.out, inp.lpt.MN), 0.76));
     turbValues('lpt', 'LP turbine', lop2, lpt.power, lpt.out.Tt);
     shafts.push({ name: 'LP shaft', powerIn_W: lpt.power * inp.mechEff, powerOut_W: fanShaftPower + lpPower, turbinePR: lop2.PR, rpm: Nlp, outputRpm: inp.fanGear.ratio !== 1 ? Nfan : undefined });
-    let f17: Flow = { ...f13, Pt: f13.Pt * (1 - inp.bypDuct_dPqP) };
+    let f17: Flow = { ...f13, Pt: f13.Pt * (1 - inp.bypDuct_dPqP * (prov.lossScale?.('13', f13) ?? 1)) };
     if (Whb > 0) { // bleed air mixes into the bypass duct at bypass pressure
       const ht = (f17.W * f17.ht + Whb * f25.ht) / (f17.W + Whb);
       const Tt = f17.gas.TfromH(ht, f17.Pt, f17.Tt + 20);
@@ -324,8 +334,9 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     if (inp.mixed) {
       stations.push(station('17', 'Bypass duct exit', f17, staticFromMN(f17, 0.45), 0.72, 'bypass'));
       const areas = prov.mixerAreas();
-      const m = mixer(lpt.out, f17, areas ? { Acore: areas.Acore, Abyp: areas.Abyp } : inp.mixer.designedStream === 'core' ? { MNbyp: inp.mixer.MNbyp ?? 0.45 } : { MNcore: inp.mixer.MNcore }, inp.mixer.dPqP);
+      const m = mixer(lpt.out, f17, areas ? { Acore: areas.Acore, Abyp: areas.Abyp } : inp.mixer.designedStream === 'core' ? { MNbyp: inp.mixer.MNbyp ?? 0.45 } : { MNcore: inp.mixer.MNcore }, inp.mixer.dPqP * (prov.lossScale?.('5', lpt.out) ?? 1));
       if (areas) R.mixer_ps = m.PsCore / m.PsByp - 1;
+      else if (Math.abs(m.PsCore / m.PsByp - 1) > 0.01) warnings.push(`Mixer: the core and bypass static pressures cannot be balanced at the design point (${(m.PsCore / 1000).toFixed(1)} vs ${(m.PsByp / 1000).toFixed(1)} kPa): the stream with the lower total pressure is capped at its total pressure. Change the fan pressure ratio, the overall pressure ratio or the turbine work split.`);
       components.push({ id: 'mixer', kind: 'mixer', name: 'Mixer', values: { MNcore: m.MNcore, MNbyp: m.MNbyp, MNmixed: m.MNout, Acore_m2: m.Acore, Abyp_m2: m.Abyp, Ps_core_Pa: m.PsCore, Ps_byp_Pa: m.PsByp, Pt_loss: m.PtLoss, Tt_out: m.out.Tt } });
       stations.push(station('6', 'Mixer exit', m.out, staticFromMN(m.out, m.MNout), 0.84));
       let fNoz = m.out;
@@ -360,11 +371,12 @@ export function evaluate(inp: EngineInputs, prov: Provider): EngineResult {
     stations.push(station('3', 'Compressor exit', f3, staticFromMN(f3, inp.comp.MN), 0.50));
     compValues('comp', 'Compressor', op, c);
     T3 = f3.Tt; P3 = f3.Pt;
-    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: inp.burner.dPqP, eff: inp.burner.eff, hFuel, LHV });
+    const dPqPb = inp.burner.dPqP * (prov.lossScale?.('3', f3) ?? 1);
+    const b = prov.burner('burner', f3, { T4: inp.burner.T4_K, dPqP: dPqPb, eff: inp.burner.eff, hFuel, LHV });
     if (b.residual !== undefined) R.burner = b.residual;
     Wfuel += b.Wfuel;
     stations.push(station('4', 'Turbine inlet', b.out, staticFromMN(b.out, inp.burner.MN), 0.62));
-    burnerBlock('burner', 'Combustor', b, inp.burner.dPqP);
+    burnerBlock('burner', 'Combustor', b, dPqPb);
     const req = (c.power + hpx) / inp.mechEff;
     const coolingTP: TurbineStream[] = [{ flow: c.bleeds[0], fracP: 1 }, { flow: c.bleeds[1], fracP: 0 }];
     const top = prov.turbine('turb', b.out, Nhp, coolingTP, inp.hpt, req, PRavail(b.out.Pt) / 1.2);

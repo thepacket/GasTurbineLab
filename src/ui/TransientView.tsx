@@ -33,20 +33,23 @@ export function TransientView({ store }: { store: Store }) {
   const s = (pick: (x: TransientSample) => number, name: string, c = 0): Series => ({ name, color: colors[c], points: samples.map((x) => ({ x: x.t, y: pick(x) })) });
   const spools = samples[0] ? Object.keys(samples[0].Npct) : [];
   const comps = samples[0] ? Object.keys(samples[0].SM) : [];
-  const minSM = comps.map((c) => ({ c, v: Math.min(...samples.map((x) => x.SM[c])) }));
+  const minSM = comps.map((c) => ({ c, v: Math.min(...samples.filter((x) => x.gasPath).map((x) => x.SM[c])) }));
   const Set = (k: keyof FuelSchedule, v: number) => setSch({ ...sch, [k]: v });
+  const manualLimiter = (ctl.limiter ?? 'schedule') === 'manual';
+  const starterOnly = samples.filter((x) => !x.gasPath);
+  const unconverged = samples.filter((x) => x.gasPath && !x.converged).length;
   return (
     <div>
       <div className="explore-controls">
         <strong>Transient <Provenance level="model" /></strong>
         <label>Start T4 <input className="num" type="number" aria-label="Start T4" style={{ width: 80 }} value={sch.T4start} step={10} onChange={(e) => Set('T4start', +e.target.value)} /> K</label>
         <label>Final fuel <input className="num" type="number" aria-label="Final fuel fraction" style={{ width: 70 }} value={sch.WfEndFrac} step={0.05} onChange={(e) => Set('WfEndFrac', +e.target.value)} /> × design</label>
-        <label>Ramp start <input className="num" type="number" aria-label="Ramp start" style={{ width: 60 }} value={sch.rampStart_s} step={0.1} onChange={(e) => Set('rampStart_s', +e.target.value)} /> s</label>
+        <label>Ramp start{start.enabled ? ' after light-off' : ''} <input className="num" type="number" aria-label="Ramp start" style={{ width: 60 }} value={sch.rampStart_s} step={0.1} onChange={(e) => Set('rampStart_s', +e.target.value)} /> s</label>
         <label>Ramp time <input className="num" type="number" aria-label="Ramp duration" style={{ width: 60 }} value={sch.rampDuration_s} step={0.1} onChange={(e) => Set('rampDuration_s', +e.target.value)} /> s</label>
-        <label>Wf/P3 limit <input className="num" type="number" aria-label="Ratio unit limit" style={{ width: 60 }} value={sch.ratioUnitLimit} step={0.05} onChange={(e) => Set('ratioUnitLimit', +e.target.value)} /> × design (0 = off)</label>
-        <label>Wf/P3 floor <input className="num" type="number" aria-label="Ratio unit floor" style={{ width: 60 }} value={sch.ratioUnitFloor} step={0.05} onChange={(e) => Set('ratioUnitFloor', +e.target.value)} /> × design</label>
+        <label title={manualLimiter ? 'Manual Wf/P3 limits are in force (FADEC limiter set to manual).' : 'Ignored: the FADEC acceleration schedule and deceleration floor are in force. Set the FADEC limiter to manual to use these.'} style={{ opacity: manualLimiter ? 1 : 0.5 }}>Wf/P3 limit <input className="num" type="number" aria-label="Ratio unit limit" style={{ width: 60 }} value={sch.ratioUnitLimit} step={0.05} disabled={!manualLimiter} onChange={(e) => Set('ratioUnitLimit', +e.target.value)} /> × design (0 = off)</label>
+        <label title={manualLimiter ? 'Manual Wf/P3 limits are in force (FADEC limiter set to manual).' : 'Ignored: the FADEC acceleration schedule and deceleration floor are in force. Set the FADEC limiter to manual to use these.'} style={{ opacity: manualLimiter ? 1 : 0.5 }}>Wf/P3 floor <input className="num" type="number" aria-label="Ratio unit floor" style={{ width: 60 }} value={sch.ratioUnitFloor} step={0.05} disabled={!manualLimiter} onChange={(e) => Set('ratioUnitFloor', +e.target.value)} /> × design (0 = off)</label>
         <label>Duration <input className="num" type="number" aria-label="Duration" style={{ width: 60 }} value={duration} step={1} onChange={(e) => setDuration(+e.target.value)} /> s</label>
-        <label className="toggle"><input type="checkbox" checked={start.enabled} onChange={(e) => { setStart({ ...start, enabled: e.target.checked }); if (e.target.checked && duration < 40) setDuration(60); }} /> start from shutdown</label>
+        <label className="toggle"><input type="checkbox" checked={start.enabled} onChange={(e) => { const on = e.target.checked; setStart({ ...start, enabled: on }); if (on) { if (duration < 40) setDuration(60); setSch({ ...sch, rampStart_s: 0, rampDuration_s: Math.max(sch.rampDuration_s, 20), WfEndFrac: Math.min(sch.WfEndFrac, 0.5) }); } }} /> start from shutdown</label>
         {start.enabled && (
           <>
             <label>starter torque <input className="num" type="number" aria-label="Starter torque" style={{ width: 70 }} value={start.starterTorque_Nm} step={10} onChange={(e) => setStart({ ...start, starterTorque_Nm: +e.target.value })} /> N·m</label>
@@ -72,8 +75,10 @@ export function TransientView({ store }: { store: Store }) {
             <label>Ki <input className="num" type="number" aria-label="Integral gain" style={{ width: 55 }} value={ctl.Ki} step={0.1} onChange={(e) => setCtl({ ...ctl, Ki: +e.target.value })} /></label>
           </>
         )}
-        <label>accel schedule Wf/P3 (× design) at Nc 0.6 / 0.8 / 1.0: {ctl.accelSchedule.map((pt, i) => <input key={i} className="num" type="number" aria-label={`Accel limit at Nc ${pt.Nc}`} style={{ width: 55, marginRight: 4 }} value={pt.ratioUnit} step={0.05} onChange={(e) => setCtl({ ...ctl, accelSchedule: ctl.accelSchedule.map((q, k) => (k === i ? { ...q, ratioUnit: +e.target.value } : q)) })} />)}</label>
-        <label>decel floor <input className="num" type="number" aria-label="Deceleration floor" style={{ width: 55 }} value={ctl.decelFloor} step={0.05} onChange={(e) => setCtl({ ...ctl, decelFloor: +e.target.value })} /></label>
+        <label>limiter <select value={ctl.limiter ?? 'schedule'} onChange={(e) => setCtl({ ...ctl, limiter: e.target.value as Controller['limiter'] })} aria-label="Limiter source">
+          <option value="schedule">FADEC schedule (accel schedule + decel floor)</option><option value="manual">manual Wf/P3 limit and floor</option></select></label>
+        <label style={{ opacity: manualLimiter ? 0.5 : 1 }} title={manualLimiter ? 'Ignored while the limiter is manual.' : undefined}>accel schedule Wf/P3 (× design) at Nc {ctl.accelSchedule.map((pt) => pt.Nc.toFixed(1)).join(' / ')}: {ctl.accelSchedule.map((pt, i) => <input key={i} className="num" type="number" aria-label={`Accel limit at Nc ${pt.Nc}`} style={{ width: 55, marginRight: 4 }} value={pt.ratioUnit} step={0.05} disabled={manualLimiter} onChange={(e) => setCtl({ ...ctl, accelSchedule: ctl.accelSchedule.map((q, k) => (k === i ? { ...q, ratioUnit: +e.target.value } : q)) })} />)}</label>
+        <label style={{ opacity: manualLimiter ? 0.5 : 1 }} title={manualLimiter ? 'Ignored while the limiter is manual.' : undefined}>decel floor <input className="num" type="number" aria-label="Deceleration floor" style={{ width: 55 }} value={ctl.decelFloor} step={0.05} disabled={manualLimiter} onChange={(e) => setCtl({ ...ctl, decelFloor: +e.target.value })} /></label>
         <label>bleed valve open below N2 <input className="num" type="number" aria-label="Bleed valve threshold" style={{ width: 55 }} value={ctl.bleedValve.openBelowN2} step={0.01} onChange={(e) => setCtl({ ...ctl, bleedValve: { ...ctl.bleedValve, openBelowN2: +e.target.value } })} /> × design, {' '}<input className="num" type="number" aria-label="Bleed valve fraction" style={{ width: 55 }} value={ctl.bleedValve.frac} step={0.01} onChange={(e) => setCtl({ ...ctl, bleedValve: { ...ctl.bleedValve, frac: +e.target.value } })} /> of core flow</label>
         <label>VSV gain <input className="num" type="number" aria-label="VSV gain" style={{ width: 55 }} value={ctl.vsvGain} step={0.05} onChange={(e) => setCtl({ ...ctl, vsvGain: +e.target.value })} /></label>
       </div>
@@ -92,14 +97,19 @@ export function TransientView({ store }: { store: Store }) {
         )}
       </div>
       {samples.length > 1 && stale.stale && <StaleBanner what="transient" />}
+      {result && !result.complete && <div className="err" role="alert"><strong>Trajectory incomplete.</strong> The integration stopped at {fmt(result.stoppedAt_s ?? 0, 2)} s of {duration} s because the gas path had no converged solution; only converged samples are shown and the end-point cards describe the last converged state, not the end of the manoeuvre.</div>}
+      {unconverged > 0 && <div className="err" role="alert">{unconverged} plotted sample(s) are not converged gas-path solutions.</div>}
       {result?.warnings.map((w, k) => <div className="warn" key={k}><span>⚠</span><span>{w}</span></div>)}
       {samples.length > 1 && (
         <>
           <div className="cards">
+            {!result?.complete && result && <div className="card" style={{ borderColor: 'var(--bad)' }}><div className="k">Stopped at</div><div className="v" style={{ color: 'var(--bad)' }}>{fmt(result.stoppedAt_s ?? 0, 1)}<small>s of {duration} s</small></div></div>}
+            {starterOnly.length > 0 && <div className="card"><div className="k">Starter-only regime</div><div className="v">{fmt(starterOnly[0].t, 1)} → {fmt(starterOnly[starterOnly.length - 1].t, 1)}<small>s, no gas-path solution</small></div></div>}
             {spools.map((k) => <div className="card" key={k}><div className="k">{k} spool</div><div className="v">{fmt(samples[0].Npct[k], 1)} → {fmt(samples[samples.length - 1].Npct[k], 1)}<small>%</small></div></div>)}
             <div className="card"><div className="k">Net thrust</div><div className="v">{fmt(samples[0].Fn / 1000, 1)} → {fmt(samples[samples.length - 1].Fn / 1000, 1)}<small>kN</small></div></div>
-            {minSM.map((m) => <div className="card" key={m.c}><div className="k">Min {m.c.toUpperCase()} surge margin</div><div className="v" style={{ color: m.v < 5 ? 'var(--bad)' : m.v < 10 ? 'var(--warn)' : undefined }}>{fmt(m.v, 1)}<small>%</small></div></div>)}
+            {minSM.map((m) => <div className="card" key={m.c}><div className="k">Min {m.c.toUpperCase()} surge margin</div><div className="v" style={{ color: m.v < 5 ? 'var(--bad)' : m.v < 10 ? 'var(--warn)' : undefined }}>{fmt(m.v, 1)}<small>%{m.v < 0 ? ' (beyond stall line)' : ''}</small></div></div>)}
             <div className="card"><div className="k">Peak T4</div><div className="v">{fmt(Math.max(...samples.map((x) => x.T4)), 0)}<small>K</small></div></div>
+            {th.enabled && result?.minClearance_mm !== undefined && <div className="card" style={result.contact ? { borderColor: 'var(--bad)' } : undefined}><div className="k">Min tip clearance</div><div className="v" style={{ color: result.contact ? 'var(--bad)' : undefined }}>{fmt(result.minClearance_mm, 3)}<small>mm{result.contact ? ' — contact' : ''}</small></div></div>}
             {start.enabled && <div className="card"><div className="k">Light-off</div><div className="v">{(() => { const i = samples.findIndex((x) => x.lit); return i >= 0 ? fmt(samples[i].t, 1) + ' s' : 'none'; })()}</div></div>}
             <div className="card"><div className="k">Limiter active</div><div className="v">{fmt((100 * samples.filter((x) => x.limited).length) / samples.length, 0)}<small>% of time</small></div></div>
           </div>

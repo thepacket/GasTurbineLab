@@ -139,5 +139,11 @@ export interface EngineResult {
   warnings: string[];
   shafts: ShaftResult[];
   /** off-design bookkeeping (undefined for a design-point result) */
-  offDesign?: { converged: boolean; iterations: number; residualNorm: number; throttle: string; x: Record<string, number>; shaftImbalance_W?: Record<string, number> };
+  offDesign?: {
+    converged: boolean; iterations: number; residualNorm: number; throttle: string; x: Record<string, number>; shaftImbalance_W?: Record<string, number>;
+    /** largest physical flow-matching error over the compressors (kept apart from the R-line penalty) */
+    flowMismatch?: number;
+    /** compressors running beyond the tabulated R-line range of their map (extrapolated) */
+    mapViolations?: string[];
+  };
 }

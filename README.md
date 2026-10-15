@@ -24,7 +24,7 @@ The thermodynamics are validated against NASA's pyCycle to better than 0.05 % at
 
 **Off-design.** Component maps (pyCycle's generic NPSS-style maps, uploaded maps, parametric, stage-stacked or geometry-based maps) scaled through the design point; Newton solution for flows, speeds, bypass ratio, R-lines and turbine pressure ratios at fixed geometry; throttle by T4, fuel flow, spool speed or thrust; variable geometry, bleeds and a secondary air system; sub-idle map extensions.
 
-**Dynamics.** Spool transients with inertias, fuel schedules and ratio-unit limiters, start-up with a starter and light-off, a FADEC with N1/N2/thrust loops and actuator schedules, heat soak and tip-clearance effects.
+**Dynamics.** Spool transients with inertias, fuel schedules and ratio-unit limiters, start-up with a starter, an unlit burner until light-off and an explicit starter-only regime, a FADEC with N1/N2/thrust loops and actuator schedules, heat soak and tip-clearance effects with contact detection. Only converged gas-path solutions drive the dynamics; an unsolvable step stops the run and says so.
 
 **Design studies.** Mission analysis against an aircraft polar with ratings, Nelder–Mead optimisation with constraints, Monte Carlo uncertainty, weight and size estimates, installed performance, emissions (P3–T3 and ICAO LTO with CAEP/8 limits) and noise (jet and fan).
 

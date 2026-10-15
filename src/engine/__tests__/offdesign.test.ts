@@ -35,9 +35,12 @@ describe('off-design', () => {
     for (const variant of [{ mixed: true }, { spools: 3 as const }]) {
       const inp = { ...defaultInputs('turbofan'), ...variant }; inp.chemistry = 'frozen';
       if (variant.spools === 3) { inp.ipc = { PR: 3.6, eff: 0.9, MN: 0.35 }; inp.hpc.PR = 6.5; inp.speeds.IP = 8000; }
-      if (variant.mixed) { inp.BPR = 0.8; inp.fan.PR = 3.0; inp.lpc.PR = 1.5; inp.hpc.PR = 6; inp.burner.T4_K = 1700; }
+      // a low-bypass mixed design whose mixer balances static pressures with a subsonic core stream (bypass Mach given, core matched);
+      // the pyCycle-validated mixed case has a supersonic core at the mixing plane, which the fixed-area off-design mixer does not model
+      if (variant.mixed) { inp.BPR = 0.7; inp.fan.PR = 3.5; inp.lpc.PR = 1.3; inp.hpc.PR = 4.5; inp.burner.T4_K = 1600; inp.mixer = { ...inp.mixer, designedStream: 'core', MNbyp: 0.45 }; }
       const dp = makeDesignPoint(inp);
       expect(dp.result.perf.Fn).toBeGreaterThan(0);
+      expect(dp.result.warnings.some((w) => w.startsWith('Mixer:'))).toBe(false);
       const s = solveOffDesign(dp, { altitude_m: inp.flight.altitude_m, mach: inp.flight.mach, dT_isa: 0, throttle: { mode: 'T4', value: inp.burner.T4_K * 0.9 } });
       console.log(JSON.stringify(variant), 'conv', s.converged, 'it', s.iterations, 'Fn', s.result.perf.Fn.toFixed(0), 'vs', dp.result.perf.Fn.toFixed(0));
       expect(s.converged).toBe(true);
